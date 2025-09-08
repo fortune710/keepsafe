@@ -1,0 +1,11 @@
+DO NOT CREATE capture page in app/capture.tsx again. It has alredy been created in app/capture/index.tsx.
+
+To reference forign keys in supabase use this example:
+const { data: friendships, error } = await supabase
+  .from('table_name')
+  .select(`
+    some_column,
+    other_table (
+      foreign_key
+    )
+  `)

@@ -1,0 +1,355 @@
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, ActivityIndicator } from 'react-native';
+import { Search, Share, ChevronRight, UserPlus, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { router } from 'expo-router';
+import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import InvitePopover from '@/components/invite-popover';
+import FriendSearchBar from '@/components/friend-search-bar';
+import FriendsSection from '@/components/friends-section';
+import { useFriends } from '@/hooks/use-friends';
+import { useAuthContext } from '@/providers/auth-provider';
+import ToastMessage from '@/components/toast-message';
+
+const { width } = Dimensions.get('window');
+
+export default function FriendsScreen() {
+  const { user } = useAuthContext();
+  const { 
+    friends, 
+    pendingRequests, 
+    isLoading, 
+    error, 
+    removeFriend,
+    acceptFriendRequest,
+    declineFriendRequest,
+    refetch 
+  } = useFriends(user?.id);
+
+  const [showInvitePopover, setShowInvitePopover] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success'
+  });
+
+  // Swipe gesture to close friends page
+  const swipeGesture = Gesture.Pan()
+    .onEnd((event) => {
+      if (event.translationX > width * 0.3 && event.velocityX > 500) {
+        router.back();
+      }
+    });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
+
+  const handleRemoveFriend = async (friendshipId: string) => {
+    const result = await removeFriend(friendshipId);
+    if (result.success) {
+      showToast('Friend removed successfully', 'success');
+    } else {
+      showToast(result.error || 'Failed to remove friend', 'error');
+    }
+  };
+
+  const handleAcceptRequest = async (friendshipId: string) => {
+    const result = await acceptFriendRequest(friendshipId);
+    if (result.success) {
+      showToast('Friend request accepted', 'success');
+    } else {
+      showToast(result.error || 'Failed to accept request', 'error');
+    }
+  };
+
+  const handleDeclineRequest = async (friendshipId: string) => {
+    const result = await declineFriendRequest(friendshipId);
+    if (result.success) {
+      showToast('Friend request declined', 'success');
+    } else {
+      showToast(result.error || 'Failed to decline request', 'error');
+    }
+  };
+
+  const handleFriendPress = (friend: any) => {
+    console.log('View friend profile:', friend.friend_profile?.full_name);
+    // Navigate to friend profile or show friend details
+  };
+
+  const handleShareLink = () => {
+    setShowInvitePopover(true);
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const handleSearchToggle = () => {
+    setShowSearch(!showSearch);
+    if (showSearch) {
+      setSearchQuery('');
+    }
+  };
+
+  const handleRetry = () => {
+    refetch();
+  };
+
+  // Convert friendship data to Friend format for components
+  const convertToFriendFormat = (friendships: any[]) => {
+    return friendships.map(friendship => ({
+      id: friendship.id,
+      name: friendship.friend_profile?.full_name || 'Unknown User',
+      email: friendship.friend_profile?.email || '',
+      avatar: friendship.friend_profile?.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100',
+      status: friendship.status,
+      connectedAt: friendship.status === 'accepted' ? new Date(friendship.updated_at) : undefined,
+      invitedAt: friendship.status === 'pending' ? new Date(friendship.created_at) : undefined,
+      isOnline: Math.random() > 0.5, // Mock online status
+    }));
+  };
+
+  const allFriends = convertToFriendFormat([...friends, ...pendingRequests]);
+
+  return (
+    <GestureDetector gesture={swipeGesture}>
+      <Animated.View 
+        entering={SlideInRight} 
+        exiting={SlideOutRight}
+        style={styles.container}
+      >
+        <SafeAreaView style={styles.container}>
+          <ToastMessage 
+            message={toast.message}
+            type={toast.type}
+            visible={toast.visible}
+          />
+
+          <View style={styles.header}>
+            <Text style={styles.title}>Friends</Text>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => router.back()}
+            >
+              <ChevronRight color="#64748B" size={24} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.content}>
+            {error ? (
+              <View style={styles.errorContainer}>
+                <AlertCircle color="#EF4444" size={48} />
+                <Text style={styles.errorTitle}>Unable to Load Friends</Text>
+                <Text style={styles.errorMessage}>{error.message || 'Something went wrong'}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+                  <Text style={styles.retryButtonText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+                <Text style={styles.loadingText}>Loading friends...</Text>
+              </View>
+            ) : (
+              <>
+                {!showSearch ? (
+                  <>
+                    <TouchableOpacity 
+                      style={styles.searchBox} 
+                      onPress={handleSearchToggle}
+                      activeOpacity={0.7}
+                    >
+                      <Search color="#94A3B8" size={20} />
+                      <Text style={styles.searchPlaceholder}>Search friends...</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.addFriendsSection}>
+                      <View style={styles.sectionHeader}>
+                        <UserPlus color="#8B5CF6" size={16} />
+                        <Text style={styles.sectionTitle}>Add Friends</Text>
+                      </View>
+                      
+                      <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
+                        <Share color="#8B5CF6" size={20} />
+                        <Text style={styles.shareButtonText}>Share Your Link</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <FriendsSection
+                      friends={allFriends}
+                      onRemoveFriend={handleRemoveFriend}
+                      onFriendPress={handleFriendPress}
+                      onAcceptRequest={handleAcceptRequest}
+                      onDeclineRequest={handleDeclineRequest}
+                      isLoading={false}
+                      searchQuery=""
+                    />
+                  </>
+                ) : (
+                  <>
+                    <FriendSearchBar
+                      isVisible={showSearch}
+                      onClose={() => setShowSearch(false)}
+                      onSearch={handleSearch}
+                    />
+
+                    <FriendsSection
+                      friends={allFriends}
+                      onRemoveFriend={handleRemoveFriend}
+                      onFriendPress={handleFriendPress}
+                      onAcceptRequest={handleAcceptRequest}
+                      onDeclineRequest={handleDeclineRequest}
+                      isLoading={false}
+                      searchQuery={searchQuery}
+                    />
+                  </>
+                )}
+              </>
+            )}
+          </View>
+        </SafeAreaView>
+        
+        <InvitePopover 
+          isVisible={showInvitePopover}
+          onClose={() => setShowInvitePopover(false)}
+        />
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F0F9FF',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#F0F9FF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 20,
+    padding: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748B',
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchPlaceholder: {
+    fontSize: 16,
+    color: '#94A3B8',
+    marginLeft: 12,
+  },
+  addFriendsSection: {
+    marginBottom: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748B',
+    marginLeft: 8,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  shareButtonText: {
+    color: '#8B5CF6',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+});
