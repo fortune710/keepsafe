@@ -1,9 +1,17 @@
-import { Friend, InviteLink, InviteResult, ShareOptions } from '@/types/friends';
+import { Friend, InviteLink, InviteResult, ShareOptions, SuggestedFriend } from '@/types/friends';
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
+import { ContactsService } from './contacts-service';
+import { supabase } from '@/lib/supabase';
+import { TABLES } from '@/constants/supabase';
+import { Database } from '@/types/database';
+import { deviceStorage } from './device-storage';
+import { generateDeepLinkUrl } from '@/lib/utils';
+
+type Profile = Database['public']['Tables']['profiles']['Row']
 
 export class FriendService {
-  private static readonly BASE_INVITE_URL = 'https://keepsafe.app/invite';
+  private static readonly BASE_INVITE_URL = generateDeepLinkUrl() + "/invite";
 
   static async generateInviteLink(): Promise<InviteResult> {
     try {
@@ -14,7 +22,7 @@ export class FriendService {
       const inviteLink: InviteLink = {
         url: `${this.BASE_INVITE_URL}/${inviteCode}`,
         code: inviteCode,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        //expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         usageCount: 0,
         maxUsage: 10,
       };
@@ -109,6 +117,49 @@ export class FriendService {
     } catch (error) {
       console.error('Failed to remove friend:', error);
       return false;
+    }
+  }
+
+  static async getSuggestedFriendsFromContacts(): Promise<SuggestedFriend[]> {
+    try {
+      const savedSuggestions = await deviceStorage.getSuggestedFriends();
+      if (savedSuggestions.length > 0) {
+        return savedSuggestions;
+      }
+
+      const contacts = await ContactsService.getDeviceContacts();
+      const emails = contacts?.map((contact) => contact.email).filter(Boolean).join(",");
+      const numbers = contacts?.map((contact) => !!contact.phoneNumber && contact.phoneNumber).join(",");
+    
+      const { data, error } = await supabase
+        .from(TABLES.PROFILES)
+        .select('id,full_name,avatar_url,username')
+        .or(`
+          email.in.(${emails}),
+          phone_number.in.(${numbers})
+        `.replace(/\s+/g, '')
+        ) as { data: Profile[], error: any }
+
+        if (error) {
+          throw error;
+        }
+      
+        const profiles: SuggestedFriend[] = data?.map((profile) => ({
+          id: profile.id,
+          name: profile.full_name ?? "",
+          username: profile.username ?? "",
+          avatar: profile.avatar_url,
+        }))
+
+        if (savedSuggestions.length < profiles.length) {
+          await deviceStorage.setSuggestedFriends(profiles);
+        }
+
+        return profiles;
+
+    } catch (error) {
+      console.error('Failed to get contacts:', error);
+      throw error;
     }
   }
 

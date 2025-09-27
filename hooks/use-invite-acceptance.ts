@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { Database } from '@/types/database';
@@ -23,62 +23,40 @@ export interface InviteResult {
 }
 
 interface UseInviteAcceptanceResult {
-  inviteData: InviteData | null;
+  inviteData: InviteData | undefined | null;
   isLoading: boolean;
   error: string | null;
   isProcessing: boolean;
-  loadInvite: (inviteId: string) => Promise<void>;
-  acceptInvite: (inviteId: string) => Promise<InviteResult>;
+  acceptInvite: (inviteeId: string, userId: string) => Promise<InviteResult>;
   declineInvite: (inviteId: string) => Promise<InviteResult>;
 }
 
-export function useInviteAcceptance(): UseInviteAcceptanceResult {
-  const [inviteData, setInviteData] = useState<InviteData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResult {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const acceptInviteMutation = useMutation({
-    mutationFn: async ({ inviteId, userId }: { inviteId: string; userId: string }) => {
-      // Get the invite with inviter profile
-      const { data: invite, error: inviteError } = await supabase
-        .from(TABLES.INVITES)
-        .select(`
-          *,
-          inviter_profile:profiles(*)
-        `)
-        .eq('invite_code', inviteId)
-        .eq('is_active', true)
-        .single();
-
-      if (inviteError || !invite) {
-        throw new Error('Invite not found or invalid');
-      }
-
-      // Check if invite has reached max uses
-      if (invite.current_uses >= invite.max_uses) {
-        throw new Error('This invitation has reached its usage limit');
-      }
-
-      // Check if friendship already exists
+    mutationFn: async ({ inviteeId, userId }: { inviteeId: string; userId: string }) => {
       const { data: existingFriendship } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .select('id')
-        .or(`and(user_id.eq.${userId},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${userId})`)
+        .or(`and(user_id.eq.${userId},friend_id.eq.${inviteeId}),and(user_id.eq.${inviteeId},friend_id.eq.${userId})`)
         .single();
 
       if (existingFriendship) {
         throw new Error('You are already connected with this user');
       }
 
+      
+
       // Create friendship with accepted status
       const { data: friendship, error: friendshipError } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .insert({
           user_id: userId,
-          friend_id: invite.inviter_id,
+          friend_id: inviteeId,
           status: FRIENDSHIP_STATUS.ACCEPTED,
-        })
+        } as never)
         .select()
         .single();
 
@@ -86,84 +64,66 @@ export function useInviteAcceptance(): UseInviteAcceptanceResult {
         throw new Error('Failed to create friendship');
       }
 
-      // Update invite usage count
-      const { error: updateError } = await supabase
-        .from(TABLES.INVITES)
-        .update({ 
-          current_uses: invite.current_uses + 1,
-          is_active: invite.current_uses + 1 >= invite.max_uses ? false : true
-        })
-        .eq('id', invite.id);
-
-      if (updateError) {
-        console.warn('Failed to update invite usage:', updateError);
-      }
-
       return {
-        friendshipId: friendship.id,
-        inviterName: (invite.inviter_profile as any)?.full_name || 'Unknown User',
+        friendshipId: (friendship as any).id,
+        inviterName: 'Unknown User',
       };
     },
   });
 
-  const loadInvite = useCallback(async (inviteId: string) => {
-    setIsLoading(true);
-    setError(null);
-    setInviteData(null);
+  const loadInvite = async () => {
+    if (!inviteId) return;
 
     try {
       const { data: invite, error } = await supabase
         .from(TABLES.INVITES)
-        .select(`
-          *,
-          inviter_profile:profiles(*)
-        `)
-        .eq('invite_code', inviteId)
-        .eq('is_active', true)
+        .select('*, profile:profiles (id, email, full_name, avatar_url, username)')
+        .eq('invite_code', inviteId.trim())
         .single();
-
-      if (error || !invite) {
+    
+      if (error) {
         setError('This invitation link is invalid or has expired.');
-        return;
+        return null;
       }
 
-      const isUsed = invite.current_uses >= invite.max_uses;
-
+      //const isUsed = invite.current_uses >= invite.max_uses;
+      /*
       if (isUsed) {
         setError('This invitation has already been used.');
         return;
-      }
+      }*/
 
-      const inviterProfile = invite.inviter_profile as any;
+      const inviterProfile = (invite as any).profile;
+
       
-      setInviteData({
-        id: invite.id,
+      return {
+        id: inviterProfile.id,
         inviterName: inviterProfile?.full_name || 'Unknown User',
         inviterEmail: inviterProfile?.email || '',
         inviterAvatar: inviterProfile?.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=200',
-        message: invite.message || undefined,
-        isUsed,
-      });
+        message: "",
+        isUsed: false,
+      };
     } catch (err) {
       console.error('Failed to load invite:', err);
       setError('Failed to load invitation. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
     }
-  }, []);
+  };
 
-  const acceptInvite = useCallback(async (inviteId: string): Promise<InviteResult> => {
+  const { isLoading, data: inviteData } = useQuery({
+    queryKey: ["inviter-profile", inviteId],
+    enabled: !!inviteId,
+    queryFn: loadInvite
+  })
+
+  const acceptInvite = useCallback(async (inviteeId: string, userId: string): Promise<InviteResult> => {
     setIsProcessing(true);
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error('User not authenticated');
-      }
 
       const result = await acceptInviteMutation.mutateAsync({ 
-        inviteId, 
-        userId: user.id 
+        inviteeId: inviteeId, 
+        userId: userId 
       });
 
       return {
@@ -186,28 +146,8 @@ export function useInviteAcceptance(): UseInviteAcceptanceResult {
     setIsProcessing(true);
 
     try {
-      // For declining, we just increment the usage count to "use up" the invite
-      const { data: invite, error: inviteError } = await supabase
-        .from(TABLES.INVITES)
-        .select('current_uses, max_uses')
-        .eq('invite_code', inviteId)
-        .single();
-
-      if (inviteError || !invite) {
-        throw new Error('Invite not found');
-      }
-
-      const { error: updateError } = await supabase
-        .from(TABLES.INVITES)
-        .update({ 
-          current_uses: invite.current_uses + 1,
-          is_active: invite.current_uses + 1 >= invite.max_uses ? false : true
-        })
-        .eq('invite_code', inviteId);
-
-      if (updateError) {
-        throw new Error('Failed to decline invitation');
-      }
+      
+      
 
       return {
         success: true,
@@ -229,7 +169,6 @@ export function useInviteAcceptance(): UseInviteAcceptanceResult {
     isLoading,
     error,
     isProcessing,
-    loadInvite,
     acceptInvite,
     declineInvite,
   };

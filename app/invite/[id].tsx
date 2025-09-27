@@ -9,29 +9,23 @@ import { useAuthContext } from '@/providers/auth-provider';
 export default function AcceptInviteScreen() {
   const { id } = useLocalSearchParams();
   const inviteId = Array.isArray(id) ? id[0] : id;
-  const { user } = useAuthContext();
+  const { profile } = useAuthContext();
 
   const {
     inviteData,
     isLoading,
     error,
     isProcessing,
-    loadInvite,
     acceptInvite,
     declineInvite,
-  } = useInviteAcceptance();
+  } = useInviteAcceptance(inviteId);
 
-  useEffect(() => {
-    if (inviteId) {
-      loadInvite(inviteId);
-    }
-  }, [inviteId, loadInvite]);
 
   const handleAccept = async () => {
     if (!inviteId) return;
 
     try {
-      const result = await acceptInvite(inviteId);
+      const result = await acceptInvite(inviteData?.id ?? "", profile?.id ?? "");
       
       if (result.success) {
         Alert.alert(
@@ -201,7 +195,7 @@ export default function AcceptInviteScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            By accepting, you'll be able to share moments and connect with {inviteData.inviterName}
+            By accepting, you'll be able to share moments with {inviteData.inviterName}
           </Text>
         </View>
       </Animated.View>
