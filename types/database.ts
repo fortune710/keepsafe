@@ -1,3 +1,5 @@
+import { RenderedMediaCanvasItem } from "./capture"
+
 export type Json =
   | string
   | number
@@ -19,6 +21,10 @@ export interface Database {
           bio: string | null
           created_at: string
           updated_at: string
+          invite_code: string | null
+          max_uses: number
+          current_uses: number
+          is_active: boolean
         }
         Insert: {
           id: string
@@ -29,6 +35,7 @@ export interface Database {
           bio?: string | null
           created_at?: string
           updated_at?: string
+          invite_code?: string | null
         }
         Update: {
           id?: string
@@ -47,6 +54,7 @@ export interface Database {
           user_id: string
           type: 'photo' | 'video' | 'audio'
           shared_with: string[] | null,
+          attachments: RenderedMediaCanvasItem[];
           content_url: string | null
           text_content: string | null
           music_tag: string | null
@@ -62,6 +70,7 @@ export interface Database {
           user_id: string
           type: 'photo' | 'video' | 'audio',
           shared_with?: string[],
+          attachments: RenderedMediaCanvasItem[];
           content_url?: string | null
           text_content?: string | null
           music_tag?: string | null
