@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert, ScrollView, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert, ScrollView, Dimensions, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { X, Music, MapPin, Lock, Users, Play, Pause, Sticker } from 'lucide-react-native';
-import { v4 as uuidv4 } from 'uuid';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useAuthContext } from '@/providers/auth-provider';
@@ -13,14 +12,20 @@ import ToastMessage from '@/components/toast-message';
 import { Audio } from 'expo-av';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import * as Crypto from 'expo-crypto';
-
-
-const { width } = Dimensions.get('window');
+import Animated from 'react-native-reanimated';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import { useEvent } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import MediaCanvas from '@/components/capture/media-canvas';
+import { useMediaCanvas } from '@/hooks/use-media-canvas';
+import EditorPopover from '@/components/capture/editor-popover';
+import { RenderedMediaCanvasItem } from '@/types/capture';
 
 interface Friend {
   id: string;
   name: string;
   avatar: string;
+  username: string;
 }
 
 export default function DetailsScreen() {
@@ -55,9 +60,21 @@ export default function DetailsScreen() {
     message: '',
     type: 'success'
   });
+
+  const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   
   const { location, isLoading: locationLoading, getCurrentLocation } = useDeviceLocation();
   const [locationTag, setLocationTag] = useState(location?.formattedAddress || '');
+
+  const player = useVideoPlayer(uri as string, player => {
+    player.loop = false;
+    player.play();
+  });
+
+  const transformsRef = useRef<Record<string, { x: number; y: number; scale: number; rotation: number }>>({});
+
+
+  const { isPlaying: videPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
 
   // Convert friends data to the format expected by the UI
   const realFriends: Friend[] = friends.map(friendship => {
@@ -65,7 +82,8 @@ export default function DetailsScreen() {
     return {
       id: friendship.friend_id,
       name: friendProfile?.full_name || 'Unknown User',
-      avatar: friendProfile?.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      username: friendProfile?.username ?? "",
+      avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
     };
   });
 
@@ -85,7 +103,8 @@ export default function DetailsScreen() {
   };
 
   const handleFriendToggle = (friendId: string) => {
-    if (isPrivate || isEveryone) return;
+    setIsPrivate(false);
+    setIsEveryone(false);
     
     setSelectedFriends(prev => 
       prev.includes(friendId) 
@@ -126,6 +145,7 @@ export default function DetailsScreen() {
               { uri: capture.uri },
               { shouldPlay: true }
             );
+            await newSound.setVolumeAsync(1.0);
             setSound(newSound);
             
             newSound.setOnPlaybackStatusUpdate((status) => {
@@ -143,6 +163,9 @@ export default function DetailsScreen() {
       setIsPlaying(false);
     }
   };
+
+  const { viewShotRef, items, addText, addSticker, saveImage, addMusic } = useMediaCanvas();
+
 
   // Cleanup sound on unmount
   React.useEffect(() => {
@@ -169,12 +192,32 @@ export default function DetailsScreen() {
     
     try {
 
+      const entryAttachments: RenderedMediaCanvasItem[] = items.map((item) => {
+        const attachments = transformsRef.current[item.id];
+        return {
+          ...item,
+          transforms: attachments
+        }
+      })
+
+      // Prepare the capture object, updating the URI if there are canvas items to save
+      let updatedUri = capture.uri;
+      if (items.length > 0) {
+        console.log("saving image")
+        const savedUri = await saveImage();
+        console.log({ savedUri })
+        if (savedUri) {
+          updatedUri = savedUri;
+        }
+      }
+
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
         id: tempId,
         user_id: user.id,
         type: capture.type as 'photo' | 'video' | 'audio',
         shared_with: [user.id, ...selectedFriends],
+        attachments: entryAttachments,
         content_url: capture.uri,
         text_content: textContent || null,
         music_tag: musicTag || null,
@@ -201,12 +244,13 @@ export default function DetailsScreen() {
 
       const result = await saveEntry({
         capture,
-        textContent,
-        musicTag: musicTag || undefined,
-        locationTag: locationTag || undefined,
+        textContent: textContent || '',
+        musicTag: musicTag,
+        locationTag: locationTag,
         isPrivate,
         isEveryone,
         selectedFriends,
+        attachments: entryAttachments
       });
 
       if (result.success) {
@@ -234,13 +278,6 @@ export default function DetailsScreen() {
         replaceOptimisticEntry(tempId);
       }
       showToast('Failed to share', 'error');
-    }
-  };
-
-  const handleTextChange = (text: string) => {
-    const wordCount = text.trim().split(/\s+/).filter(word => word.length > 0).length;
-    if (wordCount <= 256) {
-      setTextContent(text);
     }
   };
 
@@ -291,17 +328,35 @@ export default function DetailsScreen() {
 
           <TouchableOpacity 
             style={styles.cancelButton}
-            onPress={() => router.back()}
+            onPress={() => setShowEditorPopover(true)}
           >
             <Sticker color="#64748B" size={24} />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.mediaContainer}>
+          <Animated.View 
+            style={styles.mediaContainer}
+          >
             {capture?.type === 'photo' && capture.uri ? (
-              <Image source={{ uri: capture.uri }} style={styles.mediaPreview} resizeMode="cover" />
-            ) : capture?.type === 'audio' ? (
+              <MediaCanvas 
+                uri={capture.uri}
+                type='photo'
+                ref={viewShotRef}
+                items={items}
+                transformsRef={transformsRef}
+              />
+            ) : 
+            capture?.type === 'video' ? (
+              <Pressable onPress={() => videPlaying ? player.pause() : player.play()}>
+                <VideoView 
+                  style={styles.mediaPreview} 
+                  player={player} 
+                  contentFit='cover'
+                />
+              </Pressable>
+            ) :
+            capture?.type === 'audio' ? (
               <View style={styles.audioPreview}>
                 <TouchableOpacity style={styles.playButton} onPress={toggleAudioPlayback}>
                   {isPlaying ? (
@@ -326,38 +381,13 @@ export default function DetailsScreen() {
                 </Text>
               </View>
             ) : null}
-          </View>
+          </Animated.View>
 
           <View style={styles.form}>
-            <TextInput
-              style={styles.thoughtsInput}
-              placeholder="Write your thoughts..."
-              placeholderTextColor="#94A3B8"
-              value={textContent}
-              onChangeText={handleTextChange}
-              multiline
-              textAlignVertical="top"
-            />
-            <Text style={styles.wordCount}>{getWordCount()}/256 words</Text>
 
-            <View style={styles.tagsContainer}>
-              {canShowMusicTag && (
-                <TouchableOpacity style={styles.tagButton} onPress={handleMusicAdd}>
-                  <Music color="#8B5CF6" size={18} />
-                  <Text style={styles.tagButtonText}>
-                    {musicTag || 'Add Music'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              
-              <TouchableOpacity style={styles.tagButton} onPress={handleLocationAdd}>
-                <MapPin color="#059669" size={18} />
-                <Text style={styles.tagButtonText}>
-                  {locationLoading ? 'Getting location...' : (locationTag || 'Add Location')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
+            <Text style={styles.privacyText}>
+              Share With
+            </Text>
             <View style={styles.privacySection}>
               
               <ScrollView 
@@ -395,7 +425,7 @@ export default function DetailsScreen() {
                       (isPrivate || isEveryone) && styles.disabledFriendOption
                     ]}
                     onPress={() => handleFriendToggle(friend.id)}
-                    disabled={isPrivate || isEveryone}
+                    //disabled={isPrivate || isEveryone}
                   >
                     <Image 
                       source={{ uri: friend.avatar }} 
@@ -410,7 +440,7 @@ export default function DetailsScreen() {
                       selectedFriends.includes(friend.id) && !isPrivate && !isEveryone && styles.selectedFriendName,
                       (isPrivate || isEveryone) && styles.disabledFriendName
                     ]}>
-                      {friend.name}
+                      {friend.username}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -429,6 +459,14 @@ export default function DetailsScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        <EditorPopover
+          isVisible={showEditorPopover}
+          onClose={() => setShowEditorPopover(false)}
+          addText={addText}
+          addSticker={addSticker}
+          addMusic={addMusic}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -472,6 +510,12 @@ const styles = StyleSheet.create({
   mediaPreview: {
     width: '100%',
     height: verticalScale(250),
+  },
+  privacyText: {
+    textAlign: "center",
+    fontSize: scale(16),
+    fontWeight: '500',
+    marginVertical: verticalScale(8)
   },
   audioPreview: {
     height: 300,

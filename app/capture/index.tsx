@@ -1,3 +1,7 @@
+// ================================
+// FIXED CAMERA CAPTURE IMPLEMENTATION
+// ================================
+
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Alert, Modal, ScrollView, Image, StatusBar } from 'react-native';
 import { router } from 'expo-router';
@@ -8,11 +12,9 @@ import Animated, {
   withRepeat, 
   withTiming, 
   withSpring, 
-  SlideInDown, 
-  SlideOutDown,
-  runOnJS,
   interpolate,
-  Extrapolate
+  Extrapolate,
+  SlideInUp
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { UserPlus, Camera, Mic, Circle, RotateCw, Upload, Archive } from "lucide-react-native"
@@ -21,6 +23,7 @@ import { MediaService } from '@/services/media-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { getDefaultAvatarUrl } from '@/lib/utils';
+import { DateContainer } from '@/components/date-container';
 
 const { width, height } = Dimensions.get('window');
 
@@ -29,6 +32,14 @@ export default function CaptureScreen() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isVideoRecording, setIsVideoRecording] = useState<boolean>(false);
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  const videoTimerRef = useRef<number | null>(null);
+  
+  // Add camera ready state
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
   const { profile } = useAuthContext();
 
@@ -37,6 +48,8 @@ export default function CaptureScreen() {
     capturedMedia, 
     recordingDuration, 
     startAudioRecording, 
+    startVideoRecording,
+    stopVideoRecording,
     stopAudioRecording, 
     uploadMedia, 
     clearCapture 
@@ -48,7 +61,6 @@ export default function CaptureScreen() {
   // Pan gesture for dragging up to vault
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
-      // Only allow upward swipes to go to vault
       if (event.translationY < 0) {
         translateY.value = event.translationY;
       }
@@ -56,9 +68,16 @@ export default function CaptureScreen() {
     .onEnd((event) => {
       const shouldOpenVault = event.translationY < -height * 0.15 && event.velocityY < -300;
       
-      if (shouldOpenVault) {
-        translateY.value = 0;
-        runOnJS(() => router.push('/vault'))();
+      if (shouldOpenVault && !isNavigating) {
+        setIsNavigating(true);
+        translateY.value = withSpring(0, { damping: 20, stiffness: 90 });
+        setTimeout(() => {
+          try {
+            router.push('/vault');
+          } finally {
+            setIsNavigating(false);
+          }
+        }, 50);
       } else {
         translateY.value = withSpring(0, { damping: 20, stiffness: 90 });
       }
@@ -100,33 +119,151 @@ export default function CaptureScreen() {
     }
   }, [isCapturing, selectedMode]);
 
-  const getCurrentDate = () => {
-    const now = new Date();
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+  // Cleanup video timer on unmount
+  useEffect(() => {
+    return () => {
+      if (videoTimerRef.current) {
+        clearInterval(videoTimerRef.current);
+      }
     };
-    return now.toLocaleDateString('en-US', options);
-  };
+  }, []);
 
+
+
+  // FIXED: Proper photo capture
   const takePicture = async () => {
     try {
-      const capture = await MediaService.capturePhoto(cameraRef);
-      console.log('Capture', capture);
-      if (capture) {
-        router.push({
-          pathname: '/capture/details',
-          params: { 
-            captureId: capture.id,
-            type: capture.type,
-            uri: encodeURIComponent(capture.uri)
-          }
-        });
+      console.log('Taking picture...');
+      
+      if (!cameraRef.current) {
+        throw new Error('Camera ref not available');
       }
+
+      if (!isCameraReady) {
+        Alert.alert('Camera Not Ready', 'Please wait for camera to initialize');
+        return;
+      }
+
+      // Ensure we're in picture mode for photos
+      if (cameraMode !== 'picture') {
+        setCameraMode('picture');
+        // Wait a moment for mode to change
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      console.log('Camera ready, taking picture...');
+      
+      // Use the camera's takePictureAsync method
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        base64: false,
+        skipProcessing: false,
+      });
+
+      console.log('Photo taken:', photo);
+
+      if (photo && photo.uri) {
+        // Process the photo using your MediaService
+        const capture = await MediaService.capturePhoto(cameraRef);
+        
+        if (capture) {
+          router.push({
+            pathname: '/capture/details',
+            params: { 
+              captureId: capture.id,
+              type: capture.type,
+              uri: encodeURIComponent(capture.uri)
+            }
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Photo capture failed:', error);
+      Alert.alert('Error', `Failed to take picture: ${error.message}`);
+    }
+  };
+
+  // FIXED: Proper video recording
+  const startVideo = async () => {
+    if (!cameraRef.current || isCapturing || isVideoRecording) return;
+    
+    try {
+      console.log('Starting video recording...');
+      
+      if (!isCameraReady) {
+        Alert.alert('Camera Not Ready', 'Please wait for camera to initialize');
+        return;
+      }
+
+      // Switch to video mode
+      if (cameraMode !== 'video') {
+        setCameraMode('video');
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+
+      setIsVideoRecording(true);
+      
+      // Start the timer
+      const startTime = Date.now();
+      videoTimerRef.current = setInterval(() => {
+        setVideoDuration(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+
+      console.log('Starting recording...');
+      const videoResult = await cameraRef.current.recordAsync({
+        maxDuration: 60,
+        //quality: '720p',
+      });
+
+      console.log('Video recorded:', videoResult);
+
+      if (videoResult && videoResult.uri) {
+        const capture = await MediaService.createVideoCapture(videoResult.uri);
+        if (capture) {
+          router.push({
+            pathname: '/capture/details',
+            params: { 
+              captureId: capture.id,
+              type: capture.type,
+              uri: encodeURIComponent(capture.uri),
+              duration: videoDuration.toString()
+            }
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Error starting video recording:', error);
+      Alert.alert('Error', `Failed to start video recording: ${error.message}`);
+    }
+  };
+
+  const stopVideo = async () => {
+    if (!cameraRef.current || !isVideoRecording) return;
+    
+    try {
+      console.log('Stopping video recording...');
+      
+      // Clear timer
+      if (videoTimerRef.current) {
+        clearInterval(videoTimerRef.current);
+      }
+      
+      setIsVideoRecording(false);
+      setVideoDuration(0);
+      
+      // Stop recording
+      cameraRef.current.stopRecording();
     } catch (error) {
-      Alert.alert('Error', 'Failed to take picture');
+      console.error('Error stopping video recording:', error);
+      Alert.alert('Error', 'Failed to stop video recording');
+    }
+  };
+
+  const handleCameraCapture = async () => {
+    if (isVideoRecording) {
+      await stopVideo();
+    } else {
+      await takePicture();
     }
   };
 
@@ -180,6 +317,14 @@ export default function CaptureScreen() {
     };
   });
 
+  // Camera ready handler
+  const onCameraReady = () => {
+    console.log('Camera is ready');
+    setIsCameraReady(true);
+  };
+
+  const now = new Date();
+
   if (!permission) {
     return <View style={styles.container} />;
   }
@@ -202,8 +347,7 @@ export default function CaptureScreen() {
       <GestureDetector gesture={panGesture}>
         <Animated.View 
           style={[{ flex: 1 }, animatedStyle, styles.pageStyle]}
-          entering={SlideInDown}
-          exiting={SlideOutDown}
+          entering={SlideInUp}
         >
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.header}>
@@ -219,9 +363,7 @@ export default function CaptureScreen() {
                 />
               </TouchableOpacity>
               
-              <View style={styles.dateContainer}>
-                <Text style={styles.dateText}>{getCurrentDate()}</Text>
-              </View>
+              <DateContainer date={now} />
               
               <TouchableOpacity
                 style={styles.friendsButton}
@@ -256,9 +398,38 @@ export default function CaptureScreen() {
       
             <View style={styles.content}>
               {/* Persistent Camera or Audio Visualizer */}
-              <View style={[styles.mediaContainer, selectedMode === 'microphone' && styles.borderContainer]}>
+              <Animated.View 
+                style={[styles.mediaContainer, selectedMode === 'microphone' && styles.borderContainer]}
+              >
                 {selectedMode === 'camera' ? (
-                  <CameraView style={styles.persistentCamera} facing={facing} ref={cameraRef} />
+                  <>
+                    <CameraView 
+                      mode={cameraMode} // Dynamic mode based on current action
+                      style={styles.persistentCamera} 
+                      facing={facing} 
+                      ref={cameraRef}
+                      onCameraReady={onCameraReady} // Add camera ready handler
+                    />
+                    
+                    {/* Camera status indicator */}
+                    {!isCameraReady && (
+                      <View style={styles.cameraLoadingOverlay}>
+                        <Text style={styles.cameraLoadingText}>Initializing camera...</Text>
+                      </View>
+                    )}
+                    
+                    {/* Video recording indicator */}
+                    {isVideoRecording && (
+                      <View style={styles.cameraOverlay}>
+                        <View style={styles.videoRecordingIndicator}>
+                          <View style={styles.recordingDot} />
+                          <Text style={styles.videoTimerText}>
+                            {Math.floor(videoDuration / 60)}:{(videoDuration % 60).toString().padStart(2, '0')}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
                 ) : (
                   <View style={styles.audioVisualizer}>
                     <Animated.View style={[styles.waveform, animatedWaveStyle]}>
@@ -285,7 +456,7 @@ export default function CaptureScreen() {
                     )}
                   </View>
                 )}
-              </View>
+              </Animated.View>
       
               {/* Bottom Action Buttons */}
               <View style={styles.actionContainer}>
@@ -301,18 +472,30 @@ export default function CaptureScreen() {
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.captureButton, isCapturing && styles.recordingButton]} 
-                  onPress={selectedMode === 'camera' ? takePicture : toggleRecording}
+                  style={[
+                    styles.captureButton, 
+                    (isCapturing || isVideoRecording) && styles.recordingButton,
+                    !isCameraReady && selectedMode === 'camera' && styles.disabledButton
+                  ]} 
+                  onPress={selectedMode === 'camera' ? handleCameraCapture : toggleRecording}
+                  onLongPress={selectedMode === 'camera' ? startVideo : undefined}
+                  onPressOut={selectedMode === 'camera' && isVideoRecording ? stopVideo : undefined}
+                  delayLongPress={200}
+                  disabled={selectedMode === 'camera' && !isCameraReady}
                 >
                   <View style={styles.captureButtonInner}>
                     {selectedMode === 'camera' ? (
-                      <Circle 
-                        color="white" 
-                        stroke="black" 
-                        strokeWidth={0.3} 
-                        size={scale(75)} 
-                        fill="white" 
-                      />
+                      isVideoRecording ? (
+                        <View style={styles.stopIcon} />
+                      ) : (
+                        <Circle 
+                          color="white" 
+                          stroke="black" 
+                          strokeWidth={0.3} 
+                          size={scale(75)} 
+                          fill="white" 
+                        />
+                      )
                     ) : isCapturing ? (
                       <View style={styles.stopIcon} />
                     ) : (
@@ -324,17 +507,20 @@ export default function CaptureScreen() {
                 <TouchableOpacity 
                   style={styles.flipButton} 
                   onPress={selectedMode === 'camera' ? toggleCameraFacing : undefined}
-                  disabled={selectedMode !== 'camera'}
+                  disabled={selectedMode !== 'camera' || !isCameraReady}
                 >
                   <RotateCw 
-                    color={selectedMode === 'camera' ? "#94A3B8" : "#E5E7EB"} 
+                    color={selectedMode === 'camera' && isCameraReady ? "#94A3B8" : "#E5E7EB"} 
                     size={20} 
                   />
                 </TouchableOpacity>
               </View>
 
               <Text style={styles.uploadHint}>
-                {selectedMode === 'camera' ? 'Upload Photo/Video' : 'Upload Audio'}
+                {selectedMode === 'camera' ? 
+                  (isCameraReady ? 'Tap for photo • Long press for video' : 'Camera initializing...') : 
+                  'Upload Audio'
+                }
               </Text>
       
               <View style={styles.vaultButtonContainer}>
@@ -355,6 +541,7 @@ export default function CaptureScreen() {
   );
 }
 
+// Add new styles for the fixes
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -384,22 +571,7 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 16,
   },
-  dateContainer: {
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dateText: {
-    fontSize: 14,
-    color: '#1E293B',
-    fontWeight: '500',
-  },
+  
   friendsButton: {
     width: 36,
     height: 36,
@@ -461,6 +633,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: verticalScale(16),
     backgroundColor: '#000',
+    position: 'relative',
   },
   borderContainer: {
     borderWidth: 1,
@@ -468,6 +641,45 @@ const styles = StyleSheet.create({
   },
   persistentCamera: {
     flex: 1,
+  },
+  // NEW: Camera loading overlay
+  cameraLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  cameraLoadingText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  cameraOverlay: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  videoRecordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  videoTimerText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   audioVisualizer: {
     flex: 1,
@@ -556,6 +768,11 @@ const styles = StyleSheet.create({
   },
   recordingButton: {
     backgroundColor: '#EF4444',
+  },
+  // NEW: Disabled button style
+  disabledButton: {
+    backgroundColor: '#95a5a6',
+    shadowColor: '#95a5a6',
   },
   captureButtonInner: {
     width: scale(70),
