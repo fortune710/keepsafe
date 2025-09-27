@@ -4,23 +4,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { ArrowLeft, CircleAlert as AlertCircle } from 'lucide-react-native';
-import { useEntries } from '@/hooks/use-entries';
 import { useAuthContext } from '@/providers/auth-provider';
-import VaultEntryCard from '@/components/vault-entry-card';
-import { StorageService } from '@/services/storage-service';
+import VaultEntryCard from '@/components/entries/vault-entry-card';
+import { useUserEntries } from '@/hooks/use-user-entries';
+import { DateContainer } from '@/components/date-container';
 
 export default function CalendarDayScreen() {
   const { date } = useLocalSearchParams();
-  const { user } = useAuthContext();
-  const { entries, isLoading, error } = useEntries(user?.id);
+  const { entries, isLoading, error } = useUserEntries();
 
   const selectedDate = date as string;
-  const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
 
   // Filter entries for the selected date
   const dayEntries = React.useMemo(() => {
@@ -35,7 +28,19 @@ export default function CalendarDayScreen() {
       music: entry.music_tag || undefined,
       location: entry.location_tag || undefined,
       date: new Date(entry.created_at),
-      isPrivate: entry.is_private,
+      is_private: entry.is_private,
+      profile: entry.profile,
+      user_id: entry.user_id,
+      shared_with: entry.shared_with,
+      shared_with_everyone: entry.shared_with_everyone,
+      metadata: entry.metadata,
+      content_url: entry.content_url,
+      text_content: entry.text_content,
+      music_tag: entry.music_tag,
+      location_tag: entry.location_tag,
+      created_at: entry.created_at,
+      updated_at: entry.updated_at,
+      attachments: entry.attachments
     }));
   }, [entries, selectedDate]);
 
@@ -46,11 +51,6 @@ export default function CalendarDayScreen() {
         router.back();
       }
     });
-
-  const handleEntryPress = (entry: any) => {
-    console.log('Entry pressed:', entry.id);
-    // Navigate to entry details or perform other actions
-  };
 
   const renderContent = () => {
     if (error) {
@@ -91,8 +91,6 @@ export default function CalendarDayScreen() {
           <VaultEntryCard
             key={entry.id}
             entry={entry}
-            index={index}
-            onPress={handleEntryPress}
           />
         ))}
       </ScrollView>
@@ -114,10 +112,7 @@ export default function CalendarDayScreen() {
             >
               <ArrowLeft color="#64748B" size={24} />
             </TouchableOpacity>
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>Day Entries</Text>
-              <Text style={styles.subtitle}>{formattedDate}</Text>
-            </View>
+            <DateContainer date={new Date(selectedDate)}/>
             <View style={{ width: 40 }} />
           </View>
 

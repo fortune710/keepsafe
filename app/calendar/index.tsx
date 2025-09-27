@@ -8,6 +8,7 @@ import { useEntries } from '@/hooks/use-entries';
 import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
+import { FlashList } from '@shopify/flash-list';
 
 const { width } = Dimensions.get('window');
 
@@ -150,92 +151,90 @@ export default function CalendarScreen() {
             </View>
           </View>
 
-          <ScrollView 
-            ref={scrollViewRef}
-            style={styles.scrollContainer} 
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {isLoading && (
+          {
+            isLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#8B5CF6" />
                 <Text style={styles.loadingText}>Loading your entries...</Text>
               </View>
-            )}
-
-            {months.map((monthDate, index) => {
-              const days = getDaysInMonth(monthDate);
-              
-              return (
-                <View key={index} style={styles.monthCard}>
-                  <View style={styles.monthHeader}>
-                    <Text style={styles.monthTitle}>{formatMonthYear(monthDate)}</Text>
-                  </View>
-
-                  <View style={styles.calendar}>
-                    <View style={styles.dayNamesRow}>
-                      {dayNames.map(dayName => (
-                        <Text key={dayName} style={styles.dayName}>{dayName}</Text>
-                      ))}
+            ) :
+              <FlashList
+                contentContainerStyle={styles.scrollContent}
+                ListFooterComponent={
+                  <View style={styles.streakContainerWrapper}>
+                    <View style={styles.streakContainer}>
+                      {streakLoading ? (
+                        <ActivityIndicator size="small" color="#8B5CF6" />
+                      ) : (
+                        <View style={styles.streakStats}>
+                          <View style={styles.streakStat}>
+                            <Star color="#8B5CF6" size={20} />
+                            <Text style={styles.streakNumber}>{currentStreak}</Text>
+                            <Text style={styles.streakLabel}>Current</Text>
+                          </View>
+                          <View style={styles.streakDivider} />
+                          <View style={styles.streakStat}>
+                            <Star color="#8B5CF6" size={20} />
+                            <Text style={styles.streakNumber}>{maxStreak}</Text>
+                            <Text style={styles.streakLabel}>Best</Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
+                  </View>
+                }
+                data={months}
+                renderItem={({ item: monthDate, index }) => {
+                  const days = getDaysInMonth(monthDate);
 
-                    <View style={styles.daysGrid}>
-                      {days.map((day, dayIndex) => (
-                        <TouchableOpacity 
-                          key={dayIndex} 
-                          style={styles.dayCell}
-                          disabled={day === null || !hasEntries(day, monthDate)}
-                          onPress={() => day && handleDayPress(day, monthDate)}
-                        >
-                          {day && (
-                            <View style={styles.dayContent}>
-                              <Text style={styles.dayNumber}>{day}</Text>
-                              {hasEntries(day, monthDate) && (
-                                <View style={styles.entryIndicatorContainer}>
-                                  <View 
-                                    style={[
-                                      styles.entryIndicator,
-                                      getEntryCount(day, monthDate) > 1 && styles.multipleEntries
-                                    ]} 
-                                  />
-                                  {getEntryCount(day, monthDate) > 1 && (
-                                    <Text style={styles.entryCount}>{getEntryCount(day, monthDate)}</Text>
+                  return (
+                    <View key={index} style={styles.monthCard}>
+                      <View style={styles.monthHeader}>
+                        <Text style={styles.monthTitle}>{formatMonthYear(monthDate)}</Text>
+                      </View>
+
+                      <View style={styles.calendar}>
+                        <View style={styles.dayNamesRow}>
+                          {dayNames.map(dayName => (
+                            <Text key={dayName} style={styles.dayName}>{dayName}</Text>
+                          ))}
+                        </View>
+
+                        <View style={styles.daysGrid}>
+                          {days.map((day, dayIndex) => (
+                            <TouchableOpacity 
+                              key={dayIndex} 
+                              style={styles.dayCell}
+                              disabled={day === null || !hasEntries(day, monthDate)}
+                              onPress={() => day && handleDayPress(day, monthDate)}
+                            >
+                              {day && (
+                                <View style={styles.dayContent}>
+                                  <Text style={styles.dayNumber}>{day}</Text>
+                                  {hasEntries(day, monthDate) && (
+                                    <View style={styles.entryIndicatorContainer}>
+                                      <View 
+                                        style={[
+                                          styles.entryIndicator,
+                                          getEntryCount(day, monthDate) > 1 && styles.multipleEntries
+                                        ]} 
+                                      />
+                                      {getEntryCount(day, monthDate) > 1 && (
+                                        <Text style={styles.entryCount}>{getEntryCount(day, monthDate)}</Text>
+                                      )}
+                                    </View>
                                   )}
                                 </View>
                               )}
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      ))}
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                </View>
-              );
-            })}
-            <View style={styles.streakContainerWrapper}>
-              <View style={styles.streakContainer}>
-                {streakLoading ? (
-                  <ActivityIndicator size="small" color="#8B5CF6" />
-                ) : (
-                  <View style={styles.streakStats}>
-                    <View style={styles.streakStat}>
-                      <Star color="#8B5CF6" size={20} />
-                      <Text style={styles.streakNumber}>{currentStreak}</Text>
-                      <Text style={styles.streakLabel}>Current</Text>
-                    </View>
-                    <View style={styles.streakDivider} />
-                    <View style={styles.streakStat}>
-                      <Star color="#8B5CF6" size={20} />
-                      <Text style={styles.streakNumber}>{maxStreak}</Text>
-                      <Text style={styles.streakLabel}>Best</Text>
-                    </View>
-                  </View>
-                )}
-              </View>
-            </View>
-          </ScrollView>
-
-
+                  );
+                }}
+              />
+          }
         </SafeAreaView>
       </Animated.View>
     </GestureDetector>
