@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import VaultEntryCard, { VaultEntry } from './vault-entry-card';
+import VaultEntryCard, { VaultEntry } from './entries/vault-entry-card';
 
 interface VaultDaySectionProps {
   date: string;
