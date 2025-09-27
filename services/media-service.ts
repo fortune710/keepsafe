@@ -31,6 +31,64 @@ export class MediaService {
     }
   }
 
+  static async startVideoRecording(cameraRef: React.RefObject<CameraView | null>): Promise<MediaCapture | null> {
+    if (!cameraRef.current) {
+      throw new Error('Camera reference not available');
+    }
+
+    try {
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: 10
+      });
+      
+      if (!video) {
+        console.log("Video not done recording");
+        return null;
+      }
+
+      return {
+        id: Crypto.randomUUID(),
+        type: 'video',
+        uri: video.uri,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      console.error('Video capture failed:', error);
+      throw error;
+    }
+  }
+
+  // Add to MediaService class
+  static async createVideoCapture(uri: string): Promise<MediaCapture | null> {
+    try {
+      const id = Crypto.randomUUID();
+      const capture: MediaCapture = {
+        id,
+        uri,
+        type: 'video',
+        timestamp: new Date(),
+        duration: 0, // You can get actual duration from video metadata if needed
+      };
+      return capture;
+    } catch (error) {
+      console.error('Error creating video capture:', error);
+      return null;
+    }
+  }
+
+  static async stopVideoRecording(cameraRef: React.RefObject<CameraView | null>): Promise<void> {
+    if (!cameraRef.current) {
+      throw new Error('Camera reference not available');
+    }
+
+    try {
+      return cameraRef.current.stopRecording();
+    } catch (error) {
+      console.error('Video capture stop failed:', error);
+      throw error;
+    }
+  }
+
   static async startAudioRecording(): Promise<string> {
     // This would integrate with expo-av or similar
     // For now, return a mock recording ID

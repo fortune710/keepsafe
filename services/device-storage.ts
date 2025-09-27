@@ -1,3 +1,4 @@
+import { SuggestedFriend } from '@/types/friends';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -115,6 +116,14 @@ class DeviceStorage {
     const existingEntries = await this.getEntries(userId) || [];
     const updatedEntries = existingEntries.filter(entry => entry.id !== entryId);
     await this.setEntries(userId, updatedEntries);
+  }
+
+  async getSuggestedFriends(): Promise<SuggestedFriend[]> {
+    return await this.getItem('suggested_friends') ?? []
+  }
+
+  async setSuggestedFriends(data: SuggestedFriend[]): Promise<void> {
+    await this.setItem('suggested_friends', data);
   }
 }
 

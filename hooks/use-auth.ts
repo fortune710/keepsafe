@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
+import { Platform } from 'react-native';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -52,12 +53,29 @@ export function useAuth(): UseAuthResult {
   const updateProfileRef = useRef<((updates: Partial<Profile>) => Promise<{ error: Error | null }>) | null>(null);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+   // Platform-specific initialization
+   const initializeAuth = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        // Web-specific initialization
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+      } else {
+        // Native initialization
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+      }
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      // Don't crash the app, just log the error
+    } finally {
       setLoading(false);
-    });
+    }
+  };
+
+  initializeAuth();
 
     // Add this auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

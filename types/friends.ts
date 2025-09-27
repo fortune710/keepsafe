@@ -1,8 +1,12 @@
-export interface Friend {
+export interface SuggestedFriend {
   id: string;
   name: string;
+  username: string;
+  avatar: string | null;
+}
+
+export interface Friend extends SuggestedFriend {
   email: string;
-  avatar: string;
   status: 'connected' | 'pending' | 'invited';
   invitedAt?: Date;
   connectedAt?: Date;

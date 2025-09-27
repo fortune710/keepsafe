@@ -1,10 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthContext } from '@/providers/auth-provider';
+import { useFriends } from '@/hooks/use-friends';
 
 export default function RootScreen() {
   const { user, loading, session } = useAuthContext();
+
+  //Get Hook to Prefetch Suggested Friends
+  const { prefetchSuggestedFriends } = useFriends();
+
+  useEffect(() => {
+    prefetchSuggestedFriends();
+  }, [])
+  
 
   // Show loading while checking auth
   if (loading) {
@@ -16,12 +25,13 @@ export default function RootScreen() {
   }
 
   // Redirect to onboarding if not authenticated
-  if (!user) {
+  if (!session) {
     return <Redirect href="/onboarding" />;
   }
 
   // Redirect to capture screen if authenticated
   return <Redirect href="/capture" />;
+  //return <Redirect href="/invite/XS1hbOJw" />
 }
 
 const styles = StyleSheet.create({

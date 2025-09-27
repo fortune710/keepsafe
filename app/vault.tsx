@@ -1,202 +1,47 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { 
-  SlideInDown, 
-  SlideOutUp, 
   SlideInUp,
-  SlideOutDown,
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring, 
-  withTiming,
-  runOnJS,
-  interpolate,
-  Extrapolate,
-  FadeIn,
-  FadeOut
+  SlideInDown
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { X, Heart, MessageCircle, Play, Pause, ChevronDown } from 'lucide-react-native';
 import { useUserEntries } from '@/hooks/use-user-entries';
 import { usePopupParams } from '@/hooks/use-popup-params';
-import ToastMessage from '@/components/toast-message';
 import EntryReactionsPopup from '@/components/entry-reactions-popup';
 import EntryCommentsPopup from '@/components/entry-comments-popup';
-import { Audio } from 'expo-av';
-import { getDefaultAvatarUrl } from '@/lib/utils';
+import VaultEntryCard from '@/components/entries/vault-entry-card';
+import { EntryPage } from '@/components/entries/entry-page';
+import PageFlipper from '@/components/entries/page-flipper';
+import { scale, verticalScale } from 'react-native-size-matters';
+import { FlashList } from '@shopify/flash-list';
+import { VaultHeader } from '@/components/vault/vault-header';
+import { DateContainer } from '@/components/date-container';
 
 const { height, width } = Dimensions.get('window');
 
 export default function VaultScreen() {
-  const { entries, isLoading, error, refetch } = useUserEntries();
+  const { entries, entriesByDate, isLoading, error, refetch } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
 
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(false);
 
-  const translateY = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
-  const gestureRef = useRef(null);
+  const prevOffset = useRef(0);
 
+  const handleScroll = (event: any) => {
+    const currentOffset = event.nativeEvent.contentOffset.y;
 
-  const currentEntry = entries && entries.length > 0 && currentIndex < entries.length ? entries[currentIndex] : null;
-  
-  const moveToNext = () => {
-    try {
-      if (currentIndex < entries.length - 1 && !isTransitioning && entries.length > 0) {
-        setIsTransitioning(true);
-        setCurrentIndex(prev => {
-          const nextIndex = prev + 1;
-          if (nextIndex < entries.length) {
-            return nextIndex;
-          }
-          return prev;
-        });
-        // Reset transition state after a short delay
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 100);
-      }
-    } catch (error) {
-      console.error('Error moving to next entry:', error);
-      setIsTransitioning(false);
+    if (currentOffset > prevOffset.current && isHeaderVisible) {
+      //Scrolling downwards
+      setIsHeaderVisible(false);
+    } else if (currentOffset < prevOffset.current && !isHeaderVisible) {
+      //Scrolling upwards
+      setIsHeaderVisible(true);
     }
+
+    prevOffset.current = currentOffset;
   };
 
-  const moveToPrevious = () => {
-    try {
-      if (currentIndex > 0 && !isTransitioning && entries.length > 0) {
-        setIsTransitioning(true);
-        setCurrentIndex(prev => {
-          const prevIndex = prev - 1;
-          if (prevIndex >= 0) {
-            return prevIndex;
-          }
-          return prev;
-        });
-        // Reset transition state after a short delay
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 100);
-      }
-    } catch (error) {
-      console.error('Error moving to previous entry:', error);
-      setIsTransitioning(false);
-    }
-  };
 
-  // Stop audio when changing entries
-  useEffect(() => {
-    if (sound) {
-      sound.stopAsync();
-      setIsPlaying(false);
-    }
-  }, [currentIndex]);
-
-  // Reset animation values when entries change
-  useEffect(() => {
-    scale.value = 1;
-    opacity.value = 1;
-    translateY.value = 0;
-  }, [currentIndex]);
-
-  // Pan gesture for bidirectional swiping between entries
-  const handleReturnToCapture = () => {
-    if (isNavigating) return; // Prevent multiple navigation attempts
-    
-    try {
-      setIsNavigating(true);
-      // Reset all animation values before navigation
-      translateY.value = 0;
-      scale.value = 1;
-      opacity.value = 1;
-      setIsTransitioning(false);
-      
-      // Use a small delay to ensure animations complete
-      setTimeout(() => {
-        try {
-          router.back();
-        } catch (error) {
-          console.error('Navigation error:', error);
-          // Fallback navigation method
-          router.replace('/capture');
-        } finally {
-          setIsNavigating(false);
-        }
-      }, 100);
-    } catch (error) {
-      console.error('Error returning to capture:', error);
-      setIsNavigating(false);
-    }
-  };
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      if (isTransitioning) return;
-      
-      // Allow both upward and downward swipes, but handle beginning case
-      if (currentIndex === 0 && event.translationY > 0) {
-        // At beginning, allow swipe down to go back to capture
-        translateY.value = event.translationY;
-      } else {
-        // Normal bidirectional swiping between entries
-        translateY.value = event.translationY;
-      }
-    })
-    .onEnd((event) => {
-      if (isTransitioning || isNavigating) return;
-      
-      // Reduced thresholds for better iOS compatibility
-      const shouldMoveToNext = event.translationY < -height * 0.2 && event.velocityY < -300;
-      const shouldMoveToPrevious = event.translationY > height * 0.2 && event.velocityY > 300;
-      const shouldReturnToCapture = currentIndex === 0 && event.translationY > height * 0.25 && event.velocityY > 400;
-      
-      if (shouldReturnToCapture) {
-        // Return to capture page from beginning with proper cleanup
-        translateY.value = withSpring(0, { damping: 20, stiffness: 100 });
-        runOnJS(handleReturnToCapture)();
-      } else if (shouldMoveToNext && currentIndex < entries.length - 1) {
-        // Swipe down to next entry
-        translateY.value = withSpring(0, { damping: 20, stiffness: 100 });
-        runOnJS(moveToNext)();
-      } else if (shouldMoveToPrevious && currentIndex > 0) {
-        // Swipe up to previous entry
-        translateY.value = withSpring(0, { damping: 20, stiffness: 100 });
-        runOnJS(moveToPrevious)();
-      } else {
-        // Return to original position
-        translateY.value = withSpring(0, { damping: 20, stiffness: 100 });
-      }
-    });
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const swipeOpacity = interpolate(
-      translateY.value,
-      [-height * 0.2, 0, height * 0.2],
-      [0.8, 1, 0.8],
-      Extrapolate.CLAMP
-    );
-
-    const swipeScale = interpolate(
-      translateY.value,
-      [-height * 0.2, 0, height * 0.2],
-      [0.95, 1, 0.95],
-      Extrapolate.CLAMP
-    );
-
-    return {
-      transform: [
-        { translateY: translateY.value },
-        { scale: swipeScale }
-      ],
-      opacity: swipeOpacity,
-    };
-  });
 
   const handleEntryReactions = (entryId: string) => {
     showReactions(entryId);
@@ -206,83 +51,6 @@ export default function VaultScreen() {
     showComments(entryId);
   };
 
-  const toggleAudioPlayback = async () => {
-    if (!currentEntry || currentEntry.type !== 'audio') return;
-
-    try {
-      if (isPlaying) {
-        if (sound) {
-          await sound.pauseAsync();
-        }
-        setIsPlaying(false);
-      } else {
-        if (currentEntry.content_url) {
-          if (sound) {
-            await sound.replayAsync();
-          } else {
-            const { sound: newSound } = await Audio.Sound.createAsync(
-              { uri: currentEntry.content_url },
-              { shouldPlay: true }
-            );
-            setSound(newSound);
-            
-            newSound.setOnPlaybackStatusUpdate((status) => {
-              if (status.isLoaded && status.didJustFinish) {
-                setIsPlaying(false);
-              }
-            });
-          }
-          setIsPlaying(true);
-        }
-      }
-    } catch (error) {
-      console.error('Audio playback error:', error);
-      setIsPlaying(false);
-    }
-  };
-
-  // Cleanup sound on unmount
-  React.useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
-
-  // Cleanup on unmount
-  React.useEffect(() => {
-    return () => {
-      setIsTransitioning(false);
-      setIsNavigating(false);
-      scale.value = 1;
-      opacity.value = 1;
-      translateY.value = 0;
-    };
-  }, []);
-
-  const getRelativeDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInHours = diffInMs / (1000 * 60 * 60);
-    const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
-
-    if (diffInHours < 1) {
-      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-      return diffInMinutes <= 1 ? 'Just now' : `${diffInMinutes}m`;
-    } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)}h`;
-    } else if (diffInDays < 7) {
-      return `${Math.floor(diffInDays)}d`;
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-      });
-    }
-  };
 
   const renderContent = () => {
     if (error) {
@@ -321,173 +89,52 @@ export default function VaultScreen() {
       );
     }
 
-    if (!currentEntry) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Loading entry...</Text>
-        </View>
-      );
-    }
-
     return (
-      <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.entryContainer, animatedStyle]}>
-          {/* Main entry content */}
-          <Animated.View 
-            key={`entry-${currentIndex}`}
-            style={styles.entryCard}
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-          >
-            {currentEntry.type === 'photo' && currentEntry.content_url && (
-              <Image source={{ uri: currentEntry.content_url }} style={styles.entryImage} />
-            )}
-            
-            {currentEntry.type === 'audio' && (
-              <View style={styles.audioContainer}>
-                <TouchableOpacity style={styles.audioPlayButton} onPress={toggleAudioPlayback}>
-                  {isPlaying ? (
-                    <Pause color="#8B5CF6" size={32} fill="#8B5CF6" />
-                  ) : (
-                    <Play color="#8B5CF6" size={32} fill="#8B5CF6" />
-                  )}
-                </TouchableOpacity>
-                <View style={styles.audioWave}>
-                  {[...Array(15)].map((_, i) => (
-                    <View 
-                      key={i} 
-                      style={[
-                        styles.waveBar, 
-                        { height: Math.random() * 40 + 20 }
-                      ]} 
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
+      <PageFlipper
+        data={Object.keys(entriesByDate)}
+    
+        //pageSize={{ width, height: 800 }}
+        //contentContainerStyle={{}}
+        renderPage={(key: string) => {
+          const entries = entriesByDate[key];
+          const entriesDate = new Date(key);
 
-            <View style={styles.entryContent}>
-              {currentEntry.text_content && (
-                <Text style={styles.entryText}>{currentEntry.text_content}</Text>
-              )}
-              
-              <View style={styles.entryMeta}>
-                {currentEntry.music_tag && (
-                  <Text style={styles.musicTag}>♪ {currentEntry.music_tag}</Text>
+          return (
+            <EntryPage>
+              <FlashList
+                data={entries}
+                contentContainerStyle={styles.contentContainer}
+                keyExtractor={(item) => item.id}
+                onScroll={handleScroll}
+                ListHeaderComponent={
+                  <View style={styles.listHeader}>
+                    <DateContainer date={entriesDate}/>
+                  </View>
+                }
+                renderItem={({ item }) => (
+                  <VaultEntryCard
+                    entry={item as any}
+                    key={item.id}
+                    onReactions={handleEntryReactions}
+                    onComments={handleEntryComments}
+                  />
                 )}
-                {currentEntry.location_tag && (
-                  <Text style={styles.locationTag}>📍 {currentEntry.location_tag}</Text>
-                )}
-                {currentEntry.is_private && (
-                  <Text style={styles.privateTag}>🔒 Private</Text>
-                )}
-              </View>
-
-              <View style={styles.actionsContainer}>
-                <TouchableOpacity 
-                  style={styles.actionButton} 
-                  onPress={() => handleEntryReactions(currentEntry.id)}
-                >
-                  <Heart color="#64748B" size={20} />
-                  <Text style={styles.actionText}>React</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.actionButton} 
-                  onPress={() => handleEntryComments(currentEntry.id)}
-                >
-                  <MessageCircle color="#64748B" size={20} />
-                  <Text style={styles.actionText}>Comment</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Animated.View>
-
-          {/* Author info at bottom */}
-          <View style={styles.authorContainer}>
-            <Image 
-              source={{ 
-                uri: currentEntry.profile?.avatar_url || getDefaultAvatarUrl(currentEntry.profile?.full_name || '')
-              }}
-              style={styles.authorAvatar}
-            />
-            <Text style={styles.authorName}>
-              {currentEntry.profile?.full_name || 'Unknown User'}
-            </Text>
-
-            <Text style={styles.dateText}>{getRelativeDate(currentEntry.created_at)}</Text>
-          </View>
-
-          {/* Navigation indicator */}
-          <View style={styles.navigationContainer}>
-            <View style={styles.progressIndicator}>
-              <Text style={styles.progressText}>
-                {currentIndex + 1} of {entries.length}
-              </Text>
-            </View>
-            
-            <View style={styles.swipeHint}>
-              {currentIndex > 0 && (
-                <Text style={styles.swipeHintText}>Swipe up for newer entries</Text>
-              )}
-              {currentIndex === 0 && (
-                <Text style={styles.swipeHintText}>Swipe down to return to capture</Text>
-              )}
-              {currentIndex < entries.length - 1 && (
-                <Text style={styles.swipeHintText}>Swipe down for older entries</Text>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-      </GestureDetector>
+              />
+            </EntryPage>
+          )
+        }}
+      />
     );
   };
 
   return (
     <Animated.View 
       entering={SlideInDown.duration(400).springify().damping(20).stiffness(90)} 
-      exiting={SlideOutUp.duration(400).springify().damping(20).stiffness(90)}
+      exiting={SlideInUp.duration(400).springify().damping(20).stiffness(90)}
       style={styles.container}
     >
-      <SafeAreaView style={styles.container}>
-
-        <View style={styles.header}>
-          <Text style={styles.title}>Your Vault</Text>
-          <TouchableOpacity 
-            style={styles.closeButton} 
-            onPress={() => {
-              if (isNavigating) return; // Prevent multiple navigation attempts
-              
-              try {
-                setIsNavigating(true);
-                // Reset animation values before navigation
-                translateY.value = 0;
-                scale.value = 1;
-                opacity.value = 1;
-                setIsTransitioning(false);
-                
-                // Use a small delay to ensure animations complete
-                setTimeout(() => {
-                  try {
-                    router.back();
-                  } catch (error) {
-                    console.error('Navigation error:', error);
-                    router.replace('/capture');
-                  } finally {
-                    setIsNavigating(false);
-                  }
-                }, 50);
-              } catch (error) {
-                console.error('Error closing vault:', error);
-                setIsNavigating(false);
-                router.replace('/capture');
-              }
-            }}
-          >
-            <X color="#64748B" size={24} />
-          </TouchableOpacity>
-        </View>
+      <>
+        <VaultHeader isVisible={isHeaderVisible}/>
 
         <View style={styles.content}>
           {renderContent()}
@@ -512,7 +159,7 @@ export default function VaultScreen() {
             )}
           </>
         )}
-      </SafeAreaView>
+      </>
     </Animated.View>
   );
 }
@@ -522,21 +169,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F0F9FF',
   },
-  header: {
-    flexDirection: 'row',
+  contentContainer: {
+    paddingVertical: verticalScale(30)
+  },
+  listHeader: {
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#F0F9FF',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  closeButton: {
-    padding: 8,
+    display: 'flex',
+    flexDirection: 'row',
+    marginTop: verticalScale(24)
   },
   content: {
     flex: 1,

@@ -5,16 +5,18 @@ import { TABLES } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { useAuthContext } from '@/providers/auth-provider';
 import { deviceStorage } from '@/services/device-storage';
+import { groupBy } from '@/lib/utils';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Insert'];
 
 interface EntryWithProfile extends Entry {
-  profile: Profile;
+  profile: Omit<Profile, "invite_code">;
 }
 
 interface UseUserEntriesResult {
   entries: EntryWithProfile[];
+  entriesByDate: Record<string, EntryWithProfile[]>;
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
@@ -112,6 +114,7 @@ export function useUserEntries(): UseUserEntriesResult {
 
   return {
     entries: allEntries,
+    entriesByDate: groupBy(allEntries, "created_at"),
     isLoading,
     error,
     refetch,

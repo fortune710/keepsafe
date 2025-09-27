@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/database';
+import { TABLES } from '@/constants/supabase';
+import { generateInviteCode } from '@/lib/utils';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -26,7 +28,7 @@ export function useProfile(): UseProfileResult {
 
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from(TABLES.PROFILES)
         .select('*')
         .eq('id', userId)
         .single();
@@ -45,11 +47,12 @@ export function useProfile(): UseProfileResult {
               username: null,
               avatar_url: null,
               bio: null,
+              invite_code: generateInviteCode(),
             };
 
             const { data: newProfile, error: createError } = await supabase
               .from('profiles')
-              .insert(profileData)
+              .insert(profileData as never)
               .select()
               .single();
 
@@ -78,7 +81,7 @@ export function useProfile(): UseProfileResult {
     }
   }, []);
 
-  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
+  const updateProfile = useCallback(async (updates: Partial<Omit<Profile, "id">>) => {
     if (!profile) {
       return { error: new Error('No profile loaded') };
     }
@@ -86,7 +89,7 @@ export function useProfile(): UseProfileResult {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(updates as never)
         .eq('id', profile.id)
         .select()
         .single();

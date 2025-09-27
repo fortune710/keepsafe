@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "keepsafe",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -14,13 +14,22 @@
     "ios": {
       "supportsTablet": true,
       "associatedDomains": [
-        "applinks:keepsafe.app"
-      ]
+        "applinks:keepsafe.app",
+        "applinks:www.keepsafe.app",
+        "applinks:app.keepsafe.app"
+      ],
+      "bundleIdentifier": "com.fortune710.keepsafe",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
     },
     "extra": {
       "eas": {
-        "projectId": ""
-      }
+        "projectId": "97eb5c9e-4f9a-47a1-9994-1351aca19f05"
+      },
+      "router": {}
     },
     "android": {
       "intentFilters": [
@@ -31,6 +40,10 @@
             {
               "scheme": "https",
               "host": "keepsafe.app"
+            },
+            {
+              "scheme": "https",
+              "host": "app.keepsafe.app"
             }
           ],
           "category": [
@@ -38,16 +51,26 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ],
+      "package": "com.fortune710.keepsafe"
     },
     "web": {
       "bundler": "metro",
-      "output": "single",
+      "output": "server",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router", 
-      "expo-font", 
+      [
+        "expo-router",
+        {
+          "origin": "http://localhost:8081/"
+        }
+      ],
+      "expo-font",
       "expo-web-browser",
       [
         "expo-notifications",
@@ -62,6 +85,39 @@
         {
           "photosPermission": "The app accesses your photos to let you share them with your friends."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Keepsafe to access your camera",
+          "microphonePermission": "Allow Keepsafe to access your microphone",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Keepsafe to access your contacts."
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": false
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Keepsafe to access your microphone."
+        }
       ]
     ],
     "experiments": {
@@ -70,6 +126,7 @@
     "notification": {
       "icon": "./assets/images/icon.png",
       "color": "#8B5CF6"
-    }
+    },
+    "owner": "fortune710"
   }
 }

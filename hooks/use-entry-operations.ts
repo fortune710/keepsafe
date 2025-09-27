@@ -6,6 +6,7 @@ import { MediaCapture } from '@/types/media';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { getContentType, getFileExtension, isBase64File, isLocalFile } from '@/lib/utils';
+import { RenderedMediaCanvasItem } from '@/types/capture';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type EntryInsert = Database['public']['Tables']['entries']['Insert'];
@@ -27,41 +28,58 @@ interface UseEntryOperationsResult {
     isPrivate: boolean;
     isEveryone: boolean;
     selectedFriends: string[];
+    attachments: RenderedMediaCanvasItem[];
   }) => Promise<ShareResult>;
-  uploadMedia: (file: File | Blob | string, userId: string, fileName: string, contentType: string) => Promise<string | null>;
+  uploadMedia: (file: File | string, userId: string, fileName: string, contentType: string) => Promise<string | null>;
 }
 
-// Helper function to convert URI to ArrayBuffer for upload
-const uriToArrayBuffer = async (uri: string): Promise<ArrayBuffer> => {
-  if (Platform.OS === 'web') {
-    const response = await fetch(uri);
+/**
+ * Converts a URI/File to ArrayBuffer for upload
+ * Works on both web and React Native
+ */
+const convertToArrayBuffer = async (source: string | File): Promise<ArrayBuffer> => {
+  if (typeof source === 'string') {
+    // URI string (React Native or web blob URL)
+    const response = await fetch(source);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.statusText}`);
+    }
+    
     return await response.arrayBuffer();
   } else {
-    // For native platforms, read the file and convert to ArrayBuffer
-    try {
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      if (!fileInfo.exists) {
-        throw new Error('File does not exist');
-      }
-      
-      // Read the file as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      
-      // Convert base64 to ArrayBuffer
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      
-      return byteArray.buffer; // Return ArrayBuffer instead of Blob
-    } catch (error) {
-      console.error('Error converting URI to ArrayBuffer:', error);
-      throw new Error('Failed to process file for upload');
+    // File object (web)
+    return await source.arrayBuffer();
+  }
+};
+
+/**
+ * Converts a URI/File to Blob for upload
+ * Alternative method that may work better in some cases
+ */
+const convertToBlob = async (source: string | File, contentType?: string): Promise<Blob> => {
+  if (typeof source === 'string') {
+    // URI string
+    const response = await fetch(source);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.statusText}`);
     }
+    
+    const blob = await response.blob();
+    
+    // Override content type if provided
+    if (contentType && blob.type !== contentType) {
+      return new Blob([blob], { type: contentType });
+    }
+    
+    return blob;
+  } else {
+    // File object (web)
+    if (contentType && source.type !== contentType) {
+      return new Blob([source], { type: contentType });
+    }
+    return source;
   }
 };
 
@@ -70,37 +88,34 @@ export function useEntryOperations(): UseEntryOperationsResult {
 
   // Updated uploadMedia function to handle native files better
   const uploadMedia = useCallback(async (
-    file: File | Blob | string, 
+    file: File | string, 
     userId: string, 
     fileName: string,
     contentType: string
   ): Promise<string | null> => {
+    const filePath = UPLOAD_PATHS.MEDIA(userId, fileName);
+    
     try {
-      const filePath = UPLOAD_PATHS.MEDIA(userId, fileName);
-      
-      let uploadData: File | Blob | ArrayBuffer;
-
-      if (typeof file === 'string' && isBase64File(file)) {
-        // Handle base64 data URL
-        const [contentTypeInfo, base64Data] = file.split(';base64,');
-        const detectedContentType = contentTypeInfo.split(':')[1];
+      // Validate file if validation options are available
+      let fileContentType = contentType;
         
-        // Convert base64 to ArrayBuffer
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        uploadData = byteArray.buffer;
-      } else if (Platform.OS === 'web') {
-        // Web: use the file/blob directly
-        uploadData = file as File | Blob;
-      } else {
-        // Native: convert file URI to ArrayBuffer
-        uploadData = await uriToArrayBuffer(file as string);
+      // Auto-detect content type for File objects
+      if (typeof file !== 'string' && !fileContentType) {
+        fileContentType = file.type;
       }
       
+      // Convert file to uploadable format
+      let uploadData: ArrayBuffer | Blob;
+      
+      try {
+        // Try ArrayBuffer first (generally more reliable)
+        uploadData = await convertToArrayBuffer(file);
+      } catch (arrayBufferError) {
+        console.warn('ArrayBuffer conversion failed, trying Blob:', arrayBufferError);
+        // Fallback to Blob
+        uploadData = await convertToBlob(file, fileContentType);
+      }
+    
       const { data, error } = await supabase.storage
         .from(STORAGE_BUCKETS.MEDIA)
         .upload(filePath, uploadData, {
@@ -119,6 +134,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
         .getPublicUrl(data.path);
 
       return publicUrl;
+      
     } catch (error) {
       console.error('Upload failed:', error);
       return null;
@@ -134,6 +150,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
     isPrivate: boolean;
     isEveryone: boolean;
     selectedFriends: string[];
+    attachments: RenderedMediaCanvasItem[];
   }): Promise<ShareResult> => {
     setIsLoading(true);
 
@@ -181,6 +198,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
         location_tag: entryData.locationTag || null,
         is_private: entryData.isPrivate,
         shared_with_everyone: entryData.isEveryone,
+        attachments: entryData.attachments,
         metadata: entryData.capture.metadata ? JSON.parse(JSON.stringify(entryData.capture.metadata)) : null,
       };
 

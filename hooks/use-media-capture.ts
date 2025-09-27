@@ -4,6 +4,8 @@ import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import * as Crypto from 'expo-crypto';
+import { CameraView } from 'expo-camera';
+import { MediaService } from '@/services/media-service';
 
 interface UseCaptureResult {
   isCapturing: boolean;
@@ -11,6 +13,8 @@ interface UseCaptureResult {
   recordingDuration: number;
   startAudioRecording: () => Promise<void>;
   stopAudioRecording: () => Promise<MediaCapture | null>;
+  startVideoRecording: (cameraRef: React.RefObject<CameraView | null>) => Promise<{ data: MediaCapture, cleanup: Function } | undefined>;
+  stopVideoRecording: (cameraRef: React.RefObject<CameraView | null>) => Promise<void>;
   uploadMedia: (mediaType: MediaType) => Promise<MediaCapture | null>;
   clearCapture: () => void;
 }
@@ -24,6 +28,45 @@ export function useMediaCapture(): UseCaptureResult {
   const generateId = () => {
     return Crypto.randomUUID();
   };
+
+  const startVideoRecording = useCallback(async (cameraRef: React.RefObject<CameraView | null>) => {
+    setIsCapturing(true);
+    setRecordingDuration(0);
+
+    try {
+      const capture = await MediaService.startVideoRecording(cameraRef);
+
+      if (!capture) {
+        console.warn("Error with camera or recorsing may not have started yet");
+        return;
+      }
+      
+      // Start duration timer
+      const timer = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+
+      const newCapture: MediaCapture = {
+        ...capture,
+        duration: recordingDuration,
+      }
+  
+      return {
+        data: newCapture,
+        cleanup: () => clearInterval(timer),
+      }
+    } catch (error) {
+      console.error('Error starting recording', error);
+      Alert.alert('Error starting recording' + error);
+    } finally {
+      setIsCapturing(false);
+    }
+
+  }, []);
+
+  const stopVideoRecording = useCallback(async (cameraRef: React.RefObject<CameraView | null>) => {
+    await MediaService.stopVideoRecording(cameraRef);
+  }, []);
 
   const startAudioRecording = useCallback(async () => {
     setIsCapturing(true);
@@ -41,10 +84,40 @@ export function useMediaCapture(): UseCaptureResult {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
       });
 
+      // Custom recording options for higher volume and quality
+      const recordingOptions = {
+        android: {
+          extension: '.m4a',
+          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 256000, // Higher bit rate for better quality
+          maxFileSize: 10 * 1024 * 1024, // 10MB max file size
+        },
+        ios: {
+          extension: '.m4a',
+          audioQuality: Audio.IOSAudioQuality.MAX, // Maximum quality
+          sampleRate: 44100,
+          numberOfChannels: 2,
+          bitRate: 256000, // Higher bit rate for better quality
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 256000,
+        },
+      };
+
       const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
+        recordingOptions
       );
       
       setRecording(newRecording);
@@ -184,6 +257,8 @@ export function useMediaCapture(): UseCaptureResult {
     recordingDuration,
     startAudioRecording,
     stopAudioRecording,
+    startVideoRecording,
+    stopVideoRecording,
     uploadMedia,
     clearCapture,
   };
