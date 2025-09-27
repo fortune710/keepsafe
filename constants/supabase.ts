@@ -9,6 +9,7 @@ export const TABLES = {
   INVITES: 'invites',
   ENTRY_REACTIONS: 'entry_reactions',
   ENTRY_COMMENTS: 'entry_comments',
+  PUSH_TOKENS: 'push_tokens'
 } as const;
 
 // Storage Bucket Names
@@ -90,4 +91,13 @@ export const SCHEMA = {
     is_active: 'boolean DEFAULT true',
     created_at: 'timestamptz DEFAULT now()',
   },
+  PUSH_TOKENS: {
+    id: 'uuid PRIMARY KEY DEFAULT gen_random_uuid()',
+    user_id: 'uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE',
+    token: 'text NOT NULL',
+    platform: "text CHECK (platform IN ('ios', 'android', 'web'))",
+    device_id: 'text',
+    created_at: 'timestamptz DEFAULT now()',
+    updated_at: 'timestamptz DEFAULT now()',
+  }
 } as const;

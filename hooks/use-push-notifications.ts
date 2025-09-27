@@ -10,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: false
   }),
 });
 
@@ -28,8 +30,8 @@ export function usePushNotifications(): UsePushNotificationsResult {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription>(null);
+  const responseListener = useRef<Notifications.Subscription>(null);
 
   useEffect(() => {
     // Register for push notifications on mount
@@ -37,6 +39,7 @@ export function usePushNotifications(): UsePushNotificationsResult {
 
     // Listen for incoming notifications
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('New notification: ', notification)
       setNotification(notification);
     });
 
@@ -48,10 +51,10 @@ export function usePushNotifications(): UsePushNotificationsResult {
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        notificationListener.current.remove();
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        notificationListener.current?.remove();
       }
     };
   }, []);
@@ -123,7 +126,7 @@ export function usePushNotifications(): UsePushNotificationsResult {
           body: 'This is a test notification from Keepsafe!',
           data: { testData: 'test' },
         },
-        trigger: { seconds: 1 },
+        trigger: null,
       });
     } catch (error) {
       console.error('Error sending test notification:', error);
