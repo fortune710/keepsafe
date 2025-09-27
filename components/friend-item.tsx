@@ -2,11 +2,14 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { X } from 'lucide-react-native';
+import { FRIENDSHIP_STATUS } from '@/constants/supabase';
+import { Colors } from '@/lib/constants';
 
 export interface Friend {
   id: string;
   name: string;
   email: string;
+  username: string;
   avatar: string;
   status: 'connected' | 'pending' | 'invited';
   invitedAt?: Date;
@@ -71,19 +74,6 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
     }
   };
 
-  const getStatusText = () => {
-    switch (friend.status) {
-      case 'connected':
-        return friend.isOnline ? 'Online' : 'Connected';
-      case 'pending':
-        return 'Invitation pending';
-      case 'invited':
-        return 'Invited';
-      default:
-        return '';
-    }
-  };
-
   return (
     <Animated.View 
       entering={FadeInDown.delay(index * 50).duration(300).springify().damping(20).stiffness(90)}
@@ -95,7 +85,7 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
       >
         <View style={styles.avatarContainer}>
           <Image source={{ uri: friend.avatar }} style={styles.avatar} />
-          {friend.status === 'connected' && (
+          {friend.status === (FRIENDSHIP_STATUS.ACCEPTED as string) && (
             <View 
               style={[
                 styles.statusIndicator, 
@@ -108,12 +98,7 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
         
         <View style={styles.friendInfo}>
           <Text style={styles.friendName}>{friend.name}</Text>
-          <Text style={styles.friendEmail}>{friend.email}</Text>
-          {friend.status !== 'connected' && (
-            <Text style={[styles.statusText, { color: getStatusColor() }]}>
-              {getStatusText()}
-            </Text>
-          )}
+          <Text style={styles.friendEmail}>{friend.username}</Text>
         </View>
 
         <TouchableOpacity 
@@ -163,16 +148,18 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     borderWidth: 2,
+    borderColor: Colors.primary
   },
   statusIndicator: {
     position: 'absolute',
-    bottom: 2,
+    bottom: -2,
     right: 2,
     width: 12,
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: 'white',
+    zIndex: 100
   },
   friendInfo: {
     flex: 1,

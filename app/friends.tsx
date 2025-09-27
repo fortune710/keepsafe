@@ -10,11 +10,15 @@ import FriendsSection from '@/components/friends-section';
 import { useFriends } from '@/hooks/use-friends';
 import { useAuthContext } from '@/providers/auth-provider';
 import ToastMessage from '@/components/toast-message';
+import { scale, verticalScale } from 'react-native-size-matters';
+import { ContactsService } from '@/services/contacts-service';
+import { useSuggestedFriends } from '@/hooks/use-suggested-friends';
+import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
 
 const { width } = Dimensions.get('window');
 
 export default function FriendsScreen() {
-  const { user } = useAuthContext();
+  const { profile } = useAuthContext();
   const { 
     friends, 
     pendingRequests, 
@@ -24,7 +28,11 @@ export default function FriendsScreen() {
     acceptFriendRequest,
     declineFriendRequest,
     refetch 
-  } = useFriends(user?.id);
+  } = useFriends(profile?.id);
+
+  const { suggestedFriends } = useSuggestedFriends();
+
+  console.log({ suggestedFriends })
 
   const [showInvitePopover, setShowInvitePopover] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -107,6 +115,7 @@ export default function FriendsScreen() {
       id: friendship.id,
       name: friendship.friend_profile?.full_name || 'Unknown User',
       email: friendship.friend_profile?.email || '',
+      username: friendship.friend_profile?.username || "",
       avatar: friendship.friend_profile?.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100',
       status: friendship.status,
       connectedAt: friendship.status === 'accepted' ? new Date(friendship.updated_at) : undefined,
@@ -117,110 +126,116 @@ export default function FriendsScreen() {
 
   const allFriends = convertToFriendFormat([...friends, ...pendingRequests]);
 
+  console.log({ allFriends })
+
   return (
-    <GestureDetector gesture={swipeGesture}>
-      <Animated.View 
-        entering={SlideInRight} 
-        exiting={SlideOutRight}
-        style={styles.container}
-      >
-        <SafeAreaView style={styles.container}>
-          <ToastMessage 
-            message={toast.message}
-            type={toast.type}
-            visible={toast.visible}
-          />
+    <SafeAreaView style={styles.container}>
+      <GestureDetector gesture={swipeGesture}>
+        <Animated.View 
+          entering={SlideInRight} 
+          exiting={SlideOutRight}
+          style={styles.container}
+        >
+          <>
+            <ToastMessage 
+              message={toast.message}
+              type={toast.type}
+              visible={toast.visible}
+            />
 
-          <View style={styles.header}>
-            <Text style={styles.title}>Friends</Text>
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={() => router.back()}
-            >
-              <ChevronRight color="#64748B" size={24} />
-            </TouchableOpacity>
-          </View>
+            <View style={styles.header}>
+              <Text style={styles.title}>Friends</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => router.back()}
+              >
+                <ChevronRight color="#64748B" size={24} />
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.content}>
-            {error ? (
-              <View style={styles.errorContainer}>
-                <AlertCircle color="#EF4444" size={48} />
-                <Text style={styles.errorTitle}>Unable to Load Friends</Text>
-                <Text style={styles.errorMessage}>{error.message || 'Something went wrong'}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-                  <Text style={styles.retryButtonText}>Try Again</Text>
-                </TouchableOpacity>
-              </View>
-            ) : isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#8B5CF6" />
-                <Text style={styles.loadingText}>Loading friends...</Text>
-              </View>
-            ) : (
-              <>
-                {!showSearch ? (
-                  <>
-                    <TouchableOpacity 
-                      style={styles.searchBox} 
-                      onPress={handleSearchToggle}
-                      activeOpacity={0.7}
-                    >
-                      <Search color="#94A3B8" size={20} />
-                      <Text style={styles.searchPlaceholder}>Search friends...</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.addFriendsSection}>
-                      <View style={styles.sectionHeader}>
-                        <UserPlus color="#8B5CF6" size={16} />
-                        <Text style={styles.sectionTitle}>Add Friends</Text>
-                      </View>
-                      
-                      <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
-                        <Share color="#8B5CF6" size={20} />
-                        <Text style={styles.shareButtonText}>Share Your Link</Text>
+            <View style={styles.content}>
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <AlertCircle color="#EF4444" size={48} />
+                  <Text style={styles.errorTitle}>Unable to Load Friends</Text>
+                  <Text style={styles.errorMessage}>{error.message || 'Something went wrong'}</Text>
+                  <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+                    <Text style={styles.retryButtonText}>Try Again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#8B5CF6" />
+                  <Text style={styles.loadingText}>Loading friends...</Text>
+                </View>
+              ) : (
+                <>
+                  {!showSearch ? (
+                    <>
+                      <TouchableOpacity 
+                        style={styles.searchBox} 
+                        onPress={handleSearchToggle}
+                        activeOpacity={0.7}
+                      >
+                        <Search color="#94A3B8" size={20} />
+                        <Text style={styles.searchPlaceholder}>Search friends...</Text>
                       </TouchableOpacity>
-                    </View>
 
-                    <FriendsSection
-                      friends={allFriends}
-                      onRemoveFriend={handleRemoveFriend}
-                      onFriendPress={handleFriendPress}
-                      onAcceptRequest={handleAcceptRequest}
-                      onDeclineRequest={handleDeclineRequest}
-                      isLoading={false}
-                      searchQuery=""
-                    />
-                  </>
-                ) : (
-                  <>
-                    <FriendSearchBar
-                      isVisible={showSearch}
-                      onClose={() => setShowSearch(false)}
-                      onSearch={handleSearch}
-                    />
+                      <View style={styles.addFriendsSection}>
+                        <View style={styles.sectionHeader}>
+                          <UserPlus color="#8B5CF6" size={16} />
+                          <Text style={styles.sectionTitle}>Add Friends</Text>
+                        </View>
+                        
+                        <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
+                          <Share color="#8B5CF6" size={20} />
+                          <Text style={styles.shareButtonText}>Share Your Link</Text>
+                        </TouchableOpacity>
+                      </View>
 
-                    <FriendsSection
-                      friends={allFriends}
-                      onRemoveFriend={handleRemoveFriend}
-                      onFriendPress={handleFriendPress}
-                      onAcceptRequest={handleAcceptRequest}
-                      onDeclineRequest={handleDeclineRequest}
-                      isLoading={false}
-                      searchQuery={searchQuery}
-                    />
-                  </>
-                )}
-              </>
-            )}
-          </View>
-        </SafeAreaView>
-        
-        <InvitePopover 
-          isVisible={showInvitePopover}
-          onClose={() => setShowInvitePopover(false)}
-        />
-      </Animated.View>
-    </GestureDetector>
+                      <SuggestedFriendsList friends={suggestedFriends}/>
+
+                      <FriendsSection
+                        friends={allFriends}
+                        onRemoveFriend={handleRemoveFriend}
+                        onFriendPress={handleFriendPress}
+                        onAcceptRequest={handleAcceptRequest}
+                        onDeclineRequest={handleDeclineRequest}
+                        isLoading={false}
+                        searchQuery=""
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <FriendSearchBar
+                        isVisible={showSearch}
+                        onClose={() => setShowSearch(false)}
+                        onSearch={handleSearch}
+                      />
+
+                      <FriendsSection
+                        friends={allFriends}
+                        onRemoveFriend={handleRemoveFriend}
+                        onFriendPress={handleFriendPress}
+                        onAcceptRequest={handleAcceptRequest}
+                        onDeclineRequest={handleDeclineRequest}
+                        isLoading={false}
+                        searchQuery={searchQuery}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+            </View>
+          </>
+          
+          <InvitePopover 
+            isVisible={showInvitePopover}
+            onClose={() => setShowInvitePopover(false)}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </SafeAreaView>
   );
 }
 
@@ -233,14 +248,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(12),
+    marginBottom: verticalScale(8),
     backgroundColor: '#F0F9FF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    //shadowColor: '#000',
+    //shadowOffset: { width: 0, height: 2 },
+    //shadowOpacity: 0.1,
+    //shadowRadius: 4,
+    //elevation: 3,
   },
   closeButton: {
     position: 'absolute',

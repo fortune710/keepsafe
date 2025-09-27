@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ActivityIndicator } from 'react-native';
-import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Copy, Share, X, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Copy, Share, X } from 'lucide-react-native';
 import { useFriendInvitation } from '@/hooks/use-friend-invitation';
+import { verticalScale } from 'react-native-size-matters';
+import { useAuthContext } from '@/providers/auth-provider';
 
 const { height } = Dimensions.get('window');
 
@@ -13,13 +15,17 @@ interface InvitePopoverProps {
 }
 
 export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps) {
-  const { inviteLink, isGenerating, error, generateInviteLink, copyInviteLink, shareInviteLink } = useFriendInvitation();
+  const { inviteLink, copyInviteLink, shareInviteLink } = useFriendInvitation();
+  const { profile } = useAuthContext();
+  
+  const popoverHeight = useSharedValue(height * 0.6);
 
-  React.useEffect(() => {
-    if (isVisible && !inviteLink) {
-      generateInviteLink();
+  const animatedPopoverStyle = useAnimatedStyle(() => {
+    return {
+      maxHeight: popoverHeight.value,
     }
-  }, [isVisible, inviteLink, generateInviteLink]);
+  })
+
 
   // Swipe down gesture to dismiss
   const swipeDownGesture = Gesture.Pan()
@@ -27,6 +33,7 @@ export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps
       // Only allow downward swipes
       if (event.translationY > 0) {
         // Handle swipe animation here if needed
+        //popoverHeight.value = popoverHeight.value - (event.translationY * 1.8)
       }
     })
     .onEnd((event) => {
@@ -79,7 +86,7 @@ export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
       
       <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View style={styles.popover}>
+        <Animated.View style={[styles.popover, animatedPopoverStyle]}>
           <View style={styles.handle} />
           
           <View style={styles.header}>
@@ -93,35 +100,21 @@ export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps
             Share your invite link with friends to connect on Keepsafe
           </Text>
 
-          {error ? (
-            <View style={styles.errorContainer}>
-              <AlertCircle color="#EF4444" size={24} />
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={generateInviteLink}>
-                <Text style={styles.retryButtonText}>Try Again</Text>
+          
+          <View style={styles.linkContainer}>
+            <View style={styles.linkBox}>
+              <Text style={styles.linkText} numberOfLines={1}>
+                {inviteLink}
+              </Text>
+              <TouchableOpacity style={styles.copyButton} onPress={handleCopyLink}>
+                <Copy color="#8B5CF6" size={16} />
               </TouchableOpacity>
             </View>
-          ) : isGenerating ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="#8B5CF6" size="small" />
-              <Text style={styles.loadingText}>Generating invite link...</Text>
-            </View>
-          ) : inviteLink ? (
-            <View style={styles.linkContainer}>
-              <View style={styles.linkBox}>
-                <Text style={styles.linkText} numberOfLines={1}>
-                  {inviteLink.url}
-                </Text>
-                <TouchableOpacity style={styles.copyButton} onPress={handleCopyLink}>
-                  <Copy color="#8B5CF6" size={16} />
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.linkInfo}>
-                {inviteLink.maxUsage - inviteLink.usageCount} uses remaining
-              </Text>
-            </View>
-          ) : null}
+            
+            <Text style={styles.linkInfo}>
+              {(profile?.max_uses || 0) - (profile?.current_uses || 0)} uses remaining
+            </Text>
+          </View>
 
           <View style={styles.actions}>
             <TouchableOpacity 
@@ -140,9 +133,19 @@ export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps
 }
 
 const styles = StyleSheet.create({
+  listContainer: { 
+    maxHeight: verticalScale(450), 
+    width: '100%',
+    paddingHorizontal: 24,
+  },
+  suggestedFriendsText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginVertical: 12
+  },
   overlay: {
     position: 'absolute',
-    top: 0,
+    top: verticalScale(-50),
     left: 0,
     right: 0,
     bottom: 0,
@@ -154,14 +157,13 @@ const styles = StyleSheet.create({
   },
   popover: {
     position: 'absolute',
-    bottom: 0,
+    bottom: verticalScale(-40),
     left: 0,
     right: 0,
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: 40,
-    maxHeight: height * 0.6,
+    paddingBottom: verticalScale(60),
   },
   handle: {
     width: 40,

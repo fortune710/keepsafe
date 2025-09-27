@@ -2,6 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Users } from 'lucide-react-native';
 import FriendItem, { Friend } from './friend-item';
+import { FRIENDSHIP_STATUS } from '@/constants/supabase';
+import Badge from './ui/badge';
+import { Colors } from '@/lib/constants';
 
 interface FriendsSectionProps {
   friends: Friend[];
@@ -27,8 +30,8 @@ export default function FriendsSection({
     friend.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const connectedFriends = filteredFriends.filter(f => f.status === 'connected');
-  const pendingFriends = filteredFriends.filter(f => f.status === 'pending');
+  const connectedFriends = filteredFriends.filter(f => f.status === FRIENDSHIP_STATUS.ACCEPTED as string);
+  const pendingFriends = filteredFriends.filter(f => f.status === FRIENDSHIP_STATUS.PENDING as string);
 
   if (isLoading) {
     return (
@@ -65,8 +68,9 @@ export default function FriendsSection({
           <View style={styles.sectionHeader}>
             <Users color="#10B981" size={16} />
             <Text style={styles.sectionTitle}>
-              Connected ({connectedFriends.length})
+              Connected
             </Text>
+            <Badge style={styles.connectedBadge} text={friends.length} />
           </View>
           
           {connectedFriends.map((friend, index) => (
@@ -110,6 +114,7 @@ export default function FriendsSection({
 }
 
 const styles = StyleSheet.create({
+  connectedBadge: { marginLeft: 5, backgroundColor: "#10B981" },
   container: {
     flex: 1,
   },

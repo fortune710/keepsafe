@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { deviceStorage } from '@/services/device-storage';
+import { FriendService } from '@/services/friend-service';
 
 type Friendship = Database['public']['Tables']['friendships']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -22,6 +23,7 @@ interface UseFriendsResult {
   declineFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   removeFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   refetch: () => void;
+  prefetchSuggestedFriends: () => Promise<{ success: boolean; error: string | null }>;
 }
 
 export function useFriends(userId?: string): UseFriendsResult {
@@ -48,11 +50,17 @@ export function useFriends(userId?: string): UseFriendsResult {
         .select(`
           *,
           friend_profile:profiles (
-            id
+            id,
+            full_name,
+            avatar_url,
+            username
           )
         `)
-        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .eq('user_id', userId)
+        //.or(`user_id.eq.${userId},friend_id.eq.${userId}`)
         .order('created_at', { ascending: false });
+
+      console.log({ data })
 
       if (error) {
         throw new Error(error.message);
@@ -81,7 +89,7 @@ export function useFriends(userId?: string): UseFriendsResult {
           user_id: userId!,
           friend_id: friendId,
           status: FRIENDSHIP_STATUS.PENDING,
-        })
+        } as never)
         .select()
         .single();
 
@@ -104,7 +112,7 @@ export function useFriends(userId?: string): UseFriendsResult {
     mutationFn: async ({ id, status }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED }) => {
       const { data, error } = await supabase
         .from(TABLES.FRIENDSHIPS)
-        .update({ status })
+        .update({ status } as never)
         .eq('id', id)
         .select()
         .single();
@@ -192,6 +200,25 @@ export function useFriends(userId?: string): UseFriendsResult {
     }
   }, [deleteFriendshipMutation]);
 
+  const prefetchSuggestedFriends = async () => {
+    try {
+      await queryClient.prefetchQuery({
+        queryKey: ["suggested-friends"],
+        queryFn: FriendService.getSuggestedFriendsFromContacts
+      })
+
+      return {
+        success: true,
+        error: null
+      }
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error getting suggested friends'
+      }
+    }
+  }
   return {
     friends,
     pendingRequests,
@@ -202,5 +229,6 @@ export function useFriends(userId?: string): UseFriendsResult {
     declineFriendRequest,
     removeFriend,
     refetch,
+    prefetchSuggestedFriends
   };
 }
