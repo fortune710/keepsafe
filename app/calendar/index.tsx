@@ -8,15 +8,15 @@ import { useEntries } from '@/hooks/use-entries';
 import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, FlashListRef } from '@shopify/flash-list';
 
 const { width } = Dimensions.get('window');
 
 export default function CalendarScreen() {
   const { user } = useAuthContext();
   const { entries, isLoading } = useEntries(user?.id);
-  const { currentStreak, maxStreak, isLoading: streakLoading } = useStreakTracking(user?.id);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const { currentStreak, maxStreak, isLoading: streakLoading, checkAndUpdateStreak } = useStreakTracking(user?.id);
+  const scrollViewRef = useRef<FlashListRef<Date>>(null);
 
   // Process entries data for calendar display
   const entriesData = React.useMemo(() => {
@@ -67,9 +67,16 @@ export default function CalendarScreen() {
   // Scroll to bottom (current month) on mount
   useEffect(() => {
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: false });
-    }, 100);
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 400);
   }, []);
+
+  // Check and update streak when component mounts
+  useEffect(() => {
+    if (user?.id && !streakLoading) {
+      checkAndUpdateStreak();
+    }
+  }, [user?.id, streakLoading, checkAndUpdateStreak]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -160,6 +167,7 @@ export default function CalendarScreen() {
             ) :
               <FlashList
                 contentContainerStyle={styles.scrollContent}
+                ref={scrollViewRef}
                 ListFooterComponent={
                   <View style={styles.streakContainerWrapper}>
                     <View style={styles.streakContainer}>
