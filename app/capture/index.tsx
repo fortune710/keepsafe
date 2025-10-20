@@ -3,7 +3,7 @@
 // ================================
 
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Dimensions, Alert, Modal, ScrollView, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ScrollView, Image, StatusBar } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import Animated, { 
@@ -24,8 +24,9 @@ import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { DateContainer } from '@/components/date-container';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 export default function CaptureScreen() {
   const [selectedMode, setSelectedMode] = useState<'camera' | 'microphone'>('camera');
@@ -343,12 +344,12 @@ export default function CaptureScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <GestureDetector gesture={panGesture}>
-        <Animated.View 
-          style={[{ flex: 1 }, animatedStyle, styles.pageStyle]}
-          entering={SlideInUp}
-        >
+    <Animated.View 
+      style={[{ flex: 1 }, animatedStyle, styles.pageStyle]}
+      entering={SlideInUp}
+    >
+      <SafeAreaView style={styles.container}>
+        <GestureDetector gesture={panGesture}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.header}>
               <TouchableOpacity 
@@ -535,9 +536,9 @@ export default function CaptureScreen() {
               </View>
             </View>
           </ScrollView>
-        </Animated.View>
-      </GestureDetector>
-    </SafeAreaView>
+        </GestureDetector>
+      </SafeAreaView>
+    </Animated.View>
   );
 }
 
@@ -548,7 +549,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F9FF',
   },
   pageStyle: {
-    paddingTop: (StatusBar.currentHeight ?? 0) + 5,
+    //paddingTop: (StatusBar.currentHeight ?? 0) + 5,
   },
   header: {
     flexDirection: 'row',
@@ -556,7 +557,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    marginTop: verticalScale(32)
+    //marginTop: verticalScale(24)
   },
   profileButton: {
     width: 36,
