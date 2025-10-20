@@ -10,6 +10,23 @@ export interface StorageItem<T> {
 
 class DeviceStorage {
   private isWeb = Platform.OS === 'web';
+  private listeners: Record<string, Set<(payload?: any) => void>> = {};
+
+  on(event: string, listener: (payload?: any) => void): () => void {
+    if (!this.listeners[event]) this.listeners[event] = new Set();
+    this.listeners[event].add(listener);
+    return () => this.off(event, listener);
+  }
+
+  off(event: string, listener: (payload?: any) => void): void {
+    this.listeners[event]?.delete(listener);
+  }
+
+  private emit(event: string, payload?: any): void {
+    this.listeners[event]?.forEach(l => {
+      try { l(payload); } catch {}
+    });
+  }
 
   // Generic storage methods
   async setItem<T>(key: string, value: T, expirationMinutes?: number): Promise<void> {
@@ -25,6 +42,11 @@ class DeviceStorage {
       localStorage.setItem(key, serializedValue);
     } else {
       await AsyncStorage.setItem(key, serializedValue);
+    }
+
+    if (key.startsWith('entries_')) {
+      const userId = key.replace('entries_', '');
+      this.emit('entriesChanged', { userId });
     }
   }
 
@@ -62,6 +84,11 @@ class DeviceStorage {
       localStorage.removeItem(key);
     } else {
       await AsyncStorage.removeItem(key);
+    }
+
+    if (key.startsWith('entries_')) {
+      const userId = key.replace('entries_', '');
+      this.emit('entriesChanged', { userId });
     }
   }
 
@@ -109,6 +136,18 @@ class DeviceStorage {
     const updatedEntries = existingEntries.map(entry => 
       entry.id === entryId ? { ...entry, ...updates } : entry
     );
+    await this.setEntries(userId, updatedEntries);
+  }
+
+  async replaceEntry(userId: string, tempId: string, realEntry: any): Promise<void> {
+    const existingEntries = await this.getEntries(userId) || [];
+    const hasTemp = existingEntries.some(e => e.id === tempId);
+    let updatedEntries;
+    if (hasTemp) {
+      updatedEntries = existingEntries.map(e => e.id === tempId ? realEntry : e);
+    } else {
+      updatedEntries = [realEntry, ...existingEntries];
+    }
     await this.setEntries(userId, updatedEntries);
   }
 
