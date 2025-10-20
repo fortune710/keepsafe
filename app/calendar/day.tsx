@@ -10,7 +10,7 @@ import { DateContainer } from '@/components/date-container';
 import { EntryPage } from '@/components/entries/entry-page';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getEntriesForDate } from '@/lib/utils';
+import { getEntriesForDate, getTimefromTimezone } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
 
 export default function CalendarDayScreen() {
@@ -18,6 +18,7 @@ export default function CalendarDayScreen() {
   const { entries, isLoading, error } = useUserEntries();
 
   const selectedDate = date as string;
+  console.log(selectedDate);
 
   // Filter entries for the selected date
   const dayEntries = React.useMemo(() => {

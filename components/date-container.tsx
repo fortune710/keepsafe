@@ -1,3 +1,4 @@
+import { getTimefromTimezone } from "@/lib/utils";
 import { View, Text, StyleSheet } from "react-native";
 import { scale } from "react-native-size-matters";
 
@@ -10,7 +11,8 @@ const getCurrentDate = (date: Date) => {
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
-      day: 'numeric' 
+      day: 'numeric',
+      timeZone: 'UTC'
     };
     return date.toLocaleDateString('en-US', options);
 };

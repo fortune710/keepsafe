@@ -8,7 +8,7 @@ import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { verticalScale } from 'react-native-size-matters';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
-import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames } from '@/lib/utils';
+import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames, getTimefromTimezone } from '@/lib/utils';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import StreakElement from '@/components/streaks/streak-element';
 
@@ -23,7 +23,7 @@ export default function CalendarScreen() {
     const data: { [key: string]: number } = {};
     
     entries.forEach(entry => {
-      const dateKey = new Date(entry.created_at).toISOString().split('T')[0];
+      const dateKey = getTimefromTimezone(new Date(entry.created_at)).toISOString().split('T')[0];
       data[dateKey] = (data[dateKey] || 0) + 1;
     });
     
