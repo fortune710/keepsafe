@@ -1,13 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
-import { ChevronRight, Sparkles, Settings, Star } from 'lucide-react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { ChevronRight, Sparkles, Settings } from 'lucide-react-native';
 import { router } from 'expo-router';
 import Animated, { SlideInLeft, SlideOutLeft } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useEntries } from '@/hooks/use-entries';
 import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
-import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
+import { verticalScale } from 'react-native-size-matters';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames } from '@/lib/utils';
 import { SafeAreaView } from 'react-native-safe-area-context';
