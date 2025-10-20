@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { ChevronRight, Sparkles, Settings, Star } from 'lucide-react-native';
 import { router } from 'expo-router';
 import Animated, { SlideInLeft, SlideOutLeft } from 'react-native-reanimated';
@@ -9,8 +9,9 @@ import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
-
-const { width } = Dimensions.get('window');
+import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames } from '@/lib/utils';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import StreakElement from '@/components/streaks/streak-element';
 
 export default function CalendarScreen() {
   const { user } = useAuthContext();
@@ -30,46 +31,21 @@ export default function CalendarScreen() {
     return data;
   }, [entries]);
 
-  // Generate months from current date backwards
-  const generateMonths = () => {
-    const months = [];
-    const currentDate = new Date();
-    
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      months.push(date);
-    }
-    
-    return months.reverse(); // Reverse so current month is at bottom
-  };
+  
 
   const months = generateMonths();
 
-  // Swipe gesture to close calendar
-  const swipeGesture = Gesture.Pan()
-    .onEnd((event) => {
-      if (event.translationX < -width * 0.3 && event.velocityX < -500) {
-        router.back();
-      }
-    });
   const handleDayPress = (day: number, monthDate: Date) => {
     const selectedDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
     const dateString = selectedDate.toISOString().split('T')[0];
     
-    if (hasEntries(day, monthDate)) {
+    if (hasEntries(day, monthDate, entriesData)) {
       router.push({
         pathname: '/calendar/day',
         params: { date: dateString }
       });
     }
   };
-
-  // Scroll to bottom (current month) on mount
-  useEffect(() => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 400);
-  }, []);
 
   // Check and update streak when component mounts
   useEffect(() => {
@@ -78,174 +54,120 @@ export default function CalendarScreen() {
     }
   }, [user?.id, streakLoading, checkAndUpdateStreak]);
 
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
 
-    const days = [];
-    
-    // Add empty cells for days before the month starts
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-    
-    // Add days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(day);
-    }
-    
-    return days;
-  };
 
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  };
 
-  const getDateKey = (day: number, monthDate: Date) => {
-    const year = monthDate.getFullYear();
-    const month = monthDate.getMonth();
-    return new Date(year, month, day).toISOString().split('T')[0];
-  };
 
-  const hasEntries = (day: number, monthDate: Date) => {
-    const dateKey = new Date(monthDate.getFullYear(), monthDate.getMonth(), day).toISOString().split('T')[0];
-    return entriesData[dateKey] > 0;
-  };
 
-  const getEntryCount = (day: number, monthDate: Date) => {
-    const dateKey = new Date(monthDate.getFullYear(), monthDate.getMonth(), day).toISOString().split('T')[0];
-    return entriesData[dateKey] || 0;
-  };
+  //TODO: Break page down into multiple components using composition
 
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <GestureDetector gesture={swipeGesture}>
-      <Animated.View 
-        entering={SlideInLeft} 
-        exiting={SlideOutLeft}
-        style={styles.container}
-      >
-        <SafeAreaView style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Timeline</Text>
+    <Animated.View 
+      entering={SlideInLeft} 
+      exiting={SlideOutLeft}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Timeline</Text>
+          
+          <View style={styles.rightIcons}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => router.push('/dreamscape')}
+            >
+              <Sparkles color="#64748B" size={20} />
+            </TouchableOpacity>
             
-            <View style={styles.rightIcons}>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => router.push('/dreamscape')}
-              >
-                <Sparkles color="#64748B" size={20} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => router.push('/settings')}
-              >
-                <Settings color="#64748B" size={20} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => router.back()}
-              >
-                <ChevronRight color="#64748B" size={20} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => router.push('/settings')}
+            >
+              <Settings color="#64748B" size={20} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => router.back()}
+            >
+              <ChevronRight color="#64748B" size={20} />
+            </TouchableOpacity>
           </View>
+        </View>
 
-          {
-            isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#8B5CF6" />
-                <Text style={styles.loadingText}>Loading your entries...</Text>
-              </View>
-            ) :
-              <FlashList
-                contentContainerStyle={styles.scrollContent}
-                ref={scrollViewRef}
-                ListFooterComponent={
-                  <View style={styles.streakContainerWrapper}>
-                    <View style={styles.streakContainer}>
-                      {streakLoading ? (
-                        <ActivityIndicator size="small" color="#8B5CF6" />
-                      ) : (
-                        <View style={styles.streakStats}>
-                          <View style={styles.streakStat}>
-                            <Star color="#8B5CF6" size={20} />
-                            <Text style={styles.streakNumber}>{currentStreak}</Text>
-                            <Text style={styles.streakLabel}>Current</Text>
-                          </View>
-                          <View style={styles.streakDivider} />
-                          <View style={styles.streakStat}>
-                            <Star color="#8B5CF6" size={20} />
-                            <Text style={styles.streakNumber}>{maxStreak}</Text>
-                            <Text style={styles.streakLabel}>Best</Text>
-                          </View>
-                        </View>
-                      )}
+        {
+          isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Loading your entries...</Text>
+            </View>
+          ) :
+            <FlashList
+              contentContainerStyle={styles.scrollContent}
+              onLoad={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+              ref={scrollViewRef}
+              ListFooterComponent={
+                <StreakElement
+                  isLoading={streakLoading}
+                  currentStreak={currentStreak}
+                  maxStreak={maxStreak}
+                />
+              }
+              data={months}
+              renderItem={({ item: monthDate, index }) => {
+                const days = getDaysInMonth(monthDate);
+
+                return (
+                  <View key={index} style={styles.monthCard}>
+                    <View style={styles.monthHeader}>
+                      <Text style={styles.monthTitle}>{formatMonthYear(monthDate)}</Text>
+                    </View>
+
+                    <View style={styles.calendar}>
+                      <View style={styles.dayNamesRow}>
+                        {dayNames.map(dayName => (
+                          <Text key={dayName} style={styles.dayName}>{dayName}</Text>
+                        ))}
+                      </View>
+
+                      <View style={styles.daysGrid}>
+                        {days.map((day, dayIndex) => (
+                          <TouchableOpacity 
+                            key={dayIndex} 
+                            style={styles.dayCell}
+                            disabled={day === null || !hasEntries(day, monthDate, entriesData)}
+                            onPress={() => day && handleDayPress(day, monthDate)}
+                          >
+                            {day && (
+                              <View style={styles.dayContent}>
+                                <Text style={styles.dayNumber}>{day}</Text>
+                                {hasEntries(day, monthDate, entriesData) && (
+                                  <View style={styles.entryIndicatorContainer}>
+                                    <View 
+                                      style={[
+                                        styles.entryIndicator,
+                                        getEntryCount(day, monthDate, entriesData) > 1 && styles.multipleEntries
+                                      ]} 
+                                    />
+                                    {getEntryCount(day, monthDate, entriesData) > 1 && (
+                                      <Text style={styles.entryCount}>{getEntryCount(day, monthDate, entriesData)}</Text>
+                                    )}
+                                  </View>
+                                )}
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
                   </View>
-                }
-                data={months}
-                renderItem={({ item: monthDate, index }) => {
-                  const days = getDaysInMonth(monthDate);
-
-                  return (
-                    <View key={index} style={styles.monthCard}>
-                      <View style={styles.monthHeader}>
-                        <Text style={styles.monthTitle}>{formatMonthYear(monthDate)}</Text>
-                      </View>
-
-                      <View style={styles.calendar}>
-                        <View style={styles.dayNamesRow}>
-                          {dayNames.map(dayName => (
-                            <Text key={dayName} style={styles.dayName}>{dayName}</Text>
-                          ))}
-                        </View>
-
-                        <View style={styles.daysGrid}>
-                          {days.map((day, dayIndex) => (
-                            <TouchableOpacity 
-                              key={dayIndex} 
-                              style={styles.dayCell}
-                              disabled={day === null || !hasEntries(day, monthDate)}
-                              onPress={() => day && handleDayPress(day, monthDate)}
-                            >
-                              {day && (
-                                <View style={styles.dayContent}>
-                                  <Text style={styles.dayNumber}>{day}</Text>
-                                  {hasEntries(day, monthDate) && (
-                                    <View style={styles.entryIndicatorContainer}>
-                                      <View 
-                                        style={[
-                                          styles.entryIndicator,
-                                          getEntryCount(day, monthDate) > 1 && styles.multipleEntries
-                                        ]} 
-                                      />
-                                      {getEntryCount(day, monthDate) > 1 && (
-                                        <Text style={styles.entryCount}>{getEntryCount(day, monthDate)}</Text>
-                                      )}
-                                    </View>
-                                  )}
-                                </View>
-                              )}
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                    </View>
-                  );
-                }}
-              />
-          }
-        </SafeAreaView>
-      </Animated.View>
-    </GestureDetector>
+                );
+              }}
+            />
+        }
+      </SafeAreaView>
+    </Animated.View>
   );
 }
 
@@ -375,59 +297,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 1,
   },
-  streakContainerWrapper: { 
-    justifyContent: 'center', 
-    flexDirection: 'row' 
-  },
-  streakContainer: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    marginVertical: 20,
-    borderRadius: 12,
-    paddingHorizontal: moderateScale(24),
-    paddingVertical: moderateScale(12),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    width: '75%'
-  },
-  streakTitle: {
-    fontSize: moderateScale(12),
-    fontWeight: '600',
-    color: '#1E293B',
-    textAlign: 'center',
-    marginRight: 12
-  },
-  streakStats: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  streakStat: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flex: 1,
-  },
-  streakNumber: {
-    fontSize: moderateScale(16),
-    fontWeight: '500',
-    color: '#8B5CF6',
-    marginLeft: 2
-  },
-  streakLabel: {
-    fontSize: moderateScale(16),
-    color: '#64748B',
-    fontWeight: '400',
-    marginLeft: 8
-  },
-  streakDivider: {
-    width: 1,
-    height: verticalScale(16),
-    backgroundColor: '#E2E8F0',
-    marginLeft: scale(28),
-    marginRight: scale(14)
-  },
+
 });

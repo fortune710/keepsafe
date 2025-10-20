@@ -1,13 +1,17 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { ArrowLeft, CircleAlert as AlertCircle } from 'lucide-react-native';
-import { useAuthContext } from '@/providers/auth-provider';
 import VaultEntryCard from '@/components/entries/vault-entry-card';
 import { useUserEntries } from '@/hooks/use-user-entries';
 import { DateContainer } from '@/components/date-container';
+import { EntryPage } from '@/components/entries/entry-page';
+import { FlashList } from '@shopify/flash-list';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getEntriesForDate } from '@/lib/utils';
+import { verticalScale } from 'react-native-size-matters';
 
 export default function CalendarDayScreen() {
   const { date } = useLocalSearchParams();
@@ -17,31 +21,7 @@ export default function CalendarDayScreen() {
 
   // Filter entries for the selected date
   const dayEntries = React.useMemo(() => {
-    return entries.filter(entry => {
-      const entryDate = new Date(entry.created_at).toISOString().split('T')[0];
-      return entryDate === selectedDate;
-    }).map(entry => ({
-      id: entry.id,
-      type: entry.type as 'photo' | 'video' | 'audio',
-      content: entry.content_url || '',
-      text: entry.text_content || '',
-      music: entry.music_tag || undefined,
-      location: entry.location_tag || undefined,
-      date: new Date(entry.created_at),
-      is_private: entry.is_private,
-      profile: entry.profile,
-      user_id: entry.user_id,
-      shared_with: entry.shared_with,
-      shared_with_everyone: entry.shared_with_everyone,
-      metadata: entry.metadata,
-      content_url: entry.content_url,
-      text_content: entry.text_content,
-      music_tag: entry.music_tag,
-      location_tag: entry.location_tag,
-      created_at: entry.created_at,
-      updated_at: entry.updated_at,
-      attachments: entry.attachments
-    }));
+    return getEntriesForDate(selectedDate, entries);
   }, [entries, selectedDate]);
 
   // Swipe right gesture to go back
@@ -82,18 +62,15 @@ export default function CalendarDayScreen() {
     }
 
     return (
-      <ScrollView 
-        style={styles.entriesScroll} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.entriesContent}
-      >
-        {dayEntries.map((entry, index) => (
+      <FlashList
+        data={dayEntries}
+        renderItem={({ item }) => (
           <VaultEntryCard
-            key={entry.id}
-            entry={entry}
+            key={item.id}
+            entry={item}
           />
-        ))}
-      </ScrollView>
+        )}
+      />
     );
   };
 
@@ -104,22 +81,25 @@ export default function CalendarDayScreen() {
         exiting={SlideOutRight.duration(300).springify().damping(20).stiffness(90)}
         style={styles.container}
       >
-        <SafeAreaView style={styles.container}>
-          <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <ArrowLeft color="#64748B" size={24} />
-            </TouchableOpacity>
-            <DateContainer date={new Date(selectedDate)}/>
-            <View style={{ width: 40 }} />
-          </View>
+        <>
+          <EntryPage>
+            <View style={styles.header}>
+              <TouchableOpacity 
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <ArrowLeft color="#64748B" size={24} />
+              </TouchableOpacity>
+              <DateContainer date={new Date(selectedDate)}/>
+              <View style={{ width: 40 }} />
+            </View>
 
-          <View style={styles.content}>
-            {renderContent()}
-          </View>
-        </SafeAreaView>
+            <View style={styles.content}>
+              {renderContent()}
+            </View>
+
+          </EntryPage>
+        </>
       </Animated.View>
     </GestureDetector>
   );
@@ -136,12 +116,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#F0F9FF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginTop: verticalScale(30)
   },
   backButton: {
     padding: 8,
