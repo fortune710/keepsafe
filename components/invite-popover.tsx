@@ -79,14 +79,16 @@ export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps
 
   return (
     <Animated.View 
-      entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)} 
-      exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
       style={styles.overlay}
     >
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
       
       <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View style={[styles.popover, animatedPopoverStyle]}>
+        <Animated.View 
+          style={[styles.popover, animatedPopoverStyle]}
+          entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)} 
+          exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
+        >
           <View style={styles.handle} />
           
           <View style={styles.header}>
@@ -163,7 +165,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: verticalScale(60),
+    paddingBottom: verticalScale(80),
   },
   handle: {
     width: 40,
