@@ -1,11 +1,9 @@
-import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image, Alert } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { X } from 'lucide-react-native';
-import { verticalScale } from 'react-native-size-matters';
-import { Audio } from 'expo-av';
+import { scale, verticalScale } from 'react-native-size-matters';
 import AudioPreview from './audio-preview-player';
+import { Colors } from '@/lib/constants';
 
 const { height } = Dimensions.get('window');
 
@@ -35,20 +33,19 @@ export default function AudioPreviewPopover({ isVisible, onClose, music }: Music
 
   return (
     <Animated.View
-      entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)}
-      exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
       style={styles.overlay}
     >
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
 
-      <Animated.View style={[styles.popover, animatedPopoverStyle]}>
+      <Animated.View 
+        style={[styles.popover, animatedPopoverStyle]}
+        entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
+        exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
+      >
         <View style={styles.handle} />
 
         <View style={styles.header}>
           <Text style={styles.title}>Now Playing</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <X color="#64748B" size={20} />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.previewContainer}>
@@ -62,6 +59,10 @@ export default function AudioPreviewPopover({ isVisible, onClose, music }: Music
             <Text style={styles.musicArtist}>{music.artist}</Text>
           </View>
         </View>
+
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeButtonText}>Close</Text>
+        </TouchableOpacity>
       </Animated.View>
     </Animated.View>
   );
@@ -103,22 +104,36 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1E293B',
+    textAlign: 'center',
   },
   closeButton: {
-    padding: 4,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: scale(24),
+    padding: scale(12),
+    width: '90%',
+    marginBottom: verticalScale(16),
+  },
+  closeButtonText: {
+    fontSize: scale(16),
+    color: 'white',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   musicContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: verticalScale(24),
+    marginVertical: verticalScale(18),
     display: 'flex',
     gap: 16,
   },
@@ -127,6 +142,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     display: "flex",
+    marginVertical: verticalScale(10),
   },
   coverImage: {
     width: 50,

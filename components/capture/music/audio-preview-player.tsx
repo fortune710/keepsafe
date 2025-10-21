@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Alert, Animated } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus, AudioPlayerOptions } from "expo-audio";
 import { Play, Pause } from "lucide-react-native";
 import {
@@ -8,7 +8,7 @@ import {
   Skia,
   Group,
 } from "@shopify/react-native-skia";
-import { useSharedValue, useDerivedValue, withTiming, cancelAnimation, runOnJS } from "react-native-reanimated";
+import { useSharedValue, useDerivedValue, withTiming, cancelAnimation, runOnJS, useAnimatedStyle, withRepeat, Easing } from "react-native-reanimated";
 import { scale, verticalScale } from "react-native-size-matters";
 import { Colors } from "@/lib/constants";
 
@@ -17,23 +17,22 @@ interface AudioPreviewProps {
   canvasRadius?: number;
 }
 
+const DEFAULT_DURATION = 30; // seconds
+
 const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius = 12 }) => {
   // Set up options explicitly
   const options: AudioPlayerOptions = {
     updateInterval: 100, 
     downloadFirst: true,
-    keepAudioSessionActive: true
-    // maybe other options as needed
-    // For example, ensure playsInSilentModeIOS
-    //playsInSilentModeIOS: true,
+    keepAudioSessionActive: true,
   };
 
   const player = useAudioPlayer(audioSource, options);
   const status = useAudioPlayerStatus(player);
 
   const [isPlaying, setIsPlaying] = useState(false);
-
-  const DURATION = 30; // seconds
+  const [isLoading, setIsLoading] = useState(false);
+  const [duration, setDuration] = useState<number>(DEFAULT_DURATION);
 
   const progressSV = useSharedValue(0);
   const progressDerived = useDerivedValue(() => {
@@ -45,16 +44,18 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
     if (status.isLoaded && status.duration != null) {
       // Optionally override duration logic
       // If actual audio is >30s, you can clamp
+      setDuration(status.duration || DEFAULT_DURATION);
     }
-    if (status.isLoaded === false) {
-      // Maybe show loading indicator
-    }
+
+
+    // Show loading indicator
+    setIsLoading(!status.isLoaded || status.isBuffering);
   }, [status]);
 
   useEffect(() => {
     if (isPlaying) {
       // Calculate remaining time based on progressSV
-      const remaining = (1 - progressSV.value) * DURATION * 1100;
+      const remaining = (1 - progressSV.value) * duration * 1100;
       progressSV.value = withTiming(
         1,
         { duration: remaining },
@@ -72,20 +73,41 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
     };
   }, [isPlaying]);
 
+  const animatedOpacity = useSharedValue(1);
+
+  // Animate the opacity from 1 to 0.5 and back indefinitely
+  const PULSE_DURATION = 1000
+  animatedOpacity.value = withRepeat(
+    withTiming(0.5, { duration: PULSE_DURATION / 2, easing: Easing.inOut(Easing.ease) }),
+    -1, // -1 means infinite repeat
+    true // Reverse the animation on each repeat
+  );
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: animatedOpacity.value,
+    };
+
+  });
+
   const togglePlayPause = async () => {
-    console.log({ audioSource })
+    
     try {
       if (isPlaying) {
         player.pause();
         setIsPlaying(false);
-      } else {
-        // If progress at end, reset
-        if (progressSV.value >= 1) {
-          progressSV.value = 0;
-          // also seek audio
-          await player.seekTo(0);
-        }
-        const result = await player.play();
+        return;
+      } 
+      
+      // If progress at end, reset
+      if (progressSV.value >= 1 || status.didJustFinish) {
+        progressSV.value = 0;
+        // also seek audio
+        await player.seekTo(0);
+      }
+
+      if (status.isLoaded) {
+        player.play();
         // result may indicate success or throw
         setIsPlaying(true);
       }
@@ -107,7 +129,7 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
   }, [center, radius]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isLoading && animatedStyle]}>
       <Canvas style={{ width: size, height: size }}>
         <Group origin={{ x: center, y: center }} transform={[{ rotate: -Math.PI / 2 }]}>
           <Path
