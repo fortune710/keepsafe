@@ -5,6 +5,7 @@ import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { deviceStorage } from '@/services/device-storage';
 import { FriendService } from '@/services/friend-service';
+import { useAuthContext } from '@/providers/auth-provider';
 
 type Friendship = Database['public']['Tables']['friendships']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -28,6 +29,7 @@ interface UseFriendsResult {
 
 export function useFriends(userId?: string): UseFriendsResult {
   const queryClient = useQueryClient();
+  const { profile } = useAuthContext();
 
   const {
     data: friendships = [],
@@ -40,27 +42,51 @@ export function useFriends(userId?: string): UseFriendsResult {
       if (!userId) return [];
 
       // Try to get cached friends first
-      const cachedFriends = await deviceStorage.getFriends(userId);
-      if (cachedFriends) {
-        return cachedFriends;
-      }
+      // const cachedFriends = await deviceStorage.getFriends(userId);
+      // if (cachedFriends) {
+      //   return cachedFriends;
+      // }
 
       const { data, error } = await supabase
-        .from('friendships')
+        .from(TABLES.FRIENDSHIPS)
         .select(`
           *,
-          friend_profile:profiles (
+          user_profile:profiles!friendships_user_id_fkey(
+            id,
+            full_name,
+            avatar_url,
+            username
+          ),
+          friend_profile:profiles!friendships_friend_id_fkey(
             id,
             full_name,
             avatar_url,
             username
           )
         `)
-        .eq('user_id', userId)
-        //.or(`user_id.eq.${userId},friend_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
+        //.eq('friend_id', userId)
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .order('created_at', { ascending: false }) as {
+          data: any[],
+          error: any,
+        };
 
-      console.log({ data })
+      const friends: FriendWithProfile[] = data.map(friend => {
+        const { 
+          user_profile: user, 
+          friend_profile: friend_, 
+          ...friend_record 
+        } = friend;
+
+        const profile = friend.friend_id === userId ? 
+        user : friend_;
+
+        return {
+          ...friend_record,
+          friend_profile: profile
+        }
+
+      })
 
       if (error) {
         throw new Error(error.message);
@@ -68,10 +94,10 @@ export function useFriends(userId?: string): UseFriendsResult {
 
       // Cache the friends data
       if (data) {
-        await deviceStorage.setFriends(userId, data);
+        await deviceStorage.setFriends(userId, friends);
       }
 
-      return data as FriendWithProfile[];
+      return friends as FriendWithProfile[];
     },
     enabled: !!userId,
   });
@@ -204,7 +230,11 @@ export function useFriends(userId?: string): UseFriendsResult {
     try {
       await queryClient.prefetchQuery({
         queryKey: ["suggested-friends"],
-        queryFn: FriendService.getSuggestedFriendsFromContacts
+        queryFn: async () => {
+          const contacts = await FriendService.getSuggestedFriendsFromContacts();
+          console.log({ contacts });
+          return contacts.filter(contact => contact.id !== profile?.id);
+        },
       })
 
       return {

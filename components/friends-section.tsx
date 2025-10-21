@@ -4,7 +4,6 @@ import { Users } from 'lucide-react-native';
 import FriendItem, { Friend } from './friend-item';
 import { FRIENDSHIP_STATUS } from '@/constants/supabase';
 import Badge from './ui/badge';
-import { Colors } from '@/lib/constants';
 
 interface FriendsSectionProps {
   friends: Friend[];
