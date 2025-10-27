@@ -9,7 +9,10 @@ export class MediaService {
     }
 
     try {
-      const photo = await cameraRef.current.takePictureAsync();
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: false,
+        skipProcessing: false,
+      });
       
       if (!photo) {
         throw new Error('Failed to capture photo');

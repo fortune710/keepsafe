@@ -22,7 +22,7 @@ import { useMediaCapture } from '@/hooks/use-media-capture';
 import { MediaService } from '@/services/media-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
-import { getDefaultAvatarUrl } from '@/lib/utils';
+import { getDefaultAvatarUrl, getTimefromTimezone } from '@/lib/utils';
 import { DateContainer } from '@/components/date-container';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -153,31 +153,22 @@ export default function CaptureScreen() {
       }
 
       console.log('Camera ready, taking picture...');
-      
-      // Use the camera's takePictureAsync method
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        base64: false,
-        skipProcessing: false,
-      });
 
-      console.log('Photo taken:', photo);
-
-      if (photo && photo.uri) {
-        // Process the photo using your MediaService
-        const capture = await MediaService.capturePhoto(cameraRef);
+      // Process the photo using your MediaService
+      const capture = await MediaService.capturePhoto(cameraRef);
         
-        if (capture) {
-          router.push({
-            pathname: '/capture/details',
-            params: { 
-              captureId: capture.id,
-              type: capture.type,
-              uri: encodeURIComponent(capture.uri)
-            }
-          });
-        }
+      if (capture) {
+        router.push({
+          pathname: '/capture/details',
+          params: { 
+            captureId: capture.id,
+            type: capture.type,
+            uri: encodeURIComponent(capture.uri)
+          }
+        });
       }
+
+
     } catch (error: any) {
       console.error('Photo capture failed:', error);
       Alert.alert('Error', `Failed to take picture: ${error.message}`);
@@ -364,7 +355,7 @@ export default function CaptureScreen() {
                 />
               </TouchableOpacity>
               
-              <DateContainer date={now} />
+              <DateContainer date={getTimefromTimezone()} />
               
               <TouchableOpacity
                 style={styles.friendsButton}
