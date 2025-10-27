@@ -1,32 +1,18 @@
 import { MusicTag } from "@/types/capture"
-import { View, StyleSheet, Text, Pressable } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
-import { useState } from "react";
-import AudioPreviewPopover from "../music/audio-preview-popover";
-import { Portal } from 'react-native-portalize';
 
 interface MusicCanvasItemProps {
     music: MusicTag;
+    onPress?: () => void;
 }
 
-export function MusicCanvasItem({ music }: MusicCanvasItemProps) {
-    const [showPopover, setShowPopover] = useState(false);
+export function MusicCanvasItem({ music, onPress }: MusicCanvasItemProps) {
     return (
-        <>
-            <Pressable onPress={() => setShowPopover(true)} style={styles.musicContainer}>
-                <Image source={{ uri: music.cover }} style={styles.musicImage} />
-                <Text style={styles.textStyle}>{music.title} - {music.artist}</Text>
-            </Pressable>
-
-            <Portal>
-                <AudioPreviewPopover 
-                    music={music} 
-                    onClose={() => setShowPopover(false)} 
-                    isVisible={showPopover} 
-                />
-            </Portal>
-        
-        </>
+        <View style={styles.musicContainer} onTouchEnd={onPress}>
+            <Image source={{ uri: music.cover }} style={styles.musicImage} />
+            <Text style={styles.textStyle}>{music.title} - {music.artist}</Text>
+        </View>
     )
 }
 

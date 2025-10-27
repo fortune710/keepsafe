@@ -1,4 +1,4 @@
-import { StyleProp, ViewStyle } from "react-native";
+import { StyleProp, View, ViewStyle } from "react-native";
 import { ImageBackground } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { MediaType } from "@/types/media";
@@ -20,30 +20,38 @@ export default function VaultCanvas({ type, uri, style, items }: VaultCanvasProp
 
   if (items?.length === 0) {
     return (
-      <ImageBackground
-        source={{ uri }} 
-        style={style}
-        contentFit="cover"
-        testID="vault-canvas-image"
-      />
+      <View style={style}>
+        <ImageBackground
+          source={{ uri }} 
+          style={style}
+          contentFit="cover"
+          cachePolicy="none"
+          //transition={300}
+          testID="vault-canvas-image"
+        />
+      </View>
     )
   }
 
   return (
-    <ImageBackground
-      source={{ uri }}
-      style={style}
-      contentFit="cover"
-      testID="vault-canvas-background"
-      
-    >
-        {items?.map((item) => (
-          <VaultCanvasItem 
-              key={item.id} 
-              item={item} 
-          />
-        ))}
-    </ImageBackground>
+    <View style={style}>
+      <ImageBackground
+        source={{ uri }}
+        style={style}
+        contentFit="cover"
+        //cachePolicy="memory-disk"
+        //transition={300}
+        testID="vault-canvas-background"
+        
+      >
+          {items?.map((item) => (
+            <VaultCanvasItem 
+                key={item.id} 
+                item={item} 
+            />
+          ))}
+      </ImageBackground>
+    </View>
   );
 }
 
@@ -70,7 +78,10 @@ function VaultCanvasItem({ item }: VaultCanvasItemProps) {
   return (
     <Animated.View style={[{ position: "absolute" }, style]}>
         {item.type === "text" && item.text && (
-            <TextCanvasItem text={item.text} />
+            <TextCanvasItem 
+              text={item.text} 
+              textStyle={item.style} 
+            />
         )}
 
         {item.type === "music" && item.music_tag && (

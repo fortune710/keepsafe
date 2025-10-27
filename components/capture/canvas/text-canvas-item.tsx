@@ -1,14 +1,19 @@
 import { View, Text, StyleSheet } from "react-native";
 
 interface TextCanvasItemProps {
-    text: string
+    text: string,
+    textStyle?: { color: string; fontFamily?: string }
 }
 
-export function TextCanvasItem({ text }: TextCanvasItemProps) {
+export function TextCanvasItem({ text, textStyle }: TextCanvasItemProps) {
     if (!text) return null;
+    
+    console.log({ textStyle })
     return (
         <View style={styles.textContainer}>
-            <Text testID="canvas-text" style={styles.textStyle}>{text}</Text>
+            <Text testID="canvas-text" style={[styles.textStyle, textStyle]}>
+                {text}
+            </Text>
         </View>
     )
 }
