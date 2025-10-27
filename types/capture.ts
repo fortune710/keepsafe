@@ -6,6 +6,7 @@ export interface MediaCanvasItem {
     text?: string;
     sticker?: any;
     music_tag?: MusicTag;
+    style?: { color: string; fontFamily?: string };
 }
 
 export interface RenderedMediaCanvasItem extends MediaCanvasItem {

@@ -6,8 +6,8 @@ import ViewShot, { captureRef } from "react-native-view-shot";
 export function useMediaCanvas() {
     const [items, setItems] = useState<Array<MediaCanvasItem>>([]);
 
-    const addText = (text: string) => {
-        setItems([...items, { id: Date.now(), type: "text", text: text }]);
+    const addText = (text: string, style: { color: string; fontFamily?: string }) => {
+        setItems([...items, { id: Date.now(), type: "text", text: text, style }]);
     };
     
     const addSticker = (sticker: any) => {

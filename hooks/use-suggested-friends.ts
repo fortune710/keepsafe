@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { FriendService } from '@/services/friend-service';
 import { SuggestedFriend } from '@/types/friends';
+import { useAuthContext } from '@/providers/auth-provider';
 
 interface UseSuggestedFriendsResult {
   suggestedFriends: SuggestedFriend[];
@@ -10,6 +11,7 @@ interface UseSuggestedFriendsResult {
 }
 
 export function useSuggestedFriends(): UseSuggestedFriendsResult {
+  const { profile } = useAuthContext();
 
   const {
     data: suggestedFriends = [],
@@ -20,8 +22,10 @@ export function useSuggestedFriends(): UseSuggestedFriendsResult {
     queryKey: ['suggested-friends'],
     queryFn: async () => {
       // Await the prefetch function to ensure it completes
-      return FriendService.getSuggestedFriendsFromContacts();
+      const contacts = await FriendService.getSuggestedFriendsFromContacts();
+      return contacts.filter(contact => contact.id !== profile?.id);
     },
+    enabled: !!profile?.id && profile.id !== '',
   });
 
   return {

@@ -49,7 +49,7 @@ export default function AudioPreviewPopover({ isVisible, onClose, music }: Music
         </View>
 
         <View style={styles.previewContainer}>
-          <AudioPreview canvasRadius={30} audioSource={music.preview} />
+          <AudioPreview canvasRadius={35} audioSource={music.preview} />
         </View>
 
         <View style={styles.musicContainer}>

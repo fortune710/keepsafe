@@ -1,4 +1,4 @@
-import React, { useCallback, useImperativeHandle, forwardRef, useState, useEffect } from 'react';
+import React, { useCallback, useImperativeHandle, forwardRef, useState, useEffect, useMemo } from 'react';
 import { Dimensions, ViewStyle, View, Text } from 'react-native';
 import {
   useSharedValue,
@@ -7,6 +7,7 @@ import {
   withTiming,
   interpolate,
   Extrapolate,
+  useDerivedValue,
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import Animated from 'react-native-reanimated';
@@ -15,6 +16,18 @@ import {
   GestureDetector,
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
+import {
+  Canvas,
+  Path,
+  Skia,
+  LinearGradient,
+  vec,
+  Group,
+  Rect,
+  Shadow,
+  Text as SkiaText,
+  useFont,
+} from '@shopify/react-native-skia';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -57,7 +70,7 @@ export interface PageFlipperRef {
   startAutoFlip: () => void;
 }
 
-const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
+const PageFlipper = React.memo(forwardRef<PageFlipperRef, PageFlipperProps>(({
   data = [],
   renderPage,
   style,
@@ -101,12 +114,11 @@ const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
   // Clamp initial page to valid range
   const initialPage = Math.max(0, Math.min(currentPage, totalPages - 1));
   
-  // State for current page index (using regular state instead of shared value for page data)
+  // State for current page index
   const [currentPageState, setCurrentPageState] = useState(initialPage);
   
-  // Animated values
-  const translateX = useSharedValue(0);
-  const currentPageIndex = useSharedValue(initialPage);
+  // Reanimated shared values for Skia integration
+  const flipProgress = useSharedValue(0);
   const isFlipping = useSharedValue(false);
   const canInteract = useSharedValue(enableInteraction);
   
@@ -116,6 +128,9 @@ const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
   
   const canvasWidth = (style?.width as number) || SCREEN_WIDTH;
   const canvasHeight = (style?.height as number) || SCREEN_HEIGHT;
+  
+  // Load font for SkiaText
+  const font = useFont(null, 16);
 
   // Update state when shared value changes
   const updateCurrentPageState = useCallback((newIndex: number) => {
@@ -127,109 +142,89 @@ const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
     return currentPageState >= 0 && currentPageState < totalPages ? data[currentPageState] : null;
   }, [data, totalPages, currentPageState]);
 
-  // Animation functions with safety checks
+  // Reanimated-based animation functions
   const flipToNext = useCallback(() => {
-    'worklet';
     if (isFlipping.value || totalPages === 0) return;
     
-    const current = currentPageIndex.value;
     const nextIndex = loopForever 
-      ? (current + 1) % totalPages
-      : Math.min(current + 1, totalPages - 1);
+      ? (currentPageState + 1) % totalPages
+      : Math.min(currentPageState + 1, totalPages - 1);
     
-    if (nextIndex !== current) {
+    if (nextIndex !== currentPageState) {
       isFlipping.value = true;
       canInteract.value = false;
       
-      translateX.value = withTiming(
-        flipDirection === 'right' ? -canvasWidth : canvasWidth,
-        { duration: animationTime },
-        (finished) => {
-          if (finished) {
-            currentPageIndex.value = nextIndex;
-            runOnJS(updateCurrentPageState)(nextIndex);
-            translateX.value = 0;
-            isFlipping.value = false;
-            canInteract.value = enableInteraction;
-            
-            if (onFlipped && data[nextIndex]) {
-              runOnJS(onFlipped)(nextIndex, data[nextIndex]);
-            }
-            if (onFlippedEnd && data[nextIndex]) {
-              runOnJS(onFlippedEnd)(nextIndex, data[nextIndex]);
-            }
-          }
-        }
-      );
-    }
-  }, [totalPages, loopForever, canvasWidth, animationTime, flipDirection, onFlipped, onFlippedEnd, data, enableInteraction, updateCurrentPageState]);
-
-  const flipToPrevious = useCallback(() => {
-    'worklet';
-    if (isFlipping.value || totalPages === 0) return;
-    
-    const current = currentPageIndex.value;
-    const prevIndex = loopForever
-      ? (current - 1 + totalPages) % totalPages
-      : Math.max(current - 1, 0);
-    
-    if (prevIndex !== current) {
-      isFlipping.value = true;
-      canInteract.value = false;
-      
-      translateX.value = withTiming(
-        flipDirection === 'right' ? canvasWidth : -canvasWidth,
-        { duration: animationTime },
-        (finished) => {
-          if (finished) {
-            currentPageIndex.value = prevIndex;
-            runOnJS(updateCurrentPageState)(prevIndex);
-            translateX.value = 0;
-            isFlipping.value = false;
-            canInteract.value = enableInteraction;
-            
-            if (onFlipped && data[prevIndex]) {
-              runOnJS(onFlipped)(prevIndex, data[prevIndex]);
-            }
-            if (onFlippedEnd && data[prevIndex]) {
-              runOnJS(onFlippedEnd)(prevIndex, data[prevIndex]);
-            }
-          }
-        }
-      );
-    }
-  }, [totalPages, loopForever, canvasWidth, animationTime, flipDirection, onFlipped, onFlippedEnd, data, enableInteraction, updateCurrentPageState]);
-
-  const flipToPage = useCallback((pageIndex: number) => {
-    'worklet';
-    if (isFlipping.value || totalPages === 0) return;
-    if (pageIndex < 0 || pageIndex >= totalPages || pageIndex === currentPageIndex.value) return;
-    
-    isFlipping.value = true;
-    canInteract.value = false;
-    const direction = pageIndex > currentPageIndex.value ? -1 : 1;
-    
-    translateX.value = withTiming(
-      direction * canvasWidth,
-      { duration: animationTime },
-      (finished) => {
+      flipProgress.value = withTiming(1, { duration: animationTime }, (finished) => {
         if (finished) {
-          currentPageIndex.value = pageIndex;
-          runOnJS(updateCurrentPageState)(pageIndex);
-          translateX.value = 0;
+          updateCurrentPageState(nextIndex);
+          flipProgress.value = 0;
           isFlipping.value = false;
           canInteract.value = enableInteraction;
           
-          if (onFlipped && data[pageIndex]) {
-            runOnJS(onFlipped)(pageIndex, data[pageIndex]);
+          if (onFlipped && data[nextIndex]) {
+            onFlipped(nextIndex, data[nextIndex]);
           }
-          if (onFlippedEnd && data[pageIndex]) {
-            runOnJS(onFlippedEnd)(pageIndex, data[pageIndex]);
+          if (onFlippedEnd && data[nextIndex]) {
+            onFlippedEnd(nextIndex, data[nextIndex]);
           }
         }
+      });
+    }
+  }, [totalPages, loopForever, animationTime, onFlipped, onFlippedEnd, data, enableInteraction, updateCurrentPageState, currentPageState]);
+
+  const flipToPrevious = useCallback(() => {
+    if (isFlipping.value || totalPages === 0) return;
+    
+    const prevIndex = loopForever
+      ? (currentPageState - 1 + totalPages) % totalPages
+      : Math.max(currentPageState - 1, 0);
+    
+    if (prevIndex !== currentPageState) {
+      isFlipping.value = true;
+      canInteract.value = false;
+      
+      flipProgress.value = withTiming(-1, { duration: animationTime }, (finished) => {
+        if (finished) {
+          updateCurrentPageState(prevIndex);
+          flipProgress.value = 0;
+          isFlipping.value = false;
+          canInteract.value = enableInteraction;
+          
+          if (onFlipped && data[prevIndex]) {
+            onFlipped(prevIndex, data[prevIndex]);
+          }
+          if (onFlippedEnd && data[prevIndex]) {
+            onFlippedEnd(prevIndex, data[prevIndex]);
+          }
+        }
+      });
+    }
+  }, [totalPages, loopForever, animationTime, onFlipped, onFlippedEnd, data, enableInteraction, updateCurrentPageState, currentPageState]);
+
+  const flipToPage = useCallback((pageIndex: number) => {
+    if (isFlipping.value || totalPages === 0) return;
+    if (pageIndex < 0 || pageIndex >= totalPages || pageIndex === currentPageState) return;
+    
+    isFlipping.value = true;
+    canInteract.value = false;
+    const direction = pageIndex > currentPageState ? 1 : -1;
+    
+    flipProgress.value = withTiming(direction, { duration: animationTime }, (finished) => {
+      if (finished) {
+        updateCurrentPageState(pageIndex);
+        flipProgress.value = 0;
+        isFlipping.value = false;
+        canInteract.value = enableInteraction;
+        
+        if (onFlipped && data[pageIndex]) {
+          onFlipped(pageIndex, data[pageIndex]);
+        }
+        if (onFlippedEnd && data[pageIndex]) {
+          onFlippedEnd(pageIndex, data[pageIndex]);
+        }
       }
-    );
-  }, [totalPages, canvasWidth, animationTime, onFlipped, onFlippedEnd, data, enableInteraction, updateCurrentPageState]);
+    });
+  }, [totalPages, animationTime, onFlipped, onFlippedEnd, data, enableInteraction, updateCurrentPageState, currentPageState]);
 
   // Auto flip management
   const startAutoFlip = useCallback(() => {
@@ -289,51 +284,55 @@ const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
     };
   }, []);
 
-  // Create gesture using the new Gesture API
-  const panGesture = Gesture.Pan()
-    .enabled(flipOnTouch)
+  // Optimized gesture handling with better responsiveness
+  const panGesture = useMemo(() => Gesture.Pan()
+    .enabled(flipOnTouch && canInteract.value)
     .onStart(() => {
-      'worklet';
-      if (!flipOnTouch) return;
+      if (!flipOnTouch || !canInteract.value) return;
       isAutoFlipActive.value = false;
     })
     .onUpdate((event) => {
-      'worklet';
-      if (!flipOnTouch || isFlipping.value) return;
-      translateX.value = event.translationX;
-      canInteract.value = false;
+      if (!flipOnTouch || isFlipping.value || !canInteract.value) return;
+      
+      // Smooth progress calculation with better sensitivity
+      const sensitivity = 0.6;
+      const progress = Math.max(-1, Math.min(1, event.translationX / (canvasWidth * sensitivity)));
+      flipProgress.value = progress;
     })
     .onEnd((event) => {
-      'worklet';
-      if (!flipOnTouch) return;
+      if (!flipOnTouch || !canInteract.value) return;
       
       const threshold = canvasWidth * flipThreshold;
       const velocity = Math.abs(event.velocityX);
       const translation = event.translationX;
       
-      if (Math.abs(translation) > threshold || velocity > 500) {
+      // Enhanced threshold logic for better UX
+      const shouldFlip = Math.abs(translation) > threshold || velocity > 300;
+      
+      if (shouldFlip) {
         if (translation > 0) {
           flipToPrevious();
         } else if (translation < 0) {
           flipToNext();
         }
       } else {
-        translateX.value = withSpring(0, springConfig, () => {
-          'worklet';
-          canInteract.value = enableInteraction;
+        // Smooth return to original position
+        flipProgress.value = withSpring(0, {
+          damping: springConfig.damping,
+          stiffness: springConfig.stiffness,
+          mass: springConfig.mass,
         });
       }
       
       if (autoFlip) {
         isAutoFlipActive.value = true;
       }
-    });
+    }), [flipOnTouch, canInteract, isFlipping, canvasWidth, flipThreshold, springConfig, autoFlip, flipToPrevious, flipToNext]);
 
-  const tapGesture = Gesture.Tap()
-    .enabled(clickToFlip && enableInteraction)
+  const tapGesture = useMemo(() => Gesture.Tap()
+    .enabled(clickToFlip && enableInteraction && canInteract.value)
     .onEnd((event) => {
-      'worklet';
-      if (!clickToFlip || !enableInteraction || isFlipping.value) return;
+      if (!clickToFlip || !enableInteraction || isFlipping.value || !canInteract.value) return;
       
       const { x } = event;
       if (x < canvasWidth / 2) {
@@ -341,170 +340,205 @@ const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
       } else {
         flipToNext();
       }
-    });
+    }), [clickToFlip, enableInteraction, canInteract, isFlipping, canvasWidth, flipToPrevious, flipToNext]);
 
-  // Combine gestures
-  const composedGesture = Gesture.Simultaneous(panGesture, tapGesture);
+  // Combine gestures with proper memoization
+  const composedGesture = useMemo(() => 
+    Gesture.Simultaneous(panGesture, tapGesture), 
+    [panGesture, tapGesture]
+  );
 
-  // Animated styles for pages with 3D transform
-  const currentPageStyle = useAnimatedStyle(() => {
-    const rotation = interpolate(
-      translateX.value,
-      [-canvasWidth, 0, canvasWidth],
-      [maxAngle, 0, -maxAngle],
-      Extrapolate.CLAMP
+  // Skia-based page flip path calculation with realistic curl using useDerivedValue
+  const pageFlipPath = useDerivedValue(() => {
+    const progress = flipProgress.value;
+    const path = Skia.Path.Make();
+    
+    if (Math.abs(progress) < 0.01) {
+      // No flip - return straight rectangle
+      path.addRect(Skia.XYWHRect(0, 0, canvasWidth, canvasHeight));
+      return path;
+    }
+    
+    // Calculate realistic page curl effect
+    const absProgress = Math.abs(progress);
+    const direction = progress > 0 ? 1 : -1;
+    
+    // Curl parameters for realistic effect
+    const curlX = canvasWidth * (1 - absProgress * 0.8);
+    const curlY = canvasHeight * 0.5;
+    const controlX = canvasWidth * (0.3 + absProgress * 0.4 * direction);
+    const controlY = canvasHeight * (0.2 + absProgress * 0.1);
+    
+    // Create curved path for page flip with multiple control points for realism
+    path.moveTo(0, 0);
+    path.lineTo(curlX, 0);
+    
+    // Top curve
+    path.quadTo(
+      controlX, 
+      controlY, 
+      curlX, 
+      curlY * 0.4
     );
     
-    const scale = interpolate(
-      Math.abs(translateX.value),
-      [0, canvasWidth * 0.3],
-      [1, 0.95],
-      Extrapolate.CLAMP
+    // Middle curve
+    path.quadTo(
+      controlX + direction * canvasWidth * 0.1, 
+      curlY, 
+      curlX, 
+      curlY
     );
+    
+    // Bottom curve
+    path.quadTo(
+      controlX, 
+      canvasHeight - controlY, 
+      curlX, 
+      canvasHeight * 0.6
+    );
+    
+    path.lineTo(curlX, canvasHeight);
+    path.lineTo(0, canvasHeight);
+    path.close();
+    
+    return path;
+  }, [flipProgress, canvasWidth, canvasHeight]);
 
+  // Shadow gradient for realistic effect using useDerivedValue
+  const shadowGradient = useDerivedValue(() => {
+    const progress = Math.abs(flipProgress.value);
     return {
-      transform: [
-        { translateX: translateX.value },
-        { perspective: perspective * 10 },
-        { rotateY: `${rotation}deg` },
-        { scale: scale },
-      ],
-      zIndex: canInteract.value ? 10 : 1,
+      start: vec(0, 0),
+      end: vec(canvasWidth, 0),
+      colors: ['rgba(0,0,0,0)', `rgba(0,0,0,${0.3 * progress})`]
     };
   });
 
-  const nextPageStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value + canvasWidth },
-    ],
-    zIndex: 0,
-    opacity: 0.8,
-  }));
+  // Memoized page content to prevent unnecessary re-renders
+  const currentData = useMemo(() => data[currentPageState] || null, [data, currentPageState]);
+  
+  const getNextIndex = useMemo(() => {
+    return loopForever 
+      ? (currentPageState + 1) % totalPages
+      : currentPageState + 1;
+  }, [loopForever, currentPageState, totalPages]);
+  
+  const getPrevIndex = useMemo(() => {
+    return loopForever
+      ? (currentPageState - 1 + totalPages) % totalPages
+      : currentPageState - 1;
+  }, [loopForever, currentPageState, totalPages]);
 
-  const prevPageStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value - canvasWidth },
-    ],
-    zIndex: 0,
-    opacity: 0.8,
-  }));
+  const nextData = useMemo(() => {
+    const nextIndex = getNextIndex;
+    return nextIndex >= 0 && nextIndex < totalPages ? data[nextIndex] : null;
+  }, [data, getNextIndex, totalPages]);
+  
+  const prevData = useMemo(() => {
+    const prevIndex = getPrevIndex;
+    return prevIndex >= 0 && prevIndex < totalPages ? data[prevIndex] : null;
+  }, [data, getPrevIndex, totalPages]);
 
-  // Shadow overlay for 3D effect
-  const shadowStyle = useAnimatedStyle(() => {
-    const shadowOpacity = interpolate(
-      Math.abs(translateX.value),
-      [0, canvasWidth * 0.5],
-      [0, 0.3],
-      Extrapolate.CLAMP
-    );
-
-    return {
-      opacity: shadowOpacity,
-    };
-  });
-
-  // Render safe page component
-  const renderSafePage = useCallback((pageData: any | null, index: number, isCurrentPage: boolean) => {
-    if (!pageData || !renderPage) {
+  // Memoized page content rendering
+  const pageContent = useMemo(() => {
+    if (!currentData || !renderPage) {
       return (
-        <View style={[{
+        <View style={{
           width: canvasWidth,
           height: canvasHeight,
           backgroundColor: '#f0f0f0',
           justifyContent: 'center',
           alignItems: 'center',
-        }, pageStyle]}>
-          <View style={{
-            padding: 20,
-            backgroundColor: '#ddd',
-            borderRadius: 8,
-          }}>
-            <Text>Page {index + 1}</Text>
-          </View>
+        }}>
+          <Text>Page {currentPageState + 1}</Text>
         </View>
       );
     }
 
     try {
       return (
-        <View style={[{
+        <View style={{
           width: canvasWidth,
           height: canvasHeight,
-        }, pageStyle]}>
-          {renderPage(pageData, index, isCurrentPage)}
+        }}>
+          {renderPage(currentData, currentPageState, true)}
         </View>
       );
     } catch (error) {
-      console.warn('PageFlipper: Error rendering page', index, error);
+      console.warn('PageFlipper: Error rendering page', currentPageState, error);
       return (
-        <View style={[{
+        <View style={{
           width: canvasWidth,
           height: canvasHeight,
           backgroundColor: '#fff',
           justifyContent: 'center',
           alignItems: 'center',
-        }, pageStyle]}>
-          <Text>Error loading page {index + 1}</Text>
+        }}>
+          <Text>Error loading page {currentPageState + 1}</Text>
         </View>
       );
     }
-  }, [renderPage, canvasWidth, canvasHeight, pageStyle]);
+  }, [currentData, currentPageState, renderPage, canvasWidth, canvasHeight]);
 
-  // Get adjacent pages safely using regular state
-  const currentData = data[currentPageState] || null;
-  
-  const getNextIndex = () => {
-    return loopForever 
-      ? (currentPageState + 1) % totalPages
-      : currentPageState + 1;
-  };
-  
-  const getPrevIndex = () => {
-    return loopForever
-      ? (currentPageState - 1 + totalPages) % totalPages
-      : currentPageState - 1;
-  };
+  // Simple animated styles for page flip effect
+  const animatedPageStyle = useAnimatedStyle(() => {
+    const progress = flipProgress.value;
+    const rotation = progress * 45; // Max 45 degrees rotation
+    const scale = 1 - Math.abs(progress) * 0.1; // Slight scale down during flip
+    
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotation}deg` },
+        { scale: scale },
+      ],
+    };
+  });
 
-  const nextIndex = getNextIndex();
-  const prevIndex = getPrevIndex();
-  
-  const nextData = nextIndex >= 0 && nextIndex < totalPages ? data[nextIndex] : null;
-  const prevData = prevIndex >= 0 && prevIndex < totalPages ? data[prevIndex] : null;
+  // Memoized Skia Canvas component for page flip effects only
+  const SkiaPageFlipper = useMemo(() => {
+    return (
+      <Canvas style={{ width: canvasWidth, height: canvasHeight }}>
+        {/* Page flip shadow effect */}
+        <Path path={pageFlipPath} color="rgba(0,0,0,0.1)">
+          <Shadow 
+            dx={Math.abs(flipProgress.value) * 5} 
+            dy={Math.abs(flipProgress.value) * 3} 
+            blur={10} 
+            color="rgba(0,0,0,0.2)" 
+          />
+        </Path>
+      </Canvas>
+    );
+  }, [canvasWidth, canvasHeight, pageFlipPath, flipProgress]);
 
   return (
     <GestureHandlerRootView style={[{ width: canvasWidth, height: canvasHeight }, style]}>
       <GestureDetector gesture={composedGesture}>
-        <View style={[{ width: canvasWidth, height: canvasHeight, overflow: 'hidden' }]}>
-          {/* Shadow overlay for 3D effect */}
-          <Animated.View 
-            style={[{
-              position: 'absolute',
-              width: canvasWidth,
+        <View style={{ width: canvasWidth, height: canvasHeight, overflow: 'hidden' }}>
+          {/* Render the actual page content with flip animation */}
+          <Animated.View style={[
+            { 
+              width: canvasWidth, 
               height: canvasHeight,
-              backgroundColor: 'rgba(0,0,0,0.1)',
-              zIndex: 5,
-            }, shadowStyle]} 
-          />
-
-          {/* Previous Page */}
-          {prevData && (
-            <Animated.View style={[{ position: 'absolute' }, prevPageStyle]}>
-              {renderSafePage(prevData, prevIndex, false)}
-            </Animated.View>
-          )}
-
-          {/* Current Page */}
-          <Animated.View style={[{ position: 'absolute' }, currentPageStyle]}>
-            {renderSafePage(currentData, currentPageState, true)}
+            },
+            animatedPageStyle
+          ]}>
+            {pageContent}
           </Animated.View>
-
-          {/* Next Page */}
-          {nextData && (
-            <Animated.View style={[{ position: 'absolute' }, nextPageStyle]}>
-              {renderSafePage(nextData, nextIndex, false)}
-            </Animated.View>
-          )}
-
+          
+          {/* Skia overlay for additional shadow effects */}
+          <View style={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0,
+            width: canvasWidth,
+            height: canvasHeight,
+            pointerEvents: 'none',
+          }}>
+            {SkiaPageFlipper}
+          </View>
+          
           {/* Page Indicator */}
           {showPageIndicator && totalPages > 1 && (
             <View style={[{
@@ -515,6 +549,7 @@ const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
               flexDirection: 'row',
               justifyContent: 'center',
               alignItems: 'center',
+              zIndex: 10,
             }, pageIndicatorStyle]}>
               {data.map((_, index) => (
                 <View
@@ -534,7 +569,7 @@ const PageFlipper = forwardRef<PageFlipperRef, PageFlipperProps>(({
       </GestureDetector>
     </GestureHandlerRootView>
   );
-});
+}));
 
 PageFlipper.displayName = 'PageFlipper';
 

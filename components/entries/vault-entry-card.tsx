@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Pressable, ActivityIndicator } from 'react-native';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle } from 'react-native-reanimated';
-import { Heart, MessageCircle, Play, Pause } from 'lucide-react-native';
+import { Heart, MessageCircle, Play, Pause, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react-native';
 import { Audio } from 'expo-av';
 import { Database } from '@/types/database';
 import { dateStringToNumber, getDefaultAvatarUrl, getRelativeDate } from '@/lib/utils';
@@ -18,6 +18,11 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 
 interface EntryWithProfile extends Entry {
   profile: Omit<Profile, "invite_code" | "max_uses" | "current_uses" | "is_active">;
+  status?: 'pending' | 'processing' | 'completed' | 'failed';
+  processingStartedAt?: string;
+  processingCompletedAt?: string;
+  processingFailedAt?: string;
+  error?: string;
 }
 
 interface VaultEntryCardProps {
@@ -25,11 +30,12 @@ interface VaultEntryCardProps {
   onPress?: (entry: EntryWithProfile) => void;
   onReactions?: (entryId: string) => void;
   onComments?: (entryId: string) => void;
+  onRetry?: (entryId: string) => void;
 }
 
 const { height } = Dimensions.get('window');
 
-export default function VaultEntryCard({ entry, onPress, onReactions, onComments }: VaultEntryCardProps) {
+export default function VaultEntryCard({ entry, onPress, onReactions, onComments, onRetry }: VaultEntryCardProps) {
   const [isPlaying, setIsPlaying] = React.useState(false);
   const numberHash = useMemo(() => {
     return dateStringToNumber(entry.created_at);
@@ -111,6 +117,58 @@ export default function VaultEntryCard({ entry, onPress, onReactions, onComments
     };
   });
 
+  const getStatusIndicator = () => {
+    if (!entry.status || entry.status === 'completed') return null;
+
+    switch (entry.status) {
+      case 'pending':
+        return (
+          <View style={styles.statusIndicator}>
+            <ActivityIndicator size="small" color="#8B5CF6" />
+            <Text style={styles.statusText}>Pending</Text>
+          </View>
+        );
+      case 'processing':
+        return (
+          <View style={styles.statusIndicator}>
+            <ActivityIndicator size="small" color="#8B5CF6" />
+            <Text style={styles.statusText}>Processing...</Text>
+          </View>
+        );
+      case 'failed':
+        return (
+          <View style={styles.statusIndicator}>
+            <AlertCircle color="#EF4444" size={16} />
+            <Text style={[styles.statusText, styles.failedText]}>Failed</Text>
+            {onRetry && (
+              <TouchableOpacity 
+                style={styles.retryButtonSmall}
+                onPress={() => onRetry(entry.id)}
+              >
+                <RotateCcw color="#8B5CF6" size={14} />
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Derive a safe profile for display to avoid undefined access during async swaps
+  const safeProfile = useMemo(() => {
+    if (entry?.profile) return entry.profile as any;
+    if (profile && entry?.user_id === profile.id) {
+      return profile;
+    }
+    return {
+      id: entry?.user_id,
+      full_name: 'Unknown User',
+      avatar_url: getDefaultAvatarUrl('Unknown User')
+    } as any;
+  }, [entry?.profile, entry?.user_id, profile]);
+
 
   return (
     <View style={styles.container}>
@@ -162,16 +220,19 @@ export default function VaultEntryCard({ entry, onPress, onReactions, onComments
           </View>
         )}
 
+        {/* Status indicator */}
+        {getStatusIndicator()}
+
         {/* Author info at bottom */}
         <View style={styles.authorContainer}>
             <Image 
               source={{ 
-                uri: entry.profile?.avatar_url || getDefaultAvatarUrl(entry.profile?.full_name || '')
+                uri: safeProfile?.avatar_url || getDefaultAvatarUrl(safeProfile?.full_name || '')
               }}
               style={styles.authorAvatar}
             />
             <Text style={styles.authorName}>
-              {entry?.profile?.id === profile?.id ? 'You' : entry.profile?.full_name || 'Unknown User'}
+              {safeProfile?.id === profile?.id ? 'You' : safeProfile?.full_name || 'Unknown User'}
             </Text>
 
           <Text style={styles.dateText}>{getRelativeDate(entry.created_at)}</Text>
@@ -341,7 +402,7 @@ const styles = StyleSheet.create({
   entryImage: {
     width: '100%',
     height: 300,
-    borderRadius: 8
+    borderRadius: 18
   },
   audioContainer: {
     height: 300,
@@ -436,5 +497,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: Colors.text,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 8,
+    gap: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#8B5CF6',
+  },
+  failedText: {
+    color: '#EF4444',
+  },
+  retryButtonSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+    gap: 4,
+  },
+  retryText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#8B5CF6',
   }
 });

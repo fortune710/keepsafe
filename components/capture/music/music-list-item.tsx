@@ -3,6 +3,7 @@ import { TouchableOpacity, Text, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import AudioPreview from "@/components/capture/music/audio-preview-player";
 import { scale, verticalScale } from "react-native-size-matters";
+import TextTicker from 'react-native-text-ticker';
 
 interface MusicListItemProps {
     music: MusicTag;
@@ -22,11 +23,20 @@ export function MusicListItem({ music, onPress }: MusicListItemProps) {
                     style={styles.image} 
                 />
                 <View style={styles.textContainer}>
-                    <Text style={styles.title}>{music.title}</Text>
+                    <TextTicker 
+                        style={styles.title}
+                        loop
+                        duration={7000}
+                    >
+                        {music.title}
+                    </TextTicker>
                     <Text style={styles.subtitle}>{music.artist}</Text>
                 </View>
             </View>
-            <AudioPreview audioSource={music.preview}/>
+            <AudioPreview 
+                canvasRadius={13}
+                audioSource={music.preview}
+            />
         </TouchableOpacity>
     )
 }
@@ -42,7 +52,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 8
+        marginBottom: 8,
     },
     listItemInner: {
         display: "flex",
@@ -50,7 +60,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     textContainer: {
-        marginLeft: 7
+        marginLeft: 7,
+        width: '75%'
     },
     title: {
         fontSize: scale(12),

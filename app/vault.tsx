@@ -11,8 +11,7 @@ import EntryReactionsPopup from '@/components/entry-reactions-popup';
 import EntryCommentsPopup from '@/components/entry-comments-popup';
 import VaultEntryCard from '@/components/entries/vault-entry-card';
 import { EntryPage } from '@/components/entries/entry-page';
-import PageFlipper from '@/components/entries/page-flipper';
-import { scale, verticalScale } from 'react-native-size-matters';
+import { verticalScale } from 'react-native-size-matters';
 import { FlashList } from '@shopify/flash-list';
 import { VaultHeader } from '@/components/vault/vault-header';
 import { DateContainer } from '@/components/date-container';
@@ -20,7 +19,7 @@ import { DateContainer } from '@/components/date-container';
 const { height, width } = Dimensions.get('window');
 
 export default function VaultScreen() {
-  const { entries, entriesByDate, isLoading, error, refetch } = useUserEntries();
+  const { entries, entriesByDate, isLoading, error, refetch, retryEntry } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(false);
@@ -90,40 +89,37 @@ export default function VaultScreen() {
     }
 
     return (
-      <PageFlipper
-        data={Object.keys(entriesByDate)}
-    
-        //pageSize={{ width, height: 800 }}
-        //contentContainerStyle={{}}
-        renderPage={(key: string) => {
-          const entries = entriesByDate[key];
-          const entriesDate = new Date(key);
-
-          return (
-            <EntryPage>
-              <FlashList
-                data={entries}
-                contentContainerStyle={styles.contentContainer}
-                keyExtractor={(item) => item.id}
-                onScroll={handleScroll}
-                ListHeaderComponent={
-                  <View style={styles.listHeader}>
-                    <DateContainer date={entriesDate}/>
-                  </View>
+      <EntryPage>
+        <FlashList
+          data={Object.keys(entriesByDate)}
+          contentContainerStyle={styles.contentContainer}
+          keyExtractor={(item) => item}
+          onScroll={handleScroll}
+          renderItem={({ item }) => {
+            const entries = entriesByDate[item];
+            const entriesDate = new Date(item);
+            return (
+              <View>
+                <View style={styles.listHeader}>
+                  <DateContainer date={entriesDate}/>
+                </View>
+                {
+                  entries.map((entry) => (
+                    <VaultEntryCard
+                      entry={entry as any}
+                      key={entry.id}
+                      onReactions={handleEntryReactions}
+                      onComments={handleEntryComments}
+                      onRetry={retryEntry}
+                    />
+                  ))
                 }
-                renderItem={({ item }) => (
-                  <VaultEntryCard
-                    entry={item as any}
-                    key={item.id}
-                    onReactions={handleEntryReactions}
-                    onComments={handleEntryComments}
-                  />
-                )}
-              />
-            </EntryPage>
-          )
-        }}
-      />
+              </View>
+
+            )
+          }}
+        />
+      </EntryPage>
     );
   };
 
@@ -177,7 +173,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     display: 'flex',
     flexDirection: 'row',
-    marginTop: verticalScale(24)
+    marginVertical: verticalScale(24)
   },
   content: {
     flex: 1,

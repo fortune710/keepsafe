@@ -1,10 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { TABLES } from '@/constants/supabase';
 import { Database } from '@/types/database';
-import { MediaCapture } from '@/types/media';
-import { deviceStorage } from '@/services/device-storage';
+import { EntryService, EntryServiceResult } from '@/services/entry-service';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type EntryInsert = Database['public']['Tables']['entries']['Insert'];
@@ -33,155 +30,126 @@ export function useEntries(userId?: string): UseEntriesResult {
     queryKey: ['entries', userId],
     queryFn: async () => {
       if (!userId) return [];
-
-      // Try to get cached entries first
-      const cachedEntries = await deviceStorage.getEntries(userId);
-      if (cachedEntries && cachedEntries.length > 0) {
-        return cachedEntries;
-      }
-
-      const { data, error } = await supabase
-        .from(TABLES.ENTRIES)
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Cache the entries data
-      if (data && data.length > 0) {
-        await deviceStorage.setEntries(userId, data);
-      }
-
-      return data;
+      return await EntryService.getEntries(userId);
     },
     enabled: !!userId,
   });
 
   const createEntryMutation = useMutation({
     mutationFn: async (entryData: EntryInsert) => {
-      const { data, error } = await supabase
-        .from(TABLES.ENTRIES)
-        .insert(entryData)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
+      if (!userId) throw new Error('User ID is required');
+      const result = await EntryService.createEntry(userId, entryData);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create entry');
       }
-
-      return data;
+      return result.data!;
     },
-    onSuccess: async (newEntry) => {
-      // Add to local storage immediately
-      if (userId) {
-        await deviceStorage.addEntry(userId, newEntry);
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entries', userId] });
     },
   });
 
   const updateEntryMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: EntryUpdate }) => {
-      const { data, error } = await supabase
-        .from(TABLES.ENTRIES)
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
+      if (!userId) throw new Error('User ID is required');
+      const result = await EntryService.updateEntry(userId, id, updates);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update entry');
       }
-
-      return data;
+      return result.data!;
     },
-    onSuccess: async (updatedEntry) => {
-      // Update in local storage
-      if (userId) {
-        await deviceStorage.updateEntry(userId, updatedEntry.id, updatedEntry);
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entries', userId] });
     },
   });
 
   const deleteEntryMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from(TABLES.ENTRIES)
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw new Error(error.message);
+      if (!userId) throw new Error('User ID is required');
+      const result = await EntryService.deleteEntry(userId, id);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete entry');
       }
     },
-    onSuccess: async (_, deletedId) => {
-      // Remove from local storage
-      if (userId) {
-        await deviceStorage.removeEntry(userId, deletedId);
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['entries', userId] });
     },
   });
 
   const createEntry = useCallback(async (entryData: EntryInsert) => {
+    if (!userId) {
+      return { 
+        success: false, 
+        error: 'User ID is required' 
+      };
+    }
+
     try {
-      const entry = await createEntryMutation.mutateAsync(entryData);
-      return { success: true, entry };
+      const result = await EntryService.createEntry(userId, entryData);
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['entries', userId] });
+      }
+      return result;
     } catch (error) {
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to create entry' 
       };
     }
-  }, [createEntryMutation]);
+  }, [userId, queryClient]);
 
   const updateEntry = useCallback(async (id: string, updates: EntryUpdate) => {
+    if (!userId) {
+      return { 
+        success: false, 
+        error: 'User ID is required' 
+      };
+    }
+
     try {
-      await updateEntryMutation.mutateAsync({ id, updates });
-      return { success: true };
+      const result = await EntryService.updateEntry(userId, id, updates);
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['entries', userId] });
+      }
+      return result;
     } catch (error) {
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to update entry' 
       };
     }
-  }, [updateEntryMutation]);
+  }, [userId, queryClient]);
 
   const deleteEntry = useCallback(async (id: string) => {
+    if (!userId) {
+      return { 
+        success: false, 
+        error: 'User ID is required' 
+      };
+    }
+
     try {
-      await deleteEntryMutation.mutateAsync(id);
-      return { success: true };
+      const result = await EntryService.deleteEntry(userId, id);
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['entries', userId] });
+      }
+      return result;
     } catch (error) {
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to delete entry' 
       };
     }
-  }, [deleteEntryMutation]);
+  }, [userId, queryClient]);
 
   const uploadMedia = useCallback(async (file: File, userId: string) => {
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from('media')
-        .upload(fileName, file);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('media')
-        .getPublicUrl(data.path);
-
-      return { success: true, url: publicUrl };
+      const result = await EntryService.uploadMedia(file, userId);
+      return {
+        success: result.success,
+        url: result.data?.url,
+        error: result.error
+      };
     } catch (error) {
       return { 
         success: false, 

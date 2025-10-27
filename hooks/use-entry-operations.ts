@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
 import { TABLES, STORAGE_BUCKETS, UPLOAD_PATHS } from '@/constants/supabase';
 import { Database } from '@/types/database';
@@ -7,6 +8,7 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { getContentType, getFileExtension, isBase64File, isLocalFile } from '@/lib/utils';
 import { RenderedMediaCanvasItem } from '@/types/capture';
+import { scheduleEntryProcessing } from '@/services/background-task-manager';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type EntryInsert = Database['public']['Tables']['entries']['Insert'];
@@ -16,6 +18,7 @@ interface ShareResult {
   message: string;
   sharedWith?: string[];
   entry?: Entry;
+  tempId?: string;
 }
 
 interface UseEntryOperationsResult {
@@ -29,6 +32,7 @@ interface UseEntryOperationsResult {
     isEveryone: boolean;
     selectedFriends: string[];
     attachments: RenderedMediaCanvasItem[];
+    tempId?: string;
   }) => Promise<ShareResult>;
   uploadMedia: (file: File | string, userId: string, fileName: string, contentType: string) => Promise<string | null>;
 }
@@ -141,7 +145,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
     }
   }, []);
 
-  // Update the saveEntry function to handle native files properly
+  // Updated saveEntry function to use background processing
   const saveEntry = useCallback(async (entryData: {
     capture: MediaCapture;
     textContent: string;
@@ -151,6 +155,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
     isEveryone: boolean;
     selectedFriends: string[];
     attachments: RenderedMediaCanvasItem[];
+    tempId?: string;
   }): Promise<ShareResult> => {
     setIsLoading(true);
 
@@ -161,73 +166,43 @@ export function useEntryOperations(): UseEntryOperationsResult {
         throw new Error('User not authenticated');
       }
 
-      // Prepare entry data
-      let finalContentUrl = entryData.capture.uri;
+      // Use provided tempId or generate a uuid to keep ids consistent across UI and processing
+      const tempId = entryData.tempId || Crypto.randomUUID();
 
-      // If it's a local file, upload to Supabase storage first
-      try {
-        // Generate filename based on media type
-        const timestamp = Date.now();
-        const fileExtension = getFileExtension(entryData.capture.type);
-        const fileName = `${entryData.capture.type}_${timestamp}.${fileExtension}`;
+      // Prepare data for background processing
+      const processingData = {
+        entryId: tempId,
+        userId: user.id,
+        capture: entryData.capture,
+        textContent: entryData.textContent,
+        musicTag: entryData.musicTag,
+        locationTag: entryData.locationTag,
+        isPrivate: entryData.isPrivate,
+        isEveryone: entryData.isEveryone,
+        selectedFriends: entryData.selectedFriends,
+        attachments: entryData.attachments,
+      };
 
-        const contentType = getContentType(entryData.capture.type);
-        
-        // Upload to Supabase storage - pass the URI directly for native platforms
-        const uploadedUrl = await uploadMedia(entryData.capture.uri, user.id, fileName, contentType);
-        
-        if (!uploadedUrl) {
-          throw new Error('Failed to upload media to storage');
-        }
-        
-        finalContentUrl = uploadedUrl;
-      } catch (uploadError) {
-        console.error('Media upload error:', uploadError);
-        throw new Error('Failed to upload media. Please try again.');
-      }
+      // Schedule background processing
+      await scheduleEntryProcessing(processingData);
 
       const sharedWith = entryData.isPrivate ? [user.id] : [user.id, ...entryData.selectedFriends];
 
-      const newEntry: EntryInsert = {
-        user_id: user.id,
-        type: entryData.capture.type as 'photo' | 'video' | 'audio',
-        shared_with: sharedWith,
-        content_url: finalContentUrl,
-        text_content: entryData.textContent || null,
-        music_tag: entryData.musicTag || null,
-        location_tag: entryData.locationTag || null,
-        is_private: entryData.isPrivate,
-        shared_with_everyone: entryData.isEveryone,
-        attachments: entryData.attachments,
-        metadata: entryData.capture.metadata ? JSON.parse(JSON.stringify(entryData.capture.metadata)) : null,
-      };
-
-      // Insert entry
-      const { data: entry, error: entryError } = await supabase
-        .from(TABLES.ENTRIES)
-        .upsert(newEntry as never)
-        .select()
-        .single();
-
-      if (entryError) {
-        throw new Error(`Failed to save entry: ${entryError.message}`);
-      }
-
       // Generate success message
-      let message = 'Shared Entry';
+      let message = 'Entry processing started';
 
       return {
         success: true,
         message,
         sharedWith,
-        entry,
+        tempId,
       };
 
     } catch (error) {
       console.error('Save entry error:', error);
       return {
         success: false,
-        message: 'Failed to share',
+        message: 'Failed to start processing',
       };
     } finally {
       setIsLoading(false);
