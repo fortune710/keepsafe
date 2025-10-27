@@ -21,7 +21,8 @@
       "bundleIdentifier": "com.fortune710.keepsafe",
       "infoPlist": {
         "UIBackgroundModes": [
-          "audio"
+          "audio",
+          "processing"
         ]
       }
     },
@@ -118,7 +119,8 @@
         {
           "microphonePermission": "Allow Keepsafe to access your microphone."
         }
-      ]
+      ],
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true
