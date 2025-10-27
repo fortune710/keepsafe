@@ -3,13 +3,17 @@ import { View, StyleSheet, Text } from "react-native";
 import SuggestedFriendItem from "./suggested-friend-item";
 import { Contact, Sparkle } from "lucide-react-native";
 import { Colors } from "@/lib/constants";
+import { useAuthContext } from "@/providers/auth-provider";
 
 interface SuggestedFriendsListProps {
     friends: SuggestedFriend[];
 }
 
 export default function SuggestedFriendsList({ friends }: SuggestedFriendsListProps) {
-    if (friends.length === 0) return null;
+    const { profile } = useAuthContext();
+    const filteredFriends = friends.filter(friend => friend.id !== profile?.id);
+    
+    if (filteredFriends.length === 0) return null;
     return (
         <View>
             <View style={styles.sectionHeader}>
