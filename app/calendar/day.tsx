@@ -91,7 +91,10 @@ export default function CalendarDayScreen() {
               >
                 <ArrowLeft color="#64748B" size={24} />
               </TouchableOpacity>
-              <DateContainer date={new Date(selectedDate)}/>
+              <DateContainer 
+                timezone='UTC'
+                date={new Date(selectedDate)}
+              />
               <View style={{ width: 40 }} />
             </View>
 
