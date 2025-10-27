@@ -22,10 +22,31 @@ export class StreakService {
     try {
       const cached = await deviceStorage.getItem<StreakData>(`streak_${userId}`);
       if (cached) {
-        // Ensure timezone is set if not present in cached data
+        const userTimeZone = cached.userTimeZone || this.getUserTimeZone();
+
+        // Check if lastEntryDate is more than 24 hours from lastAccessTime
+        if (cached.lastEntryDate && cached.lastAccessTime) {
+          const lastEntryDate = new Date(cached.lastEntryDate);
+          const lastAccessTime = new Date(cached.lastAccessTime);
+
+          const hoursDiff = differenceInHours(lastAccessTime, lastEntryDate);
+
+          if (hoursDiff > 24) {
+            // Streak has been lost, set currentStreak to 0 and update cache
+            const updated = {
+              ...cached,
+              currentStreak: 0,
+              userTimeZone,
+            };
+            await deviceStorage.setItem(`streak_${userId}`, updated);
+            return updated;
+          }
+        }
+
+        // Otherwise, hydrate as usual
         return {
           ...cached,
-          userTimeZone: cached.userTimeZone || this.getUserTimeZone(),
+          userTimeZone,
           lastAccessTime: cached.lastAccessTime || null,
         };
       }
