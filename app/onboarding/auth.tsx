@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { useAuthContext } from '@/providers/auth-provider';
 import { EmailNotVerifiedError, AccountDisabledError, TooManyAttemptsError, InvalidCredentialsError } from '@/hooks/use-auth';
-import ToastMessage from '@/components/toast-message';
+import { useToast } from '@/hooks/use-toast';
 
-const { width } = Dimensions.get('window');
 
 type SignUpStep = 'email' | 'password' | 'name' | 'username';
 
 export default function AuthScreen() {
   const { mode } = useLocalSearchParams();
-  const [isSignUp, setIsSignUp] = useState(true);
+  const [isSignUp, setIsSignUp] = useState<boolean>(
+    (mode as string) !== "signin" || mode !== "sign-in"
+  );
   const [currentStep, setCurrentStep] = useState<SignUpStep>('email');
   const [loading, setLoading] = useState(false);
   
@@ -23,27 +24,10 @@ export default function AuthScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
-    visible: false,
-    message: '',
-    type: 'success'
-  });
+  const { toast: showToast } = useToast();
   
   const { signUp, signIn } = useAuthContext();
-
-  // Set initial mode based on URL parameter
-  React.useEffect(() => {
-    if (mode === 'signin' || mode === 'sign-in') {
-      setIsSignUp(false);
-    }
-  }, [mode]);
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
+  
   const handleSignIn = async () => {
     if (!email || !password) {
       showToast('Please fill in all fields', 'error');
@@ -146,7 +130,6 @@ export default function AuthScreen() {
       case 'password': setCurrentStep('email'); break;
       case 'name': setCurrentStep('password'); break;
       case 'username': setCurrentStep('name'); break;
-      default: setIsSignUp(false); break;
     }
   };
 
@@ -321,11 +304,6 @@ export default function AuthScreen() {
 
   return (
     <View style={styles.container}>
-      <ToastMessage 
-        message={toast.message}
-        type={toast.type}
-        visible={toast.visible}
-      />
       {isSignUp ? renderSignUpStep() : renderSignIn()}
     </View>
   );

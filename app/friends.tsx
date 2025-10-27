@@ -2,18 +2,17 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { Search, Share, ChevronRight, UserPlus, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
-import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import InvitePopover from '@/components/invite-popover';
 import FriendSearchBar from '@/components/friend-search-bar';
 import FriendsSection from '@/components/friends-section';
 import { useFriends } from '@/hooks/use-friends';
 import { useAuthContext } from '@/providers/auth-provider';
-import ToastMessage from '@/components/toast-message';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { useSuggestedFriends } from '@/hooks/use-suggested-friends';
 import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getDefaultAvatarUrl } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 
 export default function FriendsScreen() {
@@ -34,19 +33,8 @@ export default function FriendsScreen() {
   const [showInvitePopover, setShowInvitePopover] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
-    visible: false,
-    message: '',
-    type: 'success'
-  });
+  const { toast: showToast } = useToast();
 
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
 
   const handleRemoveFriend = async (friendshipId: string) => {
     const result = await removeFriend(friendshipId);
@@ -73,11 +61,6 @@ export default function FriendsScreen() {
     } else {
       showToast(result.error || 'Failed to decline request', 'error');
     }
-  };
-
-  const handleFriendPress = (friend: any) => {
-    console.log('View friend profile:', friend.friend_profile?.full_name);
-    // Navigate to friend profile or show friend details
   };
 
   const handleShareLink = () => {
@@ -118,18 +101,8 @@ export default function FriendsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* <Animated.View 
-        entering={SlideInRight} 
-        exiting={SlideOutRight}
-        style={[{ flex: 1 }, styles.pageStyle]}
-      >
-      </Animated.View> */}
+  
       <ScrollView showsVerticalScrollIndicator={false}>
-        <ToastMessage 
-          message={toast.message}
-          type={toast.type}
-          visible={toast.visible}
-        />
 
         <View style={styles.header}>
           <Text style={styles.title}>Friends</Text>
@@ -186,7 +159,6 @@ export default function FriendsScreen() {
                   <FriendsSection
                     friends={allFriends}
                     onRemoveFriend={handleRemoveFriend}
-                    onFriendPress={handleFriendPress}
                     onAcceptRequest={handleAcceptRequest}
                     onDeclineRequest={handleDeclineRequest}
                     isLoading={false}
@@ -204,7 +176,6 @@ export default function FriendsScreen() {
                   <FriendsSection
                     friends={allFriends}
                     onRemoveFriend={handleRemoveFriend}
-                    onFriendPress={handleFriendPress}
                     onAcceptRequest={handleAcceptRequest}
                     onDeclineRequest={handleDeclineRequest}
                     isLoading={false}

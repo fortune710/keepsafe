@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronRight, User, AtSign, MessageSquare, Camera, Calendar, Phone } from 'lucide-react-native';
 import { useAuthContext } from '@/providers/auth-provider';
-import ProfileUpdatePopover from '@/components/profile-update-popover';
-import ToastMessage from '@/components/toast-message';
+import ProfileUpdatePopover from '@/components/profile/profile-update-popover';
+import { useToast } from '@/hooks/use-toast';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 type UpdateType = 'name' | 'username' | 'bio' | 'avatar' | 'birthday' | 'phone';
 
@@ -19,18 +21,8 @@ interface ProfileOption {
 export default function ProfileScreen() {
   const { profile } = useAuthContext();
   const [activePopover, setActivePopover] = useState<UpdateType | null>(null);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
-    visible: false,
-    message: '',
-    type: 'success'
-  });
+  const { toast: showToast } = useToast();
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
 
   const profileOptions: ProfileOption[] = [
     {
@@ -97,11 +89,6 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ToastMessage 
-        message={toast.message}
-        type={toast.type}
-        visible={toast.visible}
-      />
 
       <View style={styles.header}>
         <TouchableOpacity 

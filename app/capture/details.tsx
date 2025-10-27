@@ -1,14 +1,13 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert, ScrollView, Dimensions, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { X, Music, MapPin, Lock, Users, Play, Pause, Sticker } from 'lucide-react-native';
+import { X, Lock, Users, Play, Pause, Sticker } from 'lucide-react-native';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useUserEntries } from '@/hooks/use-user-entries';
 import { MediaCapture } from '@/types/media';
-import ToastMessage from '@/components/toast-message';
 import { Audio } from 'expo-av';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import * as Crypto from 'expo-crypto';
@@ -20,6 +19,8 @@ import MediaCanvas from '@/components/capture/media-canvas';
 import { useMediaCanvas } from '@/hooks/use-media-canvas';
 import EditorPopover from '@/components/capture/editor-popover';
 import { RenderedMediaCanvasItem } from '@/types/capture';
+import { useToast } from '@/hooks/use-toast';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Friend {
   id: string;
@@ -49,17 +50,12 @@ export default function DetailsScreen() {
 
   
   const [isPlaying, setIsPlaying] = useState(false);
-  const [textContent, setTextContent] = useState('');
-  const [musicTag, setMusicTag] = useState('');
   const [isPrivate, setIsPrivate] = useState(true);
   const [isEveryone, setIsEveryone] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
-    visible: false,
-    message: '',
-    type: 'success'
-  });
+
+  const { toast } = useToast();
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   
@@ -87,16 +83,6 @@ export default function DetailsScreen() {
     };
   });
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
-
-  const getWordCount = () => {
-    return textContent.trim().split(/\s+/).filter(word => word.length > 0).length;
-  };
 
   const hasSelectedSharing = () => {
     return isPrivate || isEveryone || selectedFriends.length > 0;
@@ -164,7 +150,7 @@ export default function DetailsScreen() {
     }
   };
 
-  const { viewShotRef, items, addText, addSticker, saveImage, addMusic } = useMediaCanvas();
+  const { viewShotRef, items, addText, addSticker, saveImage, addMusic, removeElement } = useMediaCanvas();
 
 
   // Cleanup sound on unmount
@@ -179,11 +165,11 @@ export default function DetailsScreen() {
   const handleSave = async () => {
     if (!capture || !user || !hasSelectedSharing()) {
       if (!hasSelectedSharing()) {
-        showToast('Please select who to share this entry with', 'error');
+        toast('Please select who to share this entry with', 'error');
       } else {
-        showToast('Cannot save entry', 'error');
+        toast('Cannot save entry', 'error');
       }
-      showToast('Cannot save entry', 'error');
+      toast('Cannot save entry', 'error');
       return;
     }
 
@@ -201,15 +187,15 @@ export default function DetailsScreen() {
       })
 
       // Prepare the capture object, updating the URI if there are canvas items to save
-      let updatedUri = capture.uri;
-      if (items.length > 0) {
-        console.log("saving image")
-        const savedUri = await saveImage();
-        console.log({ savedUri })
-        if (savedUri) {
-          updatedUri = savedUri;
-        }
-      }
+      // let updatedUri = capture.uri;
+      // if (items.length > 0) {
+      //   console.log("saving image")
+      //   const savedUri = await saveImage();
+      //   console.log({ savedUri })
+      //   if (savedUri) {
+      //     updatedUri = savedUri;
+      //   }
+      // }
 
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
@@ -219,8 +205,8 @@ export default function DetailsScreen() {
         shared_with: [user.id, ...selectedFriends],
         attachments: entryAttachments,
         content_url: capture.uri,
-        text_content: textContent || null,
-        music_tag: musicTag || null,
+        text_content: null,
+        music_tag: null,
         location_tag: locationTag || null,
         is_private: isPrivate,
         shared_with_everyone: isEveryone,
@@ -244,49 +230,33 @@ export default function DetailsScreen() {
 
       const result = await saveEntry({
         capture,
-        textContent: textContent || '',
-        musicTag: musicTag,
+        textContent: '',
+        musicTag: '',
         locationTag: locationTag,
         isPrivate,
         isEveryone,
         selectedFriends,
-        attachments: entryAttachments
+        attachments: entryAttachments,
+        tempId
       });
 
       if (result.success) {
-        // Replace optimistic entry with real entry from Supabase
-        if (result.entry) {
-          const realEntry = {
-            ...result.entry,
-            profile: optimisticEntry.profile, // Keep the profile data
-          };
-          replaceOptimisticEntry(tempId, realEntry);
-        }
-
-        showToast(result.message, 'success');
+        toast(result.message, 'success');
         setTimeout(() => {
           router.push('/capture');
-        }, 2000);
+        }, 200);
       } else {
         // Remove optimistic entry on failure
         replaceOptimisticEntry(tempId);
-        showToast(result.message, 'error');
+        toast(result.message, 'error');
       }
     } catch (error) {
       // Remove optimistic entry on error
       if (tempId) {
         replaceOptimisticEntry(tempId);
       }
-      showToast('Failed to share', 'error');
+      toast('Failed to share', 'error');
     }
-  };
-
-  const handleMusicAdd = () => {
-    Alert.prompt('Add Music', 'Enter song name:', (text) => {
-      if (text) {
-        setMusicTag(text);
-      }
-    });
   };
 
   const handleLocationAdd = () => {
@@ -310,12 +280,6 @@ export default function DetailsScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <SafeAreaView style={styles.container}>
-        <ToastMessage 
-          message={toast.message}
-          type={toast.type}
-          visible={toast.visible}
-        />
-        
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.cancelButton}
@@ -345,6 +309,7 @@ export default function DetailsScreen() {
                 ref={viewShotRef}
                 items={items}
                 transformsRef={transformsRef}
+                removeElement={removeElement}
               />
             ) : 
             capture?.type === 'video' ? (

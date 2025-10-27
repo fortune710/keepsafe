@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput, ActivityIndicator, Alert, Dimensions } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
-import { X, Send, MessageCircle, CreditCard as Edit3, Trash2 } from 'lucide-react-native';
+import { X, Send, CreditCard as Edit3, Trash2 } from 'lucide-react-native';
 import { useEntryComments } from '@/hooks/use-entry-comments';
 import { useAuthContext } from '@/providers/auth-provider';
 import ToastMessage from './toast-message';
+import { useToast } from '@/hooks/use-toast';
+import { getDefaultAvatarUrl } from '@/lib/utils';
 
 const { height } = Dimensions.get('window');
 
@@ -20,18 +22,8 @@ export default function EntryCommentsPopup({ isVisible, entryId, onClose }: Entr
   const [newComment, setNewComment] = useState('');
   const [editingComment, setEditingComment] = useState<{ id: string; content: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
-    visible: false,
-    message: '',
-    type: 'success'
-  });
+  const { toast: showToast } = useToast();
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
 
   const handleAddComment = async () => {
     if (!newComment.trim() || isSubmitting) return;
@@ -105,12 +97,7 @@ export default function EntryCommentsPopup({ isVisible, entryId, onClose }: Entr
 
   return (
     <View style={styles.overlay}>
-      <ToastMessage 
-        message={toast.message}
-        type={toast.type}
-        visible={toast.visible}
-      />
-
+      
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
       
       <Animated.View 
@@ -145,7 +132,7 @@ export default function EntryCommentsPopup({ isVisible, entryId, onClose }: Entr
               <View key={comment.id} style={styles.commentItem}>
                 <Image 
                   source={{ 
-                    uri: comment.user_profile.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100' 
+                    uri: comment.user_profile.avatar_url ||  getDefaultAvatarUrl(comment.user_profile?.full_name ?? "")
                   }}
                   style={styles.userAvatar}
                 />

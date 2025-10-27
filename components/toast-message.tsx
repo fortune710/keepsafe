@@ -1,20 +1,25 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Animated, { SlideInDown, SlideOutUp } from 'react-native-reanimated';
+import Animated, { SlideInDown, SlideOutUp, runOnJS } from 'react-native-reanimated';
 
 interface ToastMessageProps {
   message: string;
   type: 'success' | 'error';
   visible: boolean;
+  onHide?: () => void;
 }
 
-export default function ToastMessage({ message, type, visible }: ToastMessageProps) {
+export default function ToastMessage({ message, type, visible, onHide }: ToastMessageProps) {
   if (!visible) return null;
 
   return (
     <Animated.View 
       entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)} 
-      exiting={SlideOutUp.duration(200)}
+      exiting={SlideOutUp.duration(200).withCallback(() => {
+        if (onHide) {
+          runOnJS(onHide)();
+        }
+      })}
       style={[
         styles.container,
         type === 'success' ? styles.successContainer : styles.errorContainer

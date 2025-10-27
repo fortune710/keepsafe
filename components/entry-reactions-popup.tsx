@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIn
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { X } from 'lucide-react-native';
 import { useEntryReactions, ReactionType } from '@/hooks/use-entry-reactions';
-import ToastMessage from './toast-message';
+import { useToast } from '@/hooks/use-toast';
 
-const { height, width: screenWidth } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 interface EntryReactionsPopupProps {
   isVisible: boolean;
@@ -34,18 +34,7 @@ const reactionLabels = {
 export default function EntryReactionsPopup({ isVisible, entryId, onClose }: EntryReactionsPopupProps) {
   const { reactions, reactionSummary, userReaction, isLoading, toggleReaction } = useEntryReactions(entryId);
   const [selectedTab, setSelectedTab] = useState<ReactionType | 'all'>('all');
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
-    visible: false,
-    message: '',
-    type: 'success'
-  });
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
+  const { toast: showToast } = useToast();
 
   const handleReactionToggle = async (reactionType: ReactionType) => {
     const result = await toggleReaction(reactionType);
@@ -78,12 +67,6 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
 
   return (
     <View style={styles.overlay}>
-      <ToastMessage 
-        message={toast.message}
-        type={toast.type}
-        visible={toast.visible}
-      />
-
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
       
       <Animated.View 
