@@ -1,26 +1,29 @@
-import { getTimefromTimezone } from "@/lib/utils";
+import { getDeviceTimezone } from "@/lib/utils";
 import { View, Text, StyleSheet } from "react-native";
 import { scale } from "react-native-size-matters";
 
 interface DateContainerProps {
     date: Date;
+    timezone?: string
 }
 
-const getCurrentDate = (date: Date) => {
+const getCurrentDate = (date: Date, timeZone?: string) => {
+    const timezone = timeZone ?? getDeviceTimezone();
     const options: Intl.DateTimeFormatOptions = { 
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric',
-      timeZone: 'UTC'
+      timeZone: timezone,
     };
     return date.toLocaleDateString('en-US', options);
 };
 
-export function DateContainer({ date }: DateContainerProps) {
+export function DateContainer({ date, timezone }: DateContainerProps) {
+    console.log({ date })
     return (
         <View style={styles.dateContainer}>
-            <Text style={styles.dateText}>{getCurrentDate(date)}</Text>
+            <Text style={styles.dateText}>{getCurrentDate(date, timezone)}</Text>
         </View>
     )
 }

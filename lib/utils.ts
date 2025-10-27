@@ -1,4 +1,6 @@
+import { EntryWithProfile } from "@/types/entries";
 import { MediaType } from "@/types/media"
+import { TZDate } from "@date-fns/tz";
 
 export const getDefaultAvatarUrl = (fullName: string) => {
     return `https://api.dicebear.com/9.x/adventurer-neutral/png?seed=${fullName}`
@@ -104,15 +106,110 @@ export const getRelativeDate = (dateString: string) => {
 };
 
 export function dateStringToNumber(dateStr: string): number {
-    let hash = 0;
-  
-    for (let i = 0; i < dateStr.length; i++) {
-      hash = (hash << 5) - hash + dateStr.charCodeAt(i);
-      hash |= 0; // Convert to 32-bit integer
-    }
-  
-    // Normalize hash into range [0, 1)
-    return (hash >>> 0) / 0xffffffff;
+  let hash = 0;
+
+  for (let i = 0; i < dateStr.length; i++) {
+    hash = (hash << 5) - hash + dateStr.charCodeAt(i);
+    hash |= 0; // Convert to 32-bit integer
+  }
+
+  // Normalize hash into range [0, 1)
+  return (hash >>> 0) / 0xffffffff;
 }
+
+/* Calendar utils */
+// Generate months from current date backwards
+export const generateMonths = () => {
+  const months = [];
+  const currentDate = new Date();
   
+  for (let i = 12; i >= 0; i--) {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+    months.push(date);
+  }
   
+  return months;
+};
+
+export const getDaysInMonth = (date: Date) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+
+  const days = [];
+  
+  // Add empty cells for days before the month starts
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    days.push(null);
+  }
+  
+  // Add days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    days.push(day);
+  }
+  
+  return days;
+};
+
+export const formatMonthYear = (date: Date) => {
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+  
+export const hasEntries = (day: number, monthDate: Date, entriesData: Record<string, number>) => {
+  const dateKey = new Date(monthDate.getFullYear(), monthDate.getMonth(), day).toISOString().split('T')[0];
+  return entriesData[dateKey] > 0;
+};
+
+export const getEntryCount = (day: number, monthDate: Date, entriesData: Record<string, number>) => {
+  const dateKey = new Date(monthDate.getFullYear(), monthDate.getMonth(), day).toISOString().split('T')[0];
+  return entriesData[dateKey] || 0;
+};
+
+export const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/* Entry utils */
+export const getEntriesForDate = (date: string, entries: EntryWithProfile[]) => { 
+  return entries.filter(entry => {
+    const entryDate = getTimefromTimezone(new Date(entry.created_at)).toISOString().split('T')[0];
+    return entryDate === date;
+  }).map(entry => ({
+    id: entry.id,
+    type: entry.type as 'photo' | 'video' | 'audio',
+    content: entry.content_url || '',
+    text: entry.text_content || '',
+    music: entry.music_tag || undefined,
+    location: entry.location_tag || undefined,
+    date: new Date(entry.created_at),
+    is_private: entry.is_private,
+    profile: entry.profile,
+    user_id: entry.user_id,
+    shared_with: entry.shared_with,
+    shared_with_everyone: entry.shared_with_everyone,
+    metadata: entry.metadata,
+    content_url: entry.content_url,
+    text_content: entry.text_content,
+    music_tag: entry.music_tag,
+    location_tag: entry.location_tag,
+    created_at: entry.created_at,
+    updated_at: entry.updated_at,
+    attachments: entry.attachments
+  }));
+}
+
+export const getDeviceTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    console.warn('Failed to detect timezone, falling back to UTC:', error);
+    return 'UTC';
+  }
+}
+
+export const getTimefromTimezone = (date?: Date) => {
+  const now = date ?? new Date();
+  const timezone = getDeviceTimezone();
+  return new TZDate(now, timezone);
+}
