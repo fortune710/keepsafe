@@ -23,32 +23,21 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useMusicTag } from "@/hooks/use-music-tag";
 import { MusicTag } from "@/types/capture";
 import { MusicListItem } from "./music/music-list-item";
+import ColorSlider from "./editor/color-slider";
+import FontStyleSelector from "./editor/font-style-selector";
+import TextTab from "./editor/text-tab";
+import StickerTab from "./editor/sticker-tab";
+import MusicTab from "./editor/music-tab";
 
 const { height } = Dimensions.get("window");
 
 interface EditorPopoverProps {
   isVisible: boolean;
   onClose: () => void;
-  addText: (text: string, style: { color: string; fontWeight?: string }) => void;
+  addText: (text: string, style: { color: string; fontFamily?: string }) => void;
   addSticker: (uri: string) => void;
   addMusic: (music: MusicTag) => void;
 }
-
-// Example stickers
-const stickers = [
-  { id: "1", uri: "https://kjnuwzuhngfvdfzzaitj.supabase.co/storage/v1/object/public/stickers/1.png" },
-  { id: "2", uri: "https://kjnuwzuhngfvdfzzaitj.supabase.co/storage/v1/object/public/stickers/2.png" },
-  { id: "3", uri: "https://kjnuwzuhngfvdfzzaitj.supabase.co/storage/v1/object/public/stickers/3.png" },
-  { id: "4", uri: "https://kjnuwzuhngfvdfzzaitj.supabase.co/storage/v1/object/public/stickers/4.png" },
-];
-
-// Example text styles
-const textStyles = [
-  { id: "normal", label: "Normal", style: { color: "#000" } },
-  { id: "bold", label: "Bold", style: { color: "#000", fontWeight: "700" } },
-  { id: "red", label: "Red", style: { color: "red" } },
-  { id: "blue", label: "Blue", style: { color: "blue" } },
-];
 
 export default function EditorPopover({
   isVisible,
@@ -63,9 +52,12 @@ export default function EditorPopover({
   const musicQuery = useDebounce(musicTag, 600);
 
   const { musicTags, isLoading } = useMusicTag(musicQuery);
-  const [selectedStyle, setSelectedStyle] = useState(textStyles[0]);
+  const [selectedStyle, setSelectedStyle] = useState({
+    color: "#000",
+    fontFamily: "Arial",
+  });
 
-  const popoverHeight = useSharedValue(height * 0.7);
+  const popoverHeight = useSharedValue(height * 0.6);
 
   const animatedPopoverStyle = useAnimatedStyle(() => {
     return {
@@ -79,19 +71,37 @@ export default function EditorPopover({
     }
   });
 
+  const confirmTextSelection = () => {
+    if (textInput.trim()) {
+      addText(textInput.trim(), selectedStyle);
+      setTextInput("");
+      onClose();
+    }
+  }
+
+  const confirmStickerSelection = (uri: string) => {
+    addSticker(uri);
+    onClose();
+  }
+
+  const confirmMusicSelection = (music: MusicTag) => {
+    addMusic(music);
+    onClose();
+  }
+
 
   if (!isVisible) return null;
 
   return (
-    <Animated.View
-      entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)}
-      exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
-      style={styles.overlay}
-    >
+    <Animated.View style={styles.overlay}>
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
 
       <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View style={[styles.popover, animatedPopoverStyle, styles.popoverContent]}>
+        <Animated.View 
+          entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
+          exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
+          style={[styles.popover, animatedPopoverStyle, styles.popoverContent]}
+        >
           {/* Handle */}
           <View style={styles.handle} />
 
@@ -147,88 +157,26 @@ export default function EditorPopover({
           {/* Content */}
           <View>
             {activeTab === "text" ? (
-              <View style={styles.textTab}>
-                <TextInput
-                  value={textInput}
-                  onChangeText={setTextInput}
-                  placeholder="Enter text..."
-                  style={[styles.input, selectedStyle.style as any]}
-                />
-                <View style={styles.styleRow}>
-                  {textStyles.map((ts) => (
-                    <TouchableOpacity
-                      key={ts.id}
-                      style={[
-                        styles.styleButton,
-                        selectedStyle.id === ts.id && styles.styleButtonActive,
-                      ]}
-                      onPress={() => setSelectedStyle(ts)}
-                    >
-                      <Text style={ts.style as any}>{ts.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={() => {
-                    if (textInput.trim()) {
-                      addText(textInput.trim(), selectedStyle.style);
-                      setTextInput("");
-                      onClose();
-                    }
-                  }}
-                >
-                  <Text style={styles.addButtonText}>Add Text</Text>
-                </TouchableOpacity>
-              </View>
+              <TextTab
+                textInput={textInput}
+                onTextChange={setTextInput}
+                selectedColor={selectedStyle.color}
+                onColorChange={(color) => setSelectedStyle({ ...selectedStyle, color })}
+                selectedFont={selectedStyle.fontFamily}
+                onFontChange={(font) => setSelectedStyle({ ...selectedStyle, fontFamily: font })}
+                onConfirm={confirmTextSelection}
+              />
             ) : activeTab === "stickers" ? (
-              <FlatList
-                data={stickers}
-                keyExtractor={(item) => item.id}
-                numColumns={3}
-                //style={{ borderWidth: 1 }}
-                contentContainerStyle={styles.stickerGrid}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.stickerButton}
-                    onPress={() => {
-                      addSticker(item.uri);
-                      onClose();
-                    }}
-                  >
-                    <Image
-                      source={{ uri: item.uri }}
-                      style={{ width: 60, height: 60 }}
-                      resizeMode="contain"
-                    />
-                  </TouchableOpacity>
-                )}
+              <StickerTab
+                onSelectSticker={confirmStickerSelection}
               />
             ) : (
-              <FlatList
-                ListHeaderComponent={
-                  <KeyboardAvoidingView behavior="position">
-                    <TextInput
-                      value={musicTag}
-                      onChangeText={setMusicTag}
-                      placeholder="Enter music tags..."
-                      style={[styles.input, selectedStyle.style as any]}
-                    />
-                  </KeyboardAvoidingView>
-                }
-                data={musicTags}
-                renderItem={({ item }) => (
-                  <MusicListItem 
-                    onPress={(music) => {
-                      addMusic(music);
-                      onClose();
-                    }}
-                    music={item} 
-                  />
-                )}
-                ListHeaderComponentStyle={{ marginBottom: 10 }}
-                contentContainerStyle={{ paddingVertical: 10 }}
-                style={{ paddingVertical: 10, height: 600 }}
+              <MusicTab
+                isLoading={isLoading}
+                musicQuery={musicTag}
+                onMusicQueryChange={setMusicTag}
+                musicTags={musicTags ?? []}
+                onSelectMusic={confirmMusicSelection}
               />
             )}
           </View>
@@ -240,7 +188,7 @@ export default function EditorPopover({
 
 const styles = StyleSheet.create({
   popoverContent: {
-    minHeight: verticalScale(500)
+    minHeight: verticalScale(670)
   },
   overlay: {
     position: "absolute",
@@ -307,18 +255,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     gap: 16,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-  },
-  styleRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
+
+
   styleButton: {
     padding: 8,
     borderWidth: 1,
@@ -329,17 +267,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0E7FF",
     borderColor: "#8B5CF6",
   },
-  addButton: {
-    backgroundColor: "#8B5CF6",
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  addButtonText: {
-    color: "white",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  
   stickerGrid: {
     marginTop: 20,
     gap: 12,
