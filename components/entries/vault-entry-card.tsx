@@ -12,6 +12,7 @@ import { useEvent } from 'expo';
 import VaultCanvas from '../capture/canvas/vault-canvas';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
+import TextTicker from 'react-native-text-ticker';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -231,9 +232,11 @@ export default function VaultEntryCard({ entry, onPress, onReactions, onComments
               }}
               style={styles.authorAvatar}
             />
-            <Text style={styles.authorName}>
-              {safeProfile?.id === profile?.id ? 'You' : safeProfile?.full_name || 'Unknown User'}
-            </Text>
+            <View style={styles.authorNameContainer}>
+              <TextTicker loop duration={5000} style={styles.authorName}>
+                {safeProfile?.id === profile?.id ? 'You' : safeProfile?.full_name || 'Unknown User'}
+              </TextTicker>
+            </View>
 
           <Text style={styles.dateText}>{getRelativeDate(entry.created_at)}</Text>
         </View>
@@ -494,9 +497,16 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   authorName: {
-    fontSize: 16,
+    fontSize: scale(14),
     fontWeight: '600',
     color: Colors.text,
+  },
+  authorNameContainer: {
+    width: '65%',
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusIndicator: {
     flexDirection: 'row',
