@@ -69,6 +69,19 @@ export function useMediaCapture(): UseCaptureResult {
   }, []);
 
   const startAudioRecording = useCallback(async () => {
+    // Ensure we stop and clean up any existing recording first
+    if (recording) {
+      try {
+        if ((recording as any)._timer) {
+          clearInterval((recording as any)._timer);
+        }
+        await recording.stopAndUnloadAsync();
+        setRecording(null);
+      } catch (error) {
+        console.error('Error stopping previous recording:', error);
+      }
+    }
+
     setIsCapturing(true);
     setCapturedMedia(null);
     setRecordingDuration(0);
@@ -80,6 +93,19 @@ export function useMediaCapture(): UseCaptureResult {
         setIsCapturing(false);
         return;
       }
+
+      // Reset audio mode first, then set to recording mode
+      // This ensures we start from a clean state
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+      });
+
+      // Small delay to ensure mode reset completes
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -135,7 +161,7 @@ export function useMediaCapture(): UseCaptureResult {
       Alert.alert('Error', 'Failed to start audio recording');
       setIsCapturing(false);
     }
-  }, []);
+  }, [recording]);
 
   const stopAudioRecording = useCallback(async (): Promise<MediaCapture | null> => {
     setIsCapturing(false);
@@ -155,6 +181,15 @@ export function useMediaCapture(): UseCaptureResult {
         throw new Error('No recording URI available');
       }
 
+      // Reset audio mode back to normal playback mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+      });
+
       const audioCapture: MediaCapture = {
         id: generateId(),
         type: 'audio',
@@ -171,6 +206,20 @@ export function useMediaCapture(): UseCaptureResult {
     } catch (error) {
       console.error('Failed to stop recording:', error);
       Alert.alert('Error', 'Failed to stop audio recording');
+      
+      // Still try to reset audio mode even if stopping failed
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: false,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: false,
+        });
+      } catch (modeError) {
+        console.error('Failed to reset audio mode:', modeError);
+      }
+      
       setRecording(null);
       setRecordingDuration(0);
       return null;
@@ -241,15 +290,32 @@ export function useMediaCapture(): UseCaptureResult {
   }, [generateId]);
     
 
-  const clearCapture = useCallback(() => {
+  const clearCapture = useCallback(async () => {
     setCapturedMedia(null);
     setIsCapturing(false);
     setRecordingDuration(0);
     if (recording) {
-      recording.stopAndUnloadAsync();
+      try {
+        // Clear timer if exists
+        if ((recording as any)._timer) {
+          clearInterval((recording as any)._timer);
+        }
+        await recording.stopAndUnloadAsync();
+        
+        // Reset audio mode back to normal playback mode
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: false,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: false,
+        });
+      } catch (error) {
+        console.error('Error cleaning up recording:', error);
+      }
       setRecording(null);
     }
-  }, []);
+  }, [recording]);
 
   return {
     isCapturing,
