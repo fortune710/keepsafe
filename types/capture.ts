@@ -1,4 +1,4 @@
-type MediaCanvasItemType = "text" | "sticker" | "music";
+export type MediaCanvasItemType = "text" | "sticker" | "music" | "location";
 
 export interface MediaCanvasItem {
     id: number;
@@ -6,6 +6,7 @@ export interface MediaCanvasItem {
     text?: string;
     sticker?: any;
     music_tag?: MusicTag;
+    location?: string; // formatted address string
     style?: { color: string; fontFamily?: string };
 }
 

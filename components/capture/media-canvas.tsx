@@ -10,6 +10,7 @@ import { scale, verticalScale } from "react-native-size-matters";
 import { TextCanvasItem } from "./canvas/text-canvas-item";
 import { MusicCanvasItem } from "./canvas/music-canvas-item";
 import { StickerCanvasItem } from "./canvas/sticker-canvas-item";
+import { LocationCanvasItem } from "./canvas/location-canvas-item";
 import { X } from "lucide-react-native";
 import { Colors } from "@/lib/constants";
 import AudioPreviewPopover from "./music/audio-preview-popover";
@@ -155,6 +156,12 @@ function DraggableItem({ item, onTransformChange, onDeleteItem, onMusicPress }: 
           {
             item.type === "sticker" && item.sticker && (
               <StickerCanvasItem uri={item.sticker} />
+            )
+          }
+
+          {
+            item.type === "location" && item.location && (
+              <LocationCanvasItem location={item.location} />
             )
           }
 

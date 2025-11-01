@@ -119,7 +119,7 @@ export default function DetailsScreen() {
 
   
 
-  const { viewShotRef, items, addText, addSticker, saveImage, addMusic, removeElement } = useMediaCanvas();
+  const { viewShotRef, items, addText, addSticker, saveImage, addMusic, addLocation, removeElement } = useMediaCanvas();
 
 
   
@@ -302,6 +302,7 @@ export default function DetailsScreen() {
           addText={addText}
           addSticker={addSticker}
           addMusic={addMusic}
+          addLocation={addLocation}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>

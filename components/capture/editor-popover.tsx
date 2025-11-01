@@ -17,17 +17,18 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { Music, X } from "lucide-react-native";
+import { Music, MusicIcon, StickerIcon, TextIcon, X, MapPin } from "lucide-react-native";
 import { verticalScale } from "react-native-size-matters";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useMusicTag } from "@/hooks/use-music-tag";
-import { MusicTag } from "@/types/capture";
+import { MediaCanvasItemType, MusicTag } from "@/types/capture";
 import { MusicListItem } from "./music/music-list-item";
 import ColorSlider from "./editor/color-slider";
 import FontStyleSelector from "./editor/font-style-selector";
 import TextTab from "./editor/text-tab";
 import StickerTab from "./editor/sticker-tab";
 import MusicTab from "./editor/music-tab";
+import LocationTab from "./editor/location-tab";
 
 const { height } = Dimensions.get("window");
 
@@ -37,6 +38,7 @@ interface EditorPopoverProps {
   addText: (text: string, style: { color: string; fontFamily?: string }) => void;
   addSticker: (uri: string) => void;
   addMusic: (music: MusicTag) => void;
+  addLocation: (location: string) => void;
 }
 
 export default function EditorPopover({
@@ -45,8 +47,9 @@ export default function EditorPopover({
   addText,
   addSticker,
   addMusic,
+  addLocation,
 }: EditorPopoverProps) {
-  const [activeTab, setActiveTab] = useState<"text" | "stickers" | "music">("text");
+  const [activeTab, setActiveTab] = useState<MediaCanvasItemType>("text");
   const [textInput, setTextInput] = useState("");
   const [musicTag, setMusicTag] = useState("");
   const musicQuery = useDebounce(musicTag, 600);
@@ -89,6 +92,11 @@ export default function EditorPopover({
     onClose();
   }
 
+  const confirmLocationSelection = (location: string) => {
+    addLocation(location);
+    onClose();
+  }
+
 
   if (!isVisible) return null;
 
@@ -112,40 +120,37 @@ export default function EditorPopover({
                 style={[styles.tab, activeTab === "text" && styles.activeTab]}
                 onPress={() => setActiveTab("text")}
               >
-                <Text
-                  style={[
-                    styles.tabText,
-                    activeTab === "text" && styles.activeTabText,
-                  ]}
-                >
-                  Text
-                </Text>
+                <TextIcon 
+                  color={activeTab === "text" ? 
+                  styles.activeTabText.color : styles.tabText.color} 
+                />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tab, activeTab === "stickers" && styles.activeTab]}
-                onPress={() => setActiveTab("stickers")}
+                style={[styles.tab, activeTab === "sticker" && styles.activeTab]}
+                onPress={() => setActiveTab("sticker")}
               >
-                <Text
-                  style={[
-                    styles.tabText,
-                    activeTab === "stickers" && styles.activeTabText,
-                  ]}
-                >
-                  Stickers
-                </Text>
+                <StickerIcon 
+                  color={activeTab === "sticker" ? 
+                  styles.activeTabText.color : styles.tabText.color} 
+                />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tab, activeTab === "music" && styles.activeTab]}
                 onPress={() => setActiveTab("music")}
               >
-                <Text
-                  style={[
-                    styles.tabText,
-                    activeTab === "music" && styles.activeTabText,
-                  ]}
-                >
-                  Music
-                </Text>
+                <MusicIcon 
+                  color={activeTab === "music" ? 
+                  styles.activeTabText.color : styles.tabText.color} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === "location" && styles.activeTab]}
+                onPress={() => setActiveTab("location")}
+              >
+                <MapPin 
+                  color={activeTab === "location" ? 
+                  styles.activeTabText.color : styles.tabText.color} 
+                />
               </TouchableOpacity>
             </View>
 
@@ -166,17 +171,21 @@ export default function EditorPopover({
                 onFontChange={(font) => setSelectedStyle({ ...selectedStyle, fontFamily: font })}
                 onConfirm={confirmTextSelection}
               />
-            ) : activeTab === "stickers" ? (
+            ) : activeTab === "sticker" ? (
               <StickerTab
                 onSelectSticker={confirmStickerSelection}
               />
-            ) : (
+            ) : activeTab === "music" ? (
               <MusicTab
                 isLoading={isLoading}
                 musicQuery={musicTag}
                 onMusicQueryChange={setMusicTag}
                 musicTags={musicTags ?? []}
                 onSelectMusic={confirmMusicSelection}
+              />
+            ) : (
+              <LocationTab
+                onSelectLocation={confirmLocationSelection}
               />
             )}
           </View>
@@ -241,8 +250,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#8B5CF6",
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: "500",
     color: "#475569",
   },
   activeTabText: {

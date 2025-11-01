@@ -6,6 +6,7 @@ import {  RenderedMediaCanvasItem } from "@/types/capture";
 import { TextCanvasItem } from "@/components/capture/canvas/text-canvas-item";
 import { MusicCanvasItem } from "@/components/capture/canvas/music-canvas-item";
 import { StickerCanvasItem } from "./sticker-canvas-item";
+import { LocationCanvasItem } from "./location-canvas-item";
 
 interface VaultCanvasProps {
   type: MediaType,
@@ -90,6 +91,10 @@ function VaultCanvasItem({ item }: VaultCanvasItemProps) {
 
         {item.type === "sticker" && item.sticker && (
             <StickerCanvasItem uri={item.sticker} />
+        )}
+
+        {item.type === "location" && item.location && (
+            <LocationCanvasItem location={item.location} />
         )}
 
     </Animated.View>

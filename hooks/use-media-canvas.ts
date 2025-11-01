@@ -18,6 +18,10 @@ export function useMediaCanvas() {
         setItems([...items, { id: Date.now(), type: "music", music_tag: music }]);
     }
 
+    const addLocation = (location: string) => {
+        setItems([...items, { id: Date.now(), type: "location", location }]);
+    }
+
     const removeElement = (id: number) => {
         const remainingElements = items.filter(item => item.id != id);
         setItems(remainingElements);
@@ -74,6 +78,7 @@ export function useMediaCanvas() {
         addSticker,
         saveImage,
         removeElement,
-        addMusic
+        addMusic,
+        addLocation
     }
 }
