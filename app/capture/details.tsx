@@ -1,15 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { X, Lock, Users, Play, Pause, Sticker } from 'lucide-react-native';
+import { X, Sticker } from 'lucide-react-native';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useUserEntries } from '@/hooks/use-user-entries';
 import { MediaCapture } from '@/types/media';
-import { Audio } from 'expo-av';
-import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
+
+import { moderateScale, verticalScale } from 'react-native-size-matters';
 import * as Crypto from 'expo-crypto';
 import Animated from 'react-native-reanimated';
 import { getDefaultAvatarUrl } from '@/lib/utils';
@@ -21,6 +21,9 @@ import EditorPopover from '@/components/capture/editor-popover';
 import { RenderedMediaCanvasItem } from '@/types/capture';
 import { useToast } from '@/hooks/use-toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors } from '@/lib/constants';
+import AudioEntry from '@/components/audio/audio-entry';
+import EntryShareList from '@/components/friends/entry-share-list';
 
 interface Friend {
   id: string;
@@ -33,14 +36,13 @@ export default function DetailsScreen() {
   const params = useLocalSearchParams();
   const { captureId, type, uri, duration } = params;
 
-  const newCapture: MediaCapture = {
+  const capture: MediaCapture = {
     id: captureId as string,
     type: type as any,
     uri: decodeURIComponent(uri as string),
     duration: duration ? Number(duration) : undefined,
     timestamp: new Date(),
   };
-  const [capture, setCapture] = useState<MediaCapture | null>(newCapture);
 
 
   const { user } = useAuthContext();
@@ -49,11 +51,10 @@ export default function DetailsScreen() {
   const { addOptimisticEntry, replaceOptimisticEntry } = useUserEntries();
 
   
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isPrivate, setIsPrivate] = useState(true);
   const [isEveryone, setIsEveryone] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  
 
   const { toast } = useToast();
 
@@ -64,7 +65,8 @@ export default function DetailsScreen() {
 
   const player = useVideoPlayer(uri as string, player => {
     player.loop = false;
-    player.play();
+    // Don't auto-play video - let user control playback
+    // player.play();
   });
 
   const transformsRef = useRef<Record<string, { x: number; y: number; scale: number; rotation: number }>>({});
@@ -115,52 +117,12 @@ export default function DetailsScreen() {
     }
   };
 
-  const toggleAudioPlayback = async () => {
-    try {
-      if (isPlaying) {
-        if (sound) {
-          await sound.pauseAsync();
-        }
-        setIsPlaying(false);
-      } else {
-        if (capture?.uri) {
-          if (sound) {
-            await sound.replayAsync();
-          } else {
-            const { sound: newSound } = await Audio.Sound.createAsync(
-              { uri: capture.uri },
-              { shouldPlay: true }
-            );
-            await newSound.setVolumeAsync(1.0);
-            setSound(newSound);
-            
-            newSound.setOnPlaybackStatusUpdate((status) => {
-              if (status.isLoaded && status.didJustFinish) {
-                setIsPlaying(false);
-              }
-            });
-          }
-          setIsPlaying(true);
-        }
-      }
-    } catch (error) {
-      console.error('Audio playback error:', error);
-      Alert.alert('Error', 'Failed to play audio');
-      setIsPlaying(false);
-    }
-  };
+  
 
   const { viewShotRef, items, addText, addSticker, saveImage, addMusic, removeElement } = useMediaCanvas();
 
 
-  // Cleanup sound on unmount
-  React.useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
+  
 
   const handleSave = async () => {
     if (!capture || !user || !hasSelectedSharing()) {
@@ -185,17 +147,6 @@ export default function DetailsScreen() {
           transforms: attachments
         }
       })
-
-      // Prepare the capture object, updating the URI if there are canvas items to save
-      // let updatedUri = capture.uri;
-      // if (items.length > 0) {
-      //   console.log("saving image")
-      //   const savedUri = await saveImage();
-      //   console.log({ savedUri })
-      //   if (savedUri) {
-      //     updatedUri = savedUri;
-      //   }
-      // }
 
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
@@ -259,11 +210,6 @@ export default function DetailsScreen() {
     }
   };
 
-  const handleLocationAdd = () => {
-    getCurrentLocation();
-  };
-
-  const canShowMusicTag = capture?.type !== 'audio';
 
   const getSaveButtonText = () => {
     if (isLoading) return 'Saving...';
@@ -300,7 +246,7 @@ export default function DetailsScreen() {
 
         <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Animated.View 
-            style={styles.mediaContainer}
+            style={[styles.mediaContainer, capture?.type === 'audio' && styles.borderContainer]}
           >
             {capture?.type === 'photo' && capture.uri ? (
               <MediaCanvas 
@@ -322,95 +268,20 @@ export default function DetailsScreen() {
               </Pressable>
             ) :
             capture?.type === 'audio' ? (
-              <View style={styles.audioPreview}>
-                <TouchableOpacity style={styles.playButton} onPress={toggleAudioPlayback}>
-                  {isPlaying ? (
-                    <Pause color="#8B5CF6" size={24} fill="#8B5CF6" />
-                  ) : (
-                    <Play color="#8B5CF6" size={24} fill="#8B5CF6" />
-                  )}
-                </TouchableOpacity>
-                <View style={styles.audioWave}>
-                  {[...Array(12)].map((_, i) => (
-                    <View 
-                      key={i} 
-                      style={[
-                        styles.waveBar, 
-                        { height: Math.random() * 30 + 15 }
-                      ]} 
-                    />
-                  ))}
-                </View>
-                <Text style={styles.durationText}>
-                  {capture?.duration ? `${Math.floor(capture.duration / 60)}:${(capture.duration % 60).toString().padStart(2, '0')}` : '0:00'}
-                </Text>
-              </View>
+              <AudioEntry entry={capture}/>
             ) : null}
           </Animated.View>
 
-          <View style={styles.form}>
-
-            <Text style={styles.privacyText}>
-              Share With
-            </Text>
-            <View style={styles.privacySection}>
-              
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.friendsScroll}
-                contentContainerStyle={styles.friendsScrollContent}
-              >
-                <TouchableOpacity 
-                  style={[styles.friendOption, isPrivate && styles.selectedFriendOption]}
-                  onPress={handlePrivateToggle}
-                >
-                  <View style={[styles.friendAvatar, styles.privateAvatar, isPrivate && styles.selectedPrivateAvatar]}>
-                    <Lock color={isPrivate ? 'white' : '#64748B'} size={16} />
-                  </View>
-                  <Text style={[styles.friendName, isPrivate && styles.selectedFriendName]}>Private</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={[styles.friendOption, isEveryone && styles.selectedFriendOption]}
-                  onPress={handleEveryoneToggle}
-                >
-                  <View style={[styles.friendAvatar, styles.everyoneAvatar, isEveryone && styles.selectedEveryoneAvatar]}>
-                    <Users color={isEveryone ? 'white' : '#64748B'} size={16} />
-                  </View>
-                  <Text style={[styles.friendName, isEveryone && styles.selectedFriendName]}>Everyone</Text>
-                </TouchableOpacity>
-
-                {realFriends.map((friend) => (
-                  <TouchableOpacity 
-                    key={friend.id}
-                    style={[
-                      styles.friendOption, 
-                      selectedFriends.includes(friend.id) && !isPrivate && !isEveryone && styles.selectedFriendOption,
-                      (isPrivate || isEveryone) && styles.disabledFriendOption
-                    ]}
-                    onPress={() => handleFriendToggle(friend.id)}
-                    //disabled={isPrivate || isEveryone}
-                  >
-                    <Image 
-                      source={{ uri: friend.avatar }} 
-                      style={[
-                        styles.friendAvatar,
-                        selectedFriends.includes(friend.id) && !isPrivate && !isEveryone && styles.selectedFriendAvatar,
-                        (isPrivate || isEveryone) && styles.disabledFriendAvatar
-                      ]} 
-                    />
-                    <Text style={[
-                      styles.friendName,
-                      selectedFriends.includes(friend.id) && !isPrivate && !isEveryone && styles.selectedFriendName,
-                      (isPrivate || isEveryone) && styles.disabledFriendName
-                    ]}>
-                      {friend.username}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+          <View style={styles.form}>            
+            <EntryShareList 
+              isPrivate={isPrivate}
+              isEveryone={isEveryone}
+              selectedFriends={selectedFriends}
+              handlePrivateToggle={handlePrivateToggle}
+              handleEveryoneToggle={handleEveryoneToggle}
+              handleFriendToggle={handleFriendToggle}
+              friends={realFriends}
+            />
 
             <TouchableOpacity 
               style={[
@@ -476,33 +347,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: verticalScale(250),
   },
-  privacyText: {
-    textAlign: "center",
-    fontSize: scale(16),
-    fontWeight: '500',
-    marginVertical: verticalScale(8)
+  borderContainer: {
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  audioPreview: {
-    height: 300,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    position: 'relative',
-  },
-  playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+
+  
   audioWave: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -515,11 +365,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 1,
     borderRadius: 2,
   },
-  durationText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-  },
+  
   form: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -575,9 +421,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 8,
   },
-  privacySection: {
-    marginBottom: 32,
-  },
+  
   privacyTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -590,66 +434,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontStyle: 'italic',
   },
-  friendsScroll: {
-    marginBottom: 8,
-  },
-  friendsScrollContent: {
-    paddingRight: 20,
-  },
-  friendOption: {
-    alignItems: 'center',
-    marginRight: 16,
-    padding: 8,
-    borderRadius: 16,
-  },
-  selectedFriendOption: {
-    backgroundColor: '#EEF2FF',
-  },
-  disabledFriendOption: {
-    opacity: 0.5,
-  },
-  friendAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginBottom: 8,
-  },
-  privateAvatar: {
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedFriendAvatar: {
-    borderWidth: 3,
-    borderColor: '#8B5CF6',
-  },
-  selectedPrivateAvatar: {
-    backgroundColor: '#8B5CF6',
-  },
-  everyoneAvatar: {
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedEveryoneAvatar: {
-    backgroundColor: '#059669',
-  },
-  disabledFriendAvatar: {
-    opacity: 0.5,
-  },
-  friendName: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  selectedFriendName: {
-    color: '#8B5CF6',
-    fontWeight: '600',
-  },
-  disabledFriendName: {
-    opacity: 0.5,
-  },
+  
   saveButton: {
     backgroundColor: '#8B5CF6',
     borderRadius: 12,

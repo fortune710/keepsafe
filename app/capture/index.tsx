@@ -25,6 +25,8 @@ import { scale, verticalScale } from 'react-native-size-matters';
 import { getDefaultAvatarUrl, getTimefromTimezone } from '@/lib/utils';
 import { DateContainer } from '@/components/date-container';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors } from '@/lib/constants';
+import AudioWaveVisualier from '@/components/audio/audio-wave-visualier';
 
 const { height } = Dimensions.get('window');
 
@@ -56,7 +58,7 @@ export default function CaptureScreen() {
     clearCapture 
   } = useMediaCapture();
   
-  const waveAnimation = useSharedValue(0);
+  
   const translateY = useSharedValue(0);
 
   // Pan gesture for dragging up to vault
@@ -108,17 +110,6 @@ export default function CaptureScreen() {
     };
   });
 
-  useEffect(() => {
-    if (selectedMode === 'microphone') {
-      waveAnimation.value = withRepeat(
-        withTiming(1, { duration: isCapturing ? 300 : 1000 }),
-        -1,
-        true
-      );
-    } else {
-      waveAnimation.value = withTiming(0);
-    }
-  }, [isCapturing, selectedMode]);
 
   // Cleanup video timer on unmount
   useEffect(() => {
@@ -128,6 +119,15 @@ export default function CaptureScreen() {
       }
     };
   }, []);
+
+  // Cleanup audio recording when component unmounts (navigating away)
+  useEffect(() => {
+    return () => {
+      // Clean up any active recording when component unmounts
+      // Note: We call clearCapture which checks internally if there's a recording
+      clearCapture();
+    };
+  }, []); // Empty dependency array - only run cleanup on unmount
 
 
 
@@ -303,11 +303,6 @@ export default function CaptureScreen() {
     setFacing(current => (current === 'back' ? 'front' : 'back'));
   };
 
-  const animatedWaveStyle = useAnimatedStyle(() => {
-    return {
-      opacity: isCapturing ? waveAnimation.value * 0.8 + 0.2 : 0.3 + waveAnimation.value * 0.2,
-    };
-  });
 
   // Camera ready handler
   const onCameraReady = () => {
@@ -424,20 +419,9 @@ export default function CaptureScreen() {
                   </>
                 ) : (
                   <View style={styles.audioVisualizer}>
-                    <Animated.View style={[styles.waveform, animatedWaveStyle]}>
-                      {[...Array(20)].map((_, i) => (
-                        <View 
-                          key={i} 
-                          style={[
-                            styles.waveBar,
-                            { 
-                              height: isCapturing ? Math.random() * 60 + 20 : Math.random() * 30 + 10,
-                              backgroundColor: isCapturing ? '#8B5CF6' : '#CBD5E1',
-                            }
-                          ]} 
-                        />
-                      ))}
-                    </Animated.View>
+                    <AudioWaveVisualier
+                      isRecording={isCapturing}
+                    />
                     {isCapturing && (
                       <View style={styles.recordingIndicator}>
                         <View style={styles.recordingDot} />
@@ -629,7 +613,7 @@ const styles = StyleSheet.create({
   },
   borderContainer: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   persistentCamera: {
     flex: 1,
@@ -679,18 +663,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  waveform: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 80,
-    marginBottom: 16,
-  },
-  waveBar: {
-    width: 3,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 1,
-    borderRadius: 2,
-  },
+  
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
