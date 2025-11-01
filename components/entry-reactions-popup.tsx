@@ -55,7 +55,7 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 1) {
-      return 'Just now';
+      return 'Now';
     } else if (diffInHours < 24) {
       return `${Math.floor(diffInHours)}h ago`;
     } else {
