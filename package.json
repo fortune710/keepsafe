@@ -11,7 +11,8 @@
     "web": "EXPO_NO_TELEMETRY=1 expo start --clear --web",
     "lint": "expo lint",
     "test": "jest --watchAll",
-    "test:watch": "jest --watchAll"
+    "test:watch": "jest --watchAll",
+    "vercel-build": "expo export"
   },
   "jest": {
     "preset": "jest-expo",
