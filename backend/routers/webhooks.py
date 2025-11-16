@@ -1,0 +1,125 @@
+from fastapi import APIRouter, HTTPException, Header, Request
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
+from services.ingestion_service import IngestionService
+from services.supabase_client import get_supabase_client
+import logging
+import hmac
+import hashlib
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+ingestion_service = IngestionService()
+
+class EntryWebhookPayload(BaseModel):
+    """Payload structure for entry webhook."""
+    type: str  # 'INSERT', 'UPDATE', 'DELETE'
+    table: str
+    record: Optional[Dict[str, Any]] = None
+    old_record: Optional[Dict[str, Any]] = None
+
+@router.post("/entries")
+async def entry_webhook(
+    payload: EntryWebhookPayload,
+    request: Request,
+    x_supabase_signature: Optional[str] = Header(None, alias="x-supabase-signature")
+):
+    """
+    Webhook endpoint for processing entry changes.
+    Handles INSERT, UPDATE, and DELETE operations.
+    """
+    try:
+        # Verify webhook signature if needed (optional security check)
+        # You can implement signature verification here if Supabase sends it
+        
+        if payload.table != "entries":
+            logger.warning(f"Received webhook for unexpected table: {payload.table}")
+            return {"status": "ignored", "message": f"Table {payload.table} not handled"}
+        
+        entry_id = None
+        
+        if payload.type == "INSERT":
+            if not payload.record:
+                raise HTTPException(status_code=400, detail="Record missing in INSERT payload")
+            
+            entry_id = payload.record.get("id")
+            logger.info(f"Processing INSERT webhook for entry {entry_id}")
+            
+            success = await ingestion_service.ingest_entry(payload.record)
+            
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"Entry {entry_id} ingested successfully",
+                    "entry_id": entry_id
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to ingest entry {entry_id}"
+                )
+        
+        elif payload.type == "UPDATE":
+            if not payload.record:
+                raise HTTPException(status_code=400, detail="Record missing in UPDATE payload")
+            
+            entry_id = payload.record.get("id")
+            logger.info(f"Processing UPDATE webhook for entry {entry_id}")
+            
+            success = await ingestion_service.update_entry(payload.record)
+            
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"Entry {entry_id} updated successfully",
+                    "entry_id": entry_id
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to update entry {entry_id}"
+                )
+        
+        elif payload.type == "DELETE":
+            if not payload.old_record:
+                raise HTTPException(status_code=400, detail="Old record missing in DELETE payload")
+            
+            entry_id = payload.old_record.get("id")
+            logger.info(f"Processing DELETE webhook for entry {entry_id}")
+            
+            success = await ingestion_service.delete_entry(entry_id)
+            
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"Entry {entry_id} deleted successfully",
+                    "entry_id": entry_id
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to delete entry {entry_id}"
+                )
+        
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported webhook type: {payload.type}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing webhook: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.get("/health")
+async def health_check():
+    """Health check endpoint for webhooks."""
+    return {"status": "healthy", "service": "webhooks"}
+
