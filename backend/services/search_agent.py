@@ -217,6 +217,9 @@ class SearchAgent:
 
         pinecone_filter: Dict[str, Any] = {}
 
+        # Add user_id to cfg if not present and ensure it's the calling user's id
+        cfg["user_id"] = user_id
+
         # Types -> metadata.type $in [...]
         types = cfg.get("types") or []
         if isinstance(types, list):
@@ -246,6 +249,10 @@ class SearchAgent:
         friend_ids = cfg.get("friend_ids") or []
         if isinstance(friend_ids, list) and friend_ids:
             pinecone_filter["shared_with"] = {"$in": friend_ids}
+
+        # User id -> metadata.user_id == user_id
+        if cfg.get("user_id"):
+            pinecone_filter["user_id"] = cfg["user_id"]
 
         logger.debug("Derived Pinecone filter: %s", pinecone_filter)
         return pinecone_filter
@@ -297,18 +304,25 @@ class SearchAgent:
             ):
                 continue
 
-            score = getattr(match, "score", None) or 0.0
+            # Attachments are stored as a JSON string in Pinecone metadata; parse to Python.
+            attachments_data = []
+            attachments_str = metadata.get("attachments_json")
+            if isinstance(attachments_str, str):
+                try:
+                    loaded = json.loads(attachments_str)
+                    if isinstance(loaded, list):
+                        attachments_data = loaded
+                except Exception as e:
+                    logger.warning("Failed to parse attachments_json: %s", e)
 
             result = SearchResult(
                 entry_id=str(metadata.get("entry_id") or getattr(match, "id", "")),
-                score=float(score),
-                description=metadata.get("description") if use_metadata else None,
-                content_url=metadata.get("content_url") if use_metadata else None,
-                is_private=metadata.get("is_private") if use_metadata else None,
-                shared_with_everyone=shared_everyone if use_metadata else None,
-                created_at=metadata.get("created_at") if use_metadata else None,
-                user_id=owner_id if use_metadata else None,
-                raw_metadata=metadata if use_metadata else None,
+                user_id=owner_id,
+                type=metadata.get("type"),
+                content_url=metadata.get("content_url"),
+                attachments=attachments_data,
+                created_at=metadata.get("created_at"),
+                description=metadata.get("description"),
             )
             results.append(result)
 
@@ -320,6 +334,7 @@ class SearchAgent:
         query: str,
         friends: List[FriendSummary],
         results: List[SearchResult],
+        send: StreamCallback,
     ) -> str:
         """
         Use Gemini to create a friendly answer summarizing friends and search results.
@@ -330,8 +345,8 @@ class SearchAgent:
         friends_text = "\n".join(friends_section) or "No friends were found."
 
         results_lines = []
-        for r in results:
-            line = f"- Entry {r.entry_id} (score={r.score:.3f})"
+        for r in results: 
+            line = ""
             if r.description:
                 line += f": {r.description}"
             results_lines.append(line)
@@ -353,12 +368,16 @@ class SearchAgent:
             "could rephrase or broaden their search."
         )
 
-        response = self._gemini_client.models.generate_content(
+        response = self._gemini_client.models.generate_content_stream(
             model=GEMINI_FLASH_MODEL,
             contents=[system_prompt, user_prompt],
         )
 
-        return getattr(response, "text", "") or "Sorry, I couldn't generate an explanation."
+        for chunk in response:
+            logger.info("Gemini response chunk: %s", chunk.text if chunk.text else "")
+            await send(str(chunk.text) if chunk.text else "")
+
+        #return getattr(response, "text", "") or "Sorry, I couldn't generate an explanation."
 
     async def run(
         self,
@@ -369,7 +388,7 @@ class SearchAgent:
         """
         Orchestrate the end-to-end agent flow and stream progress messages via `send`.
         """
-        await send("Analyzing your query with Gemini to decide which tools to use...")
+        await send("Analyzing your query...")
         routing = await self._decide_tools(query)
 
         use_friends = routing.get("use_friends_tool", True)
@@ -380,7 +399,7 @@ class SearchAgent:
         results: List[SearchResult] = []
 
         if use_friends:
-            await send("Fetching your friends from the database...")
+            await send("Fetching your friends...")
             try:
                 friends = await self._get_user_friends(user_id)
                 await send(f"Found {len(friends)} friends linked to your account.")
@@ -391,7 +410,7 @@ class SearchAgent:
         if use_search:
             # First, try to extract structured filters from the query.
             await send(
-                "Looking for any filters in your query (friends, dates, types)..."
+                "Filtering your search..."
             )
             pinecone_filter: Dict[str, Any] = {}
             try:
@@ -401,7 +420,7 @@ class SearchAgent:
                 )
                 if pinecone_filter:
                     await send(
-                        "Applying filters derived from your query to narrow the search."
+                        "Applying requested filters to narrow the search."
                     )
                 else:
                     await send(
@@ -416,7 +435,7 @@ class SearchAgent:
                 )
                 pinecone_filter = {}
 
-            await send("Searching your memories in Pinecone using semantic similarity...")
+            await send("Searching your memories...")
             try:
                 results = await self._search_pinecone(
                     query=query,
@@ -424,24 +443,26 @@ class SearchAgent:
                     filters=pinecone_filter or None,
                     use_metadata=use_metadata,
                 )
-                await send(f"Found {len(results)} relevant entries in your memory index.")
+                response_message = f"Found something in your memories." if len(results) > 0 else "No matching entries were found."
+                await send(response_message)
             except Exception as e:
                 logger.error("Error searching Pinecone: %s", e, exc_info=True)
                 await send("I ran into an issue searching your memories.")
 
-        await send("Generating a friendly explanation of the results...")
+        await send("Summarizing the results...")
         try:
             summary = await self._summarize_for_user(
                 user_id=user_id,
                 query=query,
                 friends=friends,
                 results=results,
+                send=send,
             )
         except Exception as e:
             logger.error("Error generating summary with Gemini: %s", e, exc_info=True)
             summary = "I had trouble generating a detailed explanation, but the search has completed."
 
-        await send(summary)
+        #await send(summary)
 
         # Optionally stream raw structured results as JSON for the frontend.
         if results:

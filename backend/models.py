@@ -116,13 +116,11 @@ class SearchResult(BaseModel):
     """Structured view over a Pinecone match for the search agent."""
 
     entry_id: str
-    score: float
-    description: Optional[str] = None
+    user_id: str
+    type: Literal["photo", "video", "audio"]
     content_url: Optional[str] = None
-    is_private: Optional[bool] = None
-    shared_with_everyone: Optional[bool] = None
+    attachments: List[Attachment] = []
     created_at: Optional[str] = None
-    user_id: Optional[str] = None
-    raw_metadata: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
 
 
