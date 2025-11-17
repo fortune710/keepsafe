@@ -1,8 +1,10 @@
 from typing import Dict, Any, Optional
+import json
+import logging
+
 from services.gemini_client import generate_description_from_media, generate_embedding
 from services.pinecone_client import get_pinecone_index
 from utils.datetime_utils import iso_to_unix_epoch
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +86,8 @@ class IngestionService:
                 "type": entry_type,
                 "description": description,
                 "content_url": content_url,
+                # Store attachments as a JSON string for Pinecone metadata.
+                "attachments_json": json.dumps(attachments) if attachments else None,
                 "is_private": entry.get("is_private", False),
                 "shared_with_everyone": entry.get("shared_with_everyone", False),
                 "created_at": created_at,
