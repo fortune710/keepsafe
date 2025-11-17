@@ -13,7 +13,7 @@ type SignUpStep = 'email' | 'password' | 'name' | 'username';
 export default function AuthScreen() {
   const { mode } = useLocalSearchParams();
   const [isSignUp, setIsSignUp] = useState<boolean>(
-    (mode as string) !== "signin" || mode !== "sign-in"
+    (mode as string) !== "signin" && mode !== "sign-in"
   );
   const [currentStep, setCurrentStep] = useState<SignUpStep>('email');
   const [loading, setLoading] = useState(false);
