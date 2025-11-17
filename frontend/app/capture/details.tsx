@@ -78,7 +78,7 @@ export default function DetailsScreen() {
   const realFriends: Friend[] = friends.map(friendship => {
     const friendProfile = friendship.friend_profile;
     return {
-      id: friendship.friend_id,
+      id: friendProfile?.id,
       name: friendProfile?.full_name || 'Unknown User',
       username: friendProfile?.username ?? "",
       avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
@@ -134,6 +134,8 @@ export default function DetailsScreen() {
       toast('Cannot save entry', 'error');
       return;
     }
+
+    console.log({ selectedFriends })
 
     // Generate a proper UUID for optimistic entry
     const tempId = Crypto.randomUUID();
