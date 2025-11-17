@@ -7,6 +7,9 @@ import { useFriends } from '@/hooks/use-friends';
 export default function RootScreen() {
   const { user, loading, session } = useAuthContext();
 
+  console.log("User: %s", user);
+  console.log("Session: %s", session);
+
   //Get Hook to Prefetch Suggested Friends
   const { prefetchSuggestedFriends } = useFriends();
 
@@ -25,7 +28,7 @@ export default function RootScreen() {
   }
 
   // Redirect to onboarding if not authenticated
-  if (!session) {
+  if (!user) {
     return <Redirect href="/onboarding" />;
   }
 
