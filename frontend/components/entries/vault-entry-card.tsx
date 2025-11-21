@@ -28,6 +28,7 @@ interface EntryWithProfile extends Entry {
 
 interface VaultEntryCardProps {
   entry: EntryWithProfile;
+  includeRotation?: boolean;
   onPress?: (entry: EntryWithProfile) => void;
   onReactions?: (entryId: string) => void;
   onComments?: (entryId: string) => void;
@@ -36,7 +37,14 @@ interface VaultEntryCardProps {
 
 const { height } = Dimensions.get('window');
 
-export default function VaultEntryCard({ entry, onPress, onReactions, onComments, onRetry }: VaultEntryCardProps) {
+export default function VaultEntryCard({
+  entry,
+  includeRotation = true,
+  onPress,
+  onReactions,
+  onComments,
+  onRetry,
+}: VaultEntryCardProps) {
   const [isPlaying, setIsPlaying] = React.useState(false);
   const numberHash = useMemo(() => {
     return dateStringToNumber(entry.created_at);
@@ -174,7 +182,7 @@ export default function VaultEntryCard({ entry, onPress, onReactions, onComments
   return (
     <View style={styles.container}>
       <Animated.View    
-        style={[styles.entryCard, rotateStyle]}
+        style={includeRotation ? [styles.entryCard, rotateStyle] : styles.entryCard}
         entering={FadeIn.duration(200)}
         exiting={FadeOut.duration(150)}
       >
