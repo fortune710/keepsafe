@@ -308,7 +308,7 @@ class SearchAgent:
                         attachments_data = loaded
                 except Exception as e:
                     logger.warning("Failed to parse attachments_json: %s", e)
-
+            logger.debug("Search result metadata: %s", metadata)
             result = SearchResult(
                 entry_id=str(metadata.get("entry_id") or getattr(match, "id", "")),
                 user_id=owner_id,

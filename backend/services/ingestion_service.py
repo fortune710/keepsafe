@@ -88,8 +88,6 @@ class IngestionService:
                 "content_url": content_url,
                 # Store attachments as a JSON string for Pinecone metadata.
                 "attachments_json": json.dumps(attachments) if attachments else None,
-                "is_private": entry.get("is_private", False),
-                "shared_with_everyone": entry.get("shared_with_everyone", False),
                 "created_at": created_at,
                 "created_at_epoch": created_at_epoch,
                 "shared_with": friends_ids,
@@ -98,6 +96,7 @@ class IngestionService:
             # Remove None values from metadata
             metadata = {k: v for k, v in metadata.items() if v is not None}
             
+            logger.debug("Metadata: %s", metadata)
             # Upsert to Pinecone
             logger.info(f"Upserting entry {entry_id} to Pinecone")
             self.pinecone_index.upsert(
