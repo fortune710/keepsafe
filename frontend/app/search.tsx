@@ -14,12 +14,11 @@ import {
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sparkles, ArrowLeft, SendHorizonal } from 'lucide-react-native';
+import { Sparkles, ArrowLeft, SendHorizonal, Video as VideoIcon, Mic } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSearch } from '@/hooks/use-search';
 import { useUserEntries } from '@/hooks/use-user-entries';
 import { Colors } from '@/lib/constants';
-import VaultEntryCard from '@/components/entries/vault-entry-card';
 import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
 import { verticalScale } from 'react-native-size-matters';
@@ -36,6 +35,84 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 interface SearchMessageProps {
   message: { id: string; role: string; content: string };
 }
+
+interface SearchEntryPreviewProps {
+  entry: any;
+}
+
+const SearchEntryPreview: React.FC<SearchEntryPreviewProps> = ({ entry }) => {
+  const [visible, setVisible] = useState(false);
+
+  const open = () => setVisible(true);
+  const close = () => setVisible(false);
+
+  return (
+    <>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={open}
+        style={styles.searchPreviewContainer}
+      >
+        {entry.type === 'photo' && entry.content_url ? (
+          <Image
+            source={{ uri: entry.content_url }}
+            style={styles.resultPreviewImage}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={styles.resultPreviewPlaceholder}>
+            {entry.type === 'video' && (
+              <VideoIcon color="#111827" size={20} style={styles.resultPreviewIcon} />
+            )}
+            {entry.type === 'audio' && (
+              <Mic color="#111827" size={20} style={styles.resultPreviewIcon} />
+            )}
+            <Text style={styles.resultPreviewType}>
+              {entry.type || 'entry'}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={close}
+      >
+        <View style={styles.fullscreenOverlay}>
+          <TouchableOpacity style={styles.fullscreenBackdrop} onPress={close} />
+          <View style={styles.fullscreenContent}>
+            {entry.type === 'photo' && entry.content_url ? (
+              <Image
+                source={{ uri: entry.content_url }}
+                style={styles.fullscreenImage}
+                contentFit="contain"
+              />
+            ) : (
+              <View style={styles.fullscreenPlaceholder}>
+                {entry.type === 'video' && (
+                  <VideoIcon color="#E5E7EB" size={32} style={styles.resultPreviewIcon} />
+                )}
+                {entry.type === 'audio' && (
+                  <Mic color="#E5E7EB" size={32} style={styles.resultPreviewIcon} />
+                )}
+                <Text style={styles.resultPreviewType}>
+                  {entry.type || 'entry'}
+                </Text>
+                {entry.created_at && (
+                  <Text style={styles.fullscreenMeta}>
+                    {new Date(entry.created_at).toLocaleString()}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+};
 
 const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
   const isAssistant = message.role === 'assistant';
@@ -65,16 +142,6 @@ const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
       entries: parsedEntries,
     };
   }, [message.content]);
-
-  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
-
-  const handlePreviewPress = (entry: any) => {
-    setSelectedEntry(entry);
-  };
-
-  const closeModal = () => {
-    setSelectedEntry(null);
-  };
 
   return (
     <View style={styles.searchMessageContainer}>
@@ -133,58 +200,14 @@ const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
             contentContainerStyle={styles.resultPreviewList}
           >
             {entries.map((entry) => (
-              <TouchableOpacity
+              <SearchEntryPreview
                 key={entry.entry_id || entry.id}
-                style={styles.resultPreview}
-                activeOpacity={0.8}
-                onPress={() => handlePreviewPress(entry)}
-              >
-                {entry.content_url ? (
-                  <Image
-                    source={{ uri: entry.content_url }}
-                    style={styles.resultPreviewImage}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={styles.resultPreviewPlaceholder}>
-                    <Text style={styles.resultPreviewType}>
-                      {entry.type || 'entry'}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                entry={entry}
+              />
             ))}
           </ScrollView>
         )}
       </View>
-
-      <Modal
-        visible={!!selectedEntry}
-        transparent
-        animationType="fade"
-        onRequestClose={closeModal}
-      >
-        <View style={styles.fullscreenOverlay}>
-          <TouchableOpacity style={styles.fullscreenBackdrop} onPress={closeModal} />
-          {selectedEntry && (
-            <View style={styles.fullscreenContent}>
-              {selectedEntry.content_url ? (
-                <Image
-                  source={{ uri: selectedEntry.content_url }}
-                  style={styles.fullscreenImage}
-                  contentFit="contain"
-                />
-              ) : (
-                <View style={styles.fullscreenPlaceholder}>
-                  <Text style={styles.resultPreviewType}>
-                    {selectedEntry.type || 'entry'}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -205,7 +228,7 @@ export default function SearchScreen() {
   };
 
   const renderEntryItem = ({ item }: any) => {
-    return <VaultEntryCard entry={item} includeRotation={false} />;
+    return <SearchEntryPreview entry={item} />;
   };
 
   const renderMessageItem = ({ item }: any) => {
@@ -491,23 +514,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingVertical: 4,
   },
-  resultPreview: {
-    width: 96,
-    height: 96,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#E5E7EB',
+  searchPreviewContainer: {
+    width: SCREEN_WIDTH * 0.28,
+    height: SCREEN_WIDTH * 0.28,
     marginRight: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   resultPreviewImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 16,
   },
   resultPreviewPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#E5E7EB',
+  },
+  resultPreviewIcon: {
+    marginBottom: 4,
   },
   resultPreviewType: {
     fontSize: 12,
@@ -545,6 +571,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fullscreenMeta: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#E5E7EB',
   },
 });
 
