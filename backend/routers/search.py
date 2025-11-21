@@ -26,7 +26,7 @@ async def _sse_event_stream(user_id: str, query: str) -> AsyncGenerator[str, Non
 
     async def send(message: str) -> None:
         # Each message is wrapped as an SSE 'data' event.
-        await queue.put(f"data: {message}\n\n")
+        await queue.put(f"data: {message}")
 
     # Run the agent in the background to push messages into the queue.
     task = asyncio.create_task(agent.run(user_id=user_id, query=query, send=send))

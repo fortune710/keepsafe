@@ -140,6 +140,7 @@ class SearchAgent:
         self,
         user_id: str,
         query: str,
+        friends: List[FriendSummary],
     ) -> Dict[str, Any]:
         """
         Use Gemini (with the user's friends list as context) to derive a Pinecone
@@ -152,13 +153,6 @@ class SearchAgent:
           "shared_with": {"$in": ["friend-id-1", "friend-id-2"]}
         }
         """
-        try:
-            friends = await self._get_user_friends(user_id)
-        except Exception as e:
-            logger.warning(
-                "Could not fetch friends while building filters: %s", e, exc_info=True
-            )
-            friends = []
 
         friends_lines = [
             f"{f.id} | {f.username or ''} | {getattr(f, 'full_name', '') or ''} | {f.email or ''}"
@@ -388,7 +382,7 @@ class SearchAgent:
         """
         Orchestrate the end-to-end agent flow and stream progress messages via `send`.
         """
-        await send("Analyzing your query...")
+        await send("Analyzing your query...\n\n")
         routing = await self._decide_tools(query)
 
         use_friends = routing.get("use_friends_tool", True)
@@ -399,43 +393,44 @@ class SearchAgent:
         results: List[SearchResult] = []
 
         if use_friends:
-            await send("Fetching your friends...")
+            await send("Fetching your friends...\n\n")
             try:
                 friends = await self._get_user_friends(user_id)
-                await send(f"Found {len(friends)} friends linked to your account.")
+                await send(f"Found {len(friends)} friends linked to your account.\n\n")
             except Exception as e:
                 logger.error("Error fetching friends: %s", e, exc_info=True)
-                await send("I ran into an issue fetching your friends, but I'll continue the search.")
+                await send("I ran into an issue fetching your friends, but I'll continue the search.\n\n")
 
         if use_search:
             # First, try to extract structured filters from the query.
             await send(
-                "Filtering your search..."
+                "Filtering your search...\n\n"
             )
             pinecone_filter: Dict[str, Any] = {}
             try:
                 pinecone_filter = await self._build_pinecone_filter(
                     user_id=user_id,
                     query=query,
+                    friends=friends,
                 )
                 if pinecone_filter:
                     await send(
-                        "Applying requested filters to narrow the search."
+                        "Applying requested filters to narrow the search.\n\n"
                     )
                 else:
                     await send(
-                        "No specific filters detected; searching across all of your visible memories."
+                        "No specific filters detected; searching across all of your visible memories.\n\n"
                     )
             except Exception as e:
                 logger.error(
                     "Error deriving filters from query: %s", e, exc_info=True
                 )
                 await send(
-                    "I couldn't interpret filters from your query, so I'll search broadly."
+                    "I couldn't interpret filters from your query, so I'll search broadly.\n\n"
                 )
                 pinecone_filter = {}
 
-            await send("Searching your memories...")
+            await send("Searching your memories...\n\n")
             try:
                 results = await self._search_pinecone(
                     query=query,
@@ -443,13 +438,13 @@ class SearchAgent:
                     filters=pinecone_filter or None,
                     use_metadata=use_metadata,
                 )
-                response_message = f"Found something in your memories." if len(results) > 0 else "No matching entries were found."
+                response_message = f"Found something in your memories.\n\n" if len(results) > 0 else "No matching entries were found.\n\n"
                 await send(response_message)
             except Exception as e:
                 logger.error("Error searching Pinecone: %s", e, exc_info=True)
-                await send("I ran into an issue searching your memories.")
+                await send("I ran into an issue searching your memories.\n\n")
 
-        await send("Summarizing the results...")
+        await send("Summarizing the results...\n\n")
         try:
             summary = await self._summarize_for_user(
                 user_id=user_id,
@@ -460,7 +455,7 @@ class SearchAgent:
             )
         except Exception as e:
             logger.error("Error generating summary with Gemini: %s", e, exc_info=True)
-            summary = "I had trouble generating a detailed explanation, but the search has completed."
+            summary = "I had trouble generating a detailed explanation, but the search has completed.\n\n"
 
         #await send(summary)
 
