@@ -35,12 +35,13 @@ export default function RootLayout() {
                   <Stack.Screen name="index" />
                   <Stack.Screen name="capture" />
                   <Stack.Screen name="invite/[id]" />
-                  <Stack.Screen name="vault" />
+                <Stack.Screen name="vault" />
                   <Stack.Screen name="calendar" />
                   <Stack.Screen name="calendar/day" />
                   <Stack.Screen name="social" />
                   <Stack.Screen name="friends" />
                   <Stack.Screen name="dreamscape" />
+                  <Stack.Screen name="search" />
                   <Stack.Screen name="capture/details" />
                   <Stack.Screen name="+not-found" />
                 </Stack>
