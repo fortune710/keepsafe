@@ -14,7 +14,7 @@ const menuItems = [
   { name: 'Calendar', route: '/calendar', icon: Calendar },
   { name: 'Social', route: '/social', icon: Users },
   { name: 'Friends', route: '/friends', icon: UserPlus },
-  { name: 'Dreamscape', route: '/dreamscape', icon: Sparkles },
+  { name: 'Search', route: '/search', icon: Sparkles },
   { name: 'Settings', route: '/settings', icon: Settings },
 ];
 

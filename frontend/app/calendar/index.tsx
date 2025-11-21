@@ -74,7 +74,7 @@ export default function CalendarScreen() {
           <View style={styles.rightIcons}>
             <TouchableOpacity
               style={styles.iconButton}
-              onPress={() => router.push('/dreamscape')}
+              onPress={() => router.push('/search')}
             >
               <Sparkles color="#64748B" size={20} />
             </TouchableOpacity>
