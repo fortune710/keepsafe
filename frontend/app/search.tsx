@@ -22,6 +22,7 @@ import { Colors } from '@/lib/constants';
 import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
 import { verticalScale } from 'react-native-size-matters';
+import Typewriter from '@/components/ui/typewriter';
 
 const SAMPLE_QUERIES = [
   'Show me my happiest memories',
@@ -300,12 +301,29 @@ export default function SearchScreen() {
               </View>
             </View>
           ) : (
-            <FlatList
-              data={messages}
-              keyExtractor={(item) => item.id}
-              renderItem={renderMessageItem}
-              contentContainerStyle={styles.messagesListContent}
-            />
+            <>
+              <FlatList
+                data={messages}
+                keyExtractor={(item) => item.id}
+                renderItem={renderMessageItem}
+                contentContainerStyle={styles.messagesListContent}
+              />
+              {
+                isLoading && (
+                  <View style={styles.loadingContainer}>
+                    <Sparkles color={Colors.primary} size={20} />
+                    <Typewriter
+                      texts={['Superzing your fries...', 'Preparing your memories...', 'Cooking a response...']}
+                      loop={true}
+                      delay={50}
+                      pauseDelay={500}
+                      style={{ fontSize: styles.messageText.fontSize, color: Colors.text, fontWeight: '400' }}
+                    />
+                  </View>
+                )
+              }
+            
+            </>
           )}
         </View>
 
@@ -354,7 +372,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: verticalScale(4),
     backgroundColor: 'rgba(240, 249, 255, 0.96)',
   },
   backButton: {
@@ -576,6 +594,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     color: '#E5E7EB',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: verticalScale(10)
   },
 });
 
