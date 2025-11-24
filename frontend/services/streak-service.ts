@@ -1,4 +1,4 @@
-import { differenceInHours, format, subDays } from 'date-fns';
+import { differenceInHours, format } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
 import { deviceStorage } from './device-storage';
 import { getDeviceTimezone } from '@/lib/utils';
@@ -95,43 +95,39 @@ export class StreakService {
       newStreakData.lastEntryDate = entryDateStr;
       newStreakData.lastAccessTime = now.toISOString();
     } else {
-      // Check if 24 hours have passed since last access
-      const lastAccessTime = newStreakData.lastAccessTime ? new Date(newStreakData.lastAccessTime) : null;
-      const hoursSinceLastAccess = lastAccessTime ? differenceInHours(now, lastAccessTime) : 24;
+      // lastEntryDate is stored as 'yyyy-MM-dd' string in user's timezone
+      const lastEntryDateStr = newStreakData.lastEntryDate;
       
-      if (hoursSinceLastAccess >= 24) {
-        // Check if entry is for today or yesterday in user's timezone
-        const yesterdayStr = format(subDays(currentTimeInUserTz, 1), 'yyyy-MM-dd');
-        
-        if (entryDateStr === currentDateStr) {
-          // Entry for today
-          if (newStreakData.lastEntryDate === yesterdayStr) {
-            // Continuing streak from yesterday
-            newStreakData.currentStreak += 1;
-          } else if (newStreakData.lastEntryDate !== currentDateStr) {
-            // New streak starting today
-            newStreakData.currentStreak = 1;
-          }
-        } else if (entryDateStr === yesterdayStr) {
-          // Entry for yesterday
-          const dayBeforeYesterdayStr = format(subDays(currentTimeInUserTz, 2), 'yyyy-MM-dd');
-          
-          if (newStreakData.lastEntryDate === dayBeforeYesterdayStr) {
-            // Continuing streak from day before yesterday
-            newStreakData.currentStreak += 1;
-          } else {
-            // New streak starting yesterday
-            newStreakData.currentStreak = 1;
-          }
-        } else {
-          // Entry for a different day, reset streak
-          newStreakData.currentStreak = 1;
-        }
-        
-        // Update max streak
-        newStreakData.maxStreak = Math.max(newStreakData.maxStreak, newStreakData.currentStreak);
-        newStreakData.lastEntryDate = entryDateStr;
+      // Compare dates directly as strings (both are in same timezone format)
+      if (entryDateStr === lastEntryDateStr) {
+        // Same day entry - don't change streak, just update access time
         newStreakData.lastAccessTime = now.toISOString();
+      } else {
+        // Parse dates to calculate day difference
+        const lastEntryDateObj = new Date(lastEntryDateStr + 'T00:00:00');
+        const entryDateObj = new Date(entryDateStr + 'T00:00:00');
+        const daysDiff = Math.floor((entryDateObj.getTime() - lastEntryDateObj.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff === 1) {
+          // Consecutive day - continue streak
+          newStreakData.currentStreak += 1;
+          newStreakData.maxStreak = Math.max(newStreakData.maxStreak, newStreakData.currentStreak);
+          newStreakData.lastEntryDate = entryDateStr;
+          newStreakData.lastAccessTime = now.toISOString();
+        } else if (daysDiff < 0) {
+          // Entry is in the past but not consecutive - this shouldn't normally happen
+          // but if it does, we'll treat it as a new streak starting from that date
+          newStreakData.currentStreak = 1;
+          newStreakData.maxStreak = Math.max(newStreakData.maxStreak, 1);
+          newStreakData.lastEntryDate = entryDateStr;
+          newStreakData.lastAccessTime = now.toISOString();
+        } else {
+          // Gap of more than 1 day - start new streak
+          newStreakData.currentStreak = 1;
+          newStreakData.maxStreak = Math.max(newStreakData.maxStreak, 1);
+          newStreakData.lastEntryDate = entryDateStr;
+          newStreakData.lastAccessTime = now.toISOString();
+        }
       }
     }
 
@@ -142,49 +138,50 @@ export class StreakService {
 
   // Check and update streak when app is accessed
   static async checkAndUpdateStreak(userId: string, currentStreakData: StreakData): Promise<StreakData> {
-    if (!currentStreakData.lastAccessTime) {
-      return currentStreakData;
+    // If no last entry date, nothing to check
+    if (!currentStreakData.lastEntryDate) {
+      // Just update last access time
+      const updatedData: StreakData = {
+        ...currentStreakData,
+        lastAccessTime: new Date().toISOString(),
+      };
+      await this.saveStreakData(userId, updatedData);
+      return updatedData;
     }
 
     const userTimeZone = currentStreakData.userTimeZone || this.getUserTimeZone();
     const now = new Date();
-    const lastAccessTime = new Date(currentStreakData.lastAccessTime);
-    const hoursSinceLastAccess = differenceInHours(now, lastAccessTime);
-
-    // If 24+ hours have passed since last access, we need to check if streak should be reset
-    if (hoursSinceLastAccess >= 24) {
-      const currentTimeInUserTz = new TZDate(now, userTimeZone);
-      const lastAccessTimeInUserTz = new TZDate(lastAccessTime, userTimeZone);
-      
-      const currentDateStr = format(currentTimeInUserTz, 'yyyy-MM-dd');
-      const lastAccessDateStr = format(lastAccessTimeInUserTz, 'yyyy-MM-dd');
-      
-      // If more than 1 day has passed in user's timezone, reset the streak
-      if (currentDateStr !== lastAccessDateStr) {
-        const daysDifference = Math.floor(hoursSinceLastAccess / 24);
-        
-        if (daysDifference > 1) {
-          // More than 1 day gap, reset streak
-          const resetData: StreakData = {
-            ...currentStreakData,
-            currentStreak: 0,
-            lastAccessTime: now.toISOString(),
-          };
-          await this.saveStreakData(userId, resetData);
-          return resetData;
-        } else {
-          // Exactly 1 day gap, update last access time
-          const updatedData: StreakData = {
-            ...currentStreakData,
-            lastAccessTime: now.toISOString(),
-          };
-          await this.saveStreakData(userId, updatedData);
-          return updatedData;
-        }
-      }
+    
+    // Get current date in user's timezone
+    const currentTimeInUserTz = new TZDate(now, userTimeZone);
+    const currentDateStr = format(currentTimeInUserTz, 'yyyy-MM-dd');
+    
+    // lastEntryDate is stored as 'yyyy-MM-dd' string in user's timezone
+    const lastEntryDateStr = currentStreakData.lastEntryDate;
+    
+    // Parse dates to calculate day difference
+    const lastEntryDateObj = new Date(lastEntryDateStr + 'T00:00:00');
+    const currentDateObj = new Date(currentDateStr + 'T00:00:00');
+    const daysDiff = Math.floor((currentDateObj.getTime() - lastEntryDateObj.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // If more than 1 day has passed since last entry, reset streak
+    if (daysDiff > 1) {
+      const resetData: StreakData = {
+        ...currentStreakData,
+        currentStreak: 0,
+        lastAccessTime: now.toISOString(),
+      };
+      await this.saveStreakData(userId, resetData);
+      return resetData;
+    } else {
+      // Update last access time (streak is still valid)
+      const updatedData: StreakData = {
+        ...currentStreakData,
+        lastAccessTime: now.toISOString(),
+      };
+      await this.saveStreakData(userId, updatedData);
+      return updatedData;
     }
-
-    return currentStreakData;
   }
 
   // Reset streak to 0 (keep max streak)

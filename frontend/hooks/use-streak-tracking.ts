@@ -38,45 +38,53 @@ export function useStreakTracking(userId?: string): UseStreakTrackingResult {
     if (!userId) return;
 
     try {
-      const updatedData = await StreakService.updateStreak(userId, entryDate, streakData);
+      // Load fresh data from storage to avoid stale closures
+      const currentData = await StreakService.loadStreakData(userId);
+      const updatedData = await StreakService.updateStreak(userId, entryDate, currentData);
       setStreakData(updatedData);
     } catch (error) {
       console.error('Failed to update streak:', error);
     }
-  }, [userId, streakData]);
+  }, [userId]);
 
   const checkAndUpdateStreak = useCallback(async () => {
     if (!userId) return;
 
     try {
-      const updatedData = await StreakService.checkAndUpdateStreak(userId, streakData);
+      // Load fresh data from storage to avoid stale closures
+      const currentData = await StreakService.loadStreakData(userId);
+      const updatedData = await StreakService.checkAndUpdateStreak(userId, currentData);
       setStreakData(updatedData);
     } catch (error) {
       console.error('Failed to check and update streak:', error);
     }
-  }, [userId, streakData]);
+  }, [userId]);
 
   const resetStreak = useCallback(async () => {
     if (!userId) return;
 
     try {
-      const resetData = await StreakService.resetStreak(userId, streakData);
+      // Load fresh data from storage to avoid stale closures
+      const currentData = await StreakService.loadStreakData(userId);
+      const resetData = await StreakService.resetStreak(userId, currentData);
       setStreakData(resetData);
     } catch (error) {
       console.error('Failed to reset streak:', error);
     }
-  }, [userId, streakData]);
+  }, [userId]);
 
   useEffect(() => {
     loadStreakData();
   }, [loadStreakData]);
 
   // Check and update streak when component mounts and data is loaded
+  // Only run once when data is first loaded, not on every streakData change
   useEffect(() => {
-    if (!isLoading && streakData.lastAccessTime) {
+    if (!isLoading && userId) {
       checkAndUpdateStreak();
     }
-  }, [isLoading, checkAndUpdateStreak, streakData.lastAccessTime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, userId]); // Only depend on isLoading and userId to avoid infinite loops
 
   return {
     currentStreak: streakData.currentStreak,
