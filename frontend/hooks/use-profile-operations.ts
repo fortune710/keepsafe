@@ -11,6 +11,8 @@ interface ProfileUpdateData {
   username?: string;
   bio?: string;
   avatar_url?: string;
+  birthday?: string;
+  phone?: string;
 }
 
 interface UseProfileOperationsResult {
