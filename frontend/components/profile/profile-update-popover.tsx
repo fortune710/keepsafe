@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView } from 'react-native';
+import Animated, { SlideInDown, SlideOutDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { X } from 'lucide-react-native';
 import { NameUpdateForm } from './name-update-form';
@@ -31,6 +31,12 @@ export default function ProfileUpdatePopover({
   onSuccess, 
   onError 
 }: ProfileUpdatePopoverProps) {
+  const keyboard = useAnimatedKeyboard();
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    paddingBottom: keyboard.height.value,
+  }));
+
   // Swipe down gesture to dismiss
   const swipeDownGesture = Gesture.Pan()
     .onEnd((event) => {
@@ -82,7 +88,7 @@ export default function ProfileUpdatePopover({
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
       
       <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View style={styles.popover}>
+        <Animated.View style={[styles.popover, animatedStyle]}>
           <View style={styles.handle} />
           
           <View style={styles.header}>
@@ -92,19 +98,13 @@ export default function ProfileUpdatePopover({
             </TouchableOpacity>
           </View>
 
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.keyboardView}
-            keyboardVerticalOffset={0}
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
           >
-            <ScrollView 
-              style={styles.scrollView}
-              contentContainerStyle={styles.content}
-              keyboardShouldPersistTaps="handled"
-            >
-              {renderForm()}
-            </ScrollView>
-          </KeyboardAvoidingView>
+            {renderForm()}
+          </ScrollView>
         </Animated.View>
       </GestureDetector>
     </Animated.View>
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingBottom: 40,
-    maxHeight: height * 0.7,
+    maxHeight: height * 0.9, // Increased max height to allow for keyboard
   },
   handle: {
     width: 40,
@@ -158,9 +158,6 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 4,
-  },
-  keyboardView: {
-    flex: 1,
   },
   scrollView: {
     flex: 1,
