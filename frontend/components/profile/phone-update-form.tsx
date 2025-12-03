@@ -15,17 +15,24 @@ interface PhoneUpdateFormProps {
 export function PhoneUpdateForm({ currentValue, onSuccess, onError, onClose }: PhoneUpdateFormProps) {
   const [value, setValue] = useState('');
   const [countryCode, setCountryCode] = useState('+1');
+  const [countryIso, setCountryIso] = useState('US');
   const [isPickerVisible, setIsPickerVisible] = useState(false);
   
   const { updateProfile, isLoading } = useProfileOperations();
 
   useEffect(() => {
     if (currentValue) {
-      // Try to find a matching country code
-      const matchingCountry = countries.find(c => currentValue.startsWith(c.code));
-      if (matchingCountry) {
-        setCountryCode(matchingCountry.code);
-        setValue(currentValue.replace(matchingCountry.code, '').trim());
+      // Find all matching countries and sort by code length descending (longest match first)
+      const matchingCountries = countries.filter(c => currentValue.startsWith(c.code));
+      matchingCountries.sort((a, b) => b.code.length - a.code.length);
+      
+      const longestMatch = matchingCountries[0];
+
+      if (longestMatch) {
+        setCountryCode(longestMatch.code);
+        setCountryIso(longestMatch.iso);
+        // Remove only the exact prefix
+        setValue(currentValue.slice(longestMatch.code.length).trim());
       } else {
         setValue(currentValue);
       }
@@ -33,10 +40,11 @@ export function PhoneUpdateForm({ currentValue, onSuccess, onError, onClose }: P
   }, [currentValue]);
 
   const phoneRegex = /^\d+$/;
-  const isValid = (value === '' || phoneRegex.test(value.replace(/[\s\-\(\)]/g, ''))) && value.length > 0;
+  const normalized = value.replace(/[\s\-\(\)]/g, '');
+  const isValid = normalized.length > 0 && phoneRegex.test(normalized);
 
   const handleSave = async () => {
-    const fullPhoneNumber = `${countryCode}${value.trim()}`;
+    const fullPhoneNumber = `${countryCode}${normalized}`;
     const result = await updateProfile({
       phone: fullPhoneNumber
     });
@@ -81,8 +89,11 @@ export function PhoneUpdateForm({ currentValue, onSuccess, onError, onClose }: P
       <CountryPickerModal
         visible={isPickerVisible}
         onClose={() => setIsPickerVisible(false)}
-        onSelect={(country) => setCountryCode(country.code)}
-        selectedCountryCode={countryCode}
+        onSelect={(country) => {
+          setCountryCode(country.code);
+          setCountryIso(country.iso);
+        }}
+        selectedCountryIso={countryIso}
       />
 
       <TouchableOpacity 

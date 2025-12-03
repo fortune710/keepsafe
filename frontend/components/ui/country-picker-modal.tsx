@@ -7,10 +7,10 @@ interface CountryPickerModalProps {
   visible: boolean;
   onClose: () => void;
   onSelect: (country: Country) => void;
-  selectedCountryCode?: string;
+  selectedCountryIso?: string;
 }
 
-export function CountryPickerModal({ visible, onClose, onSelect, selectedCountryCode }: CountryPickerModalProps) {
+export function CountryPickerModal({ visible, onClose, onSelect, selectedCountryIso }: CountryPickerModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredCountries = useMemo(() => {
@@ -27,7 +27,7 @@ export function CountryPickerModal({ visible, onClose, onSelect, selectedCountry
     <TouchableOpacity
       style={[
         styles.countryItem,
-        selectedCountryCode === item.code && styles.selectedItem,
+        selectedCountryIso === item.iso && styles.selectedItem,
       ]}
       onPress={() => {
         onSelect(item);
@@ -41,7 +41,7 @@ export function CountryPickerModal({ visible, onClose, onSelect, selectedCountry
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Select Country</Text>

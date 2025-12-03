@@ -11,6 +11,7 @@ import { BirthdayUpdateForm } from './birthday-update-form';
 import { PhoneUpdateForm } from './phone-update-form';
 
 const { height } = Dimensions.get('window');
+const BASE_PADDING_BOTTOM = 40;
 
 type UpdateType = 'name' | 'username' | 'bio' | 'avatar' | 'birthday' | 'phone';
 
@@ -34,7 +35,7 @@ export default function ProfileUpdatePopover({
   const keyboard = useAnimatedKeyboard();
 
   const animatedStyle = useAnimatedStyle(() => ({
-    paddingBottom: keyboard.height.value,
+    paddingBottom: BASE_PADDING_BOTTOM + keyboard.height.value,
   }));
 
   // Swipe down gesture to dismiss
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: 40,
+    paddingBottom: BASE_PADDING_BOTTOM,
     maxHeight: height * 0.9, // Increased max height to allow for keyboard
   },
   handle: {
