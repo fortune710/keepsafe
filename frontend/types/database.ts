@@ -22,6 +22,8 @@ export interface Database {
           created_at: string
           updated_at: string
           invite_code: string | null
+          phone_number: string | null
+          birthday: string | null
           max_uses: number
           current_uses: number
           is_active: boolean
@@ -36,16 +38,18 @@ export interface Database {
           created_at: string
           updated_at: string
           invite_code?: string | null
+          phone_number?: string | null
+          birthday?: string | null
         }
         Update: {
-          id?: string
-          email?: string
+          email?: string,
           full_name?: string | null
           username?: string | null
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string
-          updated_at?: string
+          avatar_url?: string | null,
+          birthday?: string | null,
+          bio?: string | null,
+          updated_at?: string,
+          phone_number?: string | null,
         }
       }
       entries: {
