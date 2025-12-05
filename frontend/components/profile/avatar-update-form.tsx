@@ -38,13 +38,10 @@ export function AvatarUpdateForm({ onSuccess, onError, onClose }: AvatarUpdateFo
       }
 
       const asset = result.assets[0];
-      
-      // Convert URI to blob for upload
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
+      const uri = asset.uri;
 
       // Upload avatar
-      const uploadResult = await uploadAvatar(blob);
+      const uploadResult = await uploadAvatar(uri);
       
       if (uploadResult.success && uploadResult.url) {
         const updateResult = await updateProfile({ avatar_url: uploadResult.url });

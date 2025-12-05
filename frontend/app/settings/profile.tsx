@@ -6,6 +6,8 @@ import { useAuthContext } from '@/providers/auth-provider';
 import ProfileUpdatePopover from '@/components/profile/profile-update-popover';
 import { useToast } from '@/hooks/use-toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { formatPhoneNumber } from '@/lib/utils';
+import { scale, verticalScale } from 'react-native-size-matters';
 
 
 type UpdateType = 'name' | 'username' | 'bio' | 'avatar' | 'birthday' | 'phone';
@@ -50,14 +52,14 @@ export default function ProfileScreen() {
       id: 'birthday',
       title: 'Birthday',
       icon: Calendar,
-      value: 'Not set', // This would come from profile data
+      value: profile?.birthday || 'Not set', // This would come from profile data
       color: '#EF4444',
     },
     {
       id: 'phone',
       title: 'Phone Number',
       icon: Phone,
-      value: 'Not set', // This would come from profile data
+      value: profile?.phone_number || 'Not set',
       color: '#6366F1',
     },
   ];
@@ -79,9 +81,9 @@ export default function ProfileScreen() {
       case 'bio':
         return profile?.bio || '';
       case 'birthday':
-        return ''; // Would come from profile data
+        return profile?.birthday || ''; // Would come from profile data
       case 'phone':
-        return ''; // Would come from profile data
+        return profile?.phone_number || ''; // Would come from profile data
       default:
         return '';
     }
@@ -145,12 +147,6 @@ export default function ProfileScreen() {
             );
           })}
         </View>
-
-        <View style={styles.infoSection}>
-          <Text style={styles.infoText}>
-            Your profile information helps friends find and connect with you on Keepsafe.
-          </Text>
-        </View>
       </ScrollView>
 
       <ProfileUpdatePopover
@@ -174,9 +170,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(12),
   },
   backButton: {
     padding: 8,

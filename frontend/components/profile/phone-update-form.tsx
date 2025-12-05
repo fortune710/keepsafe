@@ -4,6 +4,9 @@ import { Check, ChevronDown } from 'lucide-react-native';
 import { useProfileOperations } from '@/hooks/use-profile-operations';
 import { CountryPickerModal } from '@/components/ui/country-picker-modal';
 import { countries, Country } from '@/constants/countries';
+import { useProfile } from '@/hooks/use-profile';
+import { useAuthContext } from '@/providers/auth-provider';
+import { extractPhoneNumber, formatPhoneNumber } from '@/lib/utils';
 
 interface PhoneUpdateFormProps {
   currentValue: string;
@@ -13,7 +16,11 @@ interface PhoneUpdateFormProps {
 }
 
 export function PhoneUpdateForm({ currentValue, onSuccess, onError, onClose }: PhoneUpdateFormProps) {
-  const [value, setValue] = useState('');
+  const { profile } = useAuthContext();
+  const phoneNumber = profile?.phone_number ?? '';
+  const extractedPhoneNumber = extractPhoneNumber(phoneNumber);
+  
+  const [value, setValue] = useState(formatPhoneNumber(extractedPhoneNumber));
   const [countryCode, setCountryCode] = useState('+1');
   const [countryIso, setCountryIso] = useState('US');
   const [isPickerVisible, setIsPickerVisible] = useState(false);

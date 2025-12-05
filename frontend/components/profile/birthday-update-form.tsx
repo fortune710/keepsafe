@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'rea
 import { Check, ChevronDown } from 'lucide-react-native';
 import { useProfileOperations } from '@/hooks/use-profile-operations';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { useAuthContext } from '@/providers/auth-provider';
 
 interface BirthdayUpdateFormProps {
   currentValue: string;
@@ -87,12 +88,16 @@ function DateSelect({ label, value, options, onSelect }: DateSelectProps) {
 export function BirthdayUpdateForm({ currentValue, onSuccess, onError, onClose }: BirthdayUpdateFormProps) {
   const currentDate = useMemo(() => {
     if (currentValue) {
-      const parsed = new Date(currentValue);
-      if (!isNaN(parsed.getTime())) {
+      // `currentValue` is stored as a date-only string: "YYYY-MM-DD"
+      const [yearStr, monthStr, dayStr] = currentValue.split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      const day = Number(dayStr);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
         return {
-          year: parsed.getFullYear(),
-          month: parsed.getMonth() + 1,
-          day: parsed.getDate()
+          year,
+          month,
+          day
         };
       }
     }
@@ -103,6 +108,8 @@ export function BirthdayUpdateForm({ currentValue, onSuccess, onError, onClose }
       day: today.getDate()
     };
   }, [currentValue]);
+
+  console.log({ currentDate });
 
   const [year, setYear] = useState(currentDate.year);
   const [month, setMonth] = useState(currentDate.month);
