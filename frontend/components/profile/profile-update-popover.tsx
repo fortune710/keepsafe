@@ -9,9 +9,10 @@ import { BioUpdateForm } from './bio-update-form';
 import { AvatarUpdateForm } from './avatar-update-form';
 import { BirthdayUpdateForm } from './birthday-update-form';
 import { PhoneUpdateForm } from './phone-update-form';
+import { verticalScale } from 'react-native-size-matters';
 
 const { height } = Dimensions.get('window');
-const BASE_PADDING_BOTTOM = 40;
+const BASE_PADDING_BOTTOM = 80;
 
 type UpdateType = 'name' | 'username' | 'bio' | 'avatar' | 'birthday' | 'phone';
 
@@ -35,7 +36,7 @@ export default function ProfileUpdatePopover({
   const keyboard = useAnimatedKeyboard();
 
   const animatedStyle = useAnimatedStyle(() => ({
-    paddingBottom: BASE_PADDING_BOTTOM + keyboard.height.value,
+    paddingBottom: BASE_PADDING_BOTTOM + keyboard.height.value + 30,
   }));
 
   // Swipe down gesture to dismiss
@@ -81,15 +82,17 @@ export default function ProfileUpdatePopover({
 
   return (
     <Animated.View 
-      entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)} 
-      exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
       style={styles.overlay}
       testID="profile-update-popover"
     >
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
       
       <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View style={[styles.popover, animatedStyle]}>
+        <Animated.View 
+          style={[styles.popover, animatedStyle]}
+          entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)} 
+          exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
+        >
           <View style={styles.handle} />
           
           <View style={styles.header}>
@@ -127,13 +130,13 @@ const styles = StyleSheet.create({
   },
   popover: {
     position: 'absolute',
-    bottom: 0,
+    bottom: verticalScale(-30),
     left: 0,
     right: 0,
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: BASE_PADDING_BOTTOM,
+    paddingBottom: verticalScale(BASE_PADDING_BOTTOM),
     maxHeight: height * 0.9, // Increased max height to allow for keyboard
   },
   handle: {
