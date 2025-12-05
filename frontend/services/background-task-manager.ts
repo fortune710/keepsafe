@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { TABLES, STORAGE_BUCKETS, UPLOAD_PATHS } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { MediaCapture } from '@/types/media';
-import { getContentType, getFileExtension, getTimefromTimezone } from '@/lib/utils';
+import { convertToArrayBuffer, getContentType, getFileExtension, getTimefromTimezone } from '@/lib/utils';
 import { RenderedMediaCanvasItem } from '@/types/capture';
 import { deviceStorage } from './device-storage';
 import { EntryService } from './entry-service';
@@ -52,18 +52,7 @@ const dequeueNext = async (): Promise<EntryProcessingData | undefined> => {
   return next;
 };
 
-/**
- * Converts a URI/File to ArrayBuffer for upload
- */
-const convertToArrayBuffer = async (source: string): Promise<ArrayBuffer> => {
-  const response = await fetch(source);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch file: ${response.statusText}`);
-  }
-  
-  return await response.arrayBuffer();
-};
+
 
 /**
  * Uploads media to Supabase storage
@@ -161,50 +150,6 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
     };
 
     console.log('Processing new entry', newEntry);
-
-    // Insert entry into database
-    // const { data: entry, error: entryError } = await supabase
-    //   .from(TABLES.ENTRIES)
-    //   .upsert(newEntry as never)
-    //   .select()
-    //   .single();
-
-    // if (entryError) {
-    //   throw new Error(`Failed to save entry: ${entryError.message}`);
-    // }
-
-    // // Update status to completed and ensure real entry replaces temp in storage
-    // if (entry) {
-    //   // Ensure profile is present; fetch if needed
-    //   let profile = (entry as any).profile;
-    //   if (!profile) {
-    //     try {
-    //       const { data: profileData } = await supabase
-    //         .from(TABLES.PROFILES)
-    //         .select('*')
-    //         .eq('id', data.userId)
-    //         .single();
-    //       profile = profileData || null;
-    //     } catch {
-    //       profile = null;
-    //     }
-    //   }
-
-    //   const entryWithProfile = { ...(entry as any), profile };
-
-    //   await deviceStorage.replaceEntry(
-    //     data.userId,
-    //     data.entryId,
-    //     { ...entryWithProfile, status: 'completed', processingCompletedAt: new Date().toISOString() }
-    //   );
-    // } else {
-    //   await deviceStorage.updateEntry(data.userId, data.entryId, { 
-    //     status: 'completed',
-    //     processingCompletedAt: new Date().toISOString(),
-    //   });
-    // }
-    
-    console.log('Starting new entry processing:', newEntry);
 
     // Use EntryService to create the entry
     const result = await EntryService.createEntry(data.userId, newEntry);

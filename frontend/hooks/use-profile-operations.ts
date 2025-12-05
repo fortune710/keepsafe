@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { TABLES, STORAGE_BUCKETS, UPLOAD_PATHS } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { useAuthContext } from '@/providers/auth-provider';
+import { convertToArrayBuffer, getContentType, getFileExtension } from '@/lib/utils';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -18,7 +19,7 @@ interface ProfileUpdateData {
 interface UseProfileOperationsResult {
   isLoading: boolean;
   updateProfile: (updates: ProfileUpdateData) => Promise<{ success: boolean; message: string }>;
-  uploadAvatar: (file: File | Blob) => Promise<{ success: boolean; url?: string; message: string }>;
+  uploadAvatar: (file: string) => Promise<{ success: boolean; url?: string; message: string }>;
   checkUsernameAvailability: (username: string) => Promise<{ available: boolean; message: string }>;
 }
 
@@ -26,7 +27,9 @@ export function useProfileOperations(): UseProfileOperationsResult {
   const [isLoading, setIsLoading] = useState(false);
   const { user, updateProfile: updateAuthProfile } = useAuthContext();
 
-  const uploadAvatar = useCallback(async (file: File | Blob): Promise<{ success: boolean; url?: string; message: string }> => {
+  const uploadAvatar = async (
+    file: string
+  ): Promise<{ success: boolean; url?: string; message: string }> => {
     if (!user) {
       return { success: false, message: 'User not authenticated' };
     }
@@ -34,10 +37,12 @@ export function useProfileOperations(): UseProfileOperationsResult {
     setIsLoading(true);
 
     try {
-      const fileExt = file instanceof File ? file.name.split('.').pop() : 'jpg';
+      const fileExt = getFileExtension('photo');
       const fileName = `avatar-${Date.now()}.${fileExt}`;
       const filePath = UPLOAD_PATHS.AVATARS(user.id, fileName);
-
+      const contentType = getContentType('photo');
+      const uploadData = await convertToArrayBuffer(file);
+      
       // Delete old avatar if exists
       const { data: existingFiles } = await supabase.storage
         .from(STORAGE_BUCKETS.AVATARS)
@@ -55,9 +60,10 @@ export function useProfileOperations(): UseProfileOperationsResult {
       // Upload new avatar
       const { data, error } = await supabase.storage
         .from(STORAGE_BUCKETS.AVATARS)
-        .upload(filePath, file, {
+        .upload(filePath, uploadData, {
           cacheControl: '3600',
           upsert: true,
+          contentType
         });
 
       if (error) {
@@ -78,7 +84,7 @@ export function useProfileOperations(): UseProfileOperationsResult {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  };
 
   const checkUsernameAvailability = useCallback(async (username: string): Promise<{ available: boolean; message: string }> => {
     if (!user) {
@@ -136,7 +142,7 @@ export function useProfileOperations(): UseProfileOperationsResult {
       // Update profile in database
       const { data, error } = await supabase
         .from(TABLES.PROFILES)
-        .update(updates)
+        .update(updates as never)
         .eq('id', user.id)
         .select()
         .single();

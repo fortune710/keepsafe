@@ -213,3 +213,36 @@ export const getTimefromTimezone = (date?: Date) => {
   const timezone = getDeviceTimezone();
   return new TZDate(now, timezone);
 }
+
+export const extractPhoneNumber = (phoneNumber: string) => {
+  return phoneNumber.substring(phoneNumber.length - 10);
+}
+
+export const formatPhoneNumber = (phoneNumber: string) => {
+  // Remove all non-numeric characters
+  const normalized = phoneNumber.replace(/\D/g, '');
+
+  if (!normalized) return '';
+
+  if (normalized.length <= 3) {
+    return normalized;
+  } else if (normalized.length <= 6) {
+    return `(${normalized.substring(0, 3)})-${normalized.substring(3)}`;
+  } else {
+    return `(${normalized.substring(0, 3)})-${normalized.substring(3, 6)}-${normalized.substring(6, 10)}`;
+  }
+}
+
+
+/**
+ * Converts a URI/File to ArrayBuffer for upload
+ */
+export const convertToArrayBuffer = async (source: string): Promise<ArrayBuffer> => {
+  const response = await fetch(source);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch file: ${response.statusText}`);
+  }
+  
+  return await response.arrayBuffer();
+};
