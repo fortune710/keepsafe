@@ -43,4 +43,28 @@ export const Colors = {
 
 export type AppColors = typeof Colors;
 
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+const getBackendUrl = () => {
+  // Attempt to get the IP address of the machine running the Expo server
+  // This is critical for physical devices to connect to the backend running on the same dev machine
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    return `http://${ip}:8000`;
+  }
+
+  // Fallback for emulators or when hostUri is not available
+  return Platform.select({
+    android: 'http://10.0.2.2:8000',
+    ios: 'http://localhost:8000',
+    default: 'http://localhost:8000',
+  });
+};
+
+export const BACKEND_URL = getBackendUrl();
+console.log('🔗 Configured Backend URL:', BACKEND_URL);
+
+
 
