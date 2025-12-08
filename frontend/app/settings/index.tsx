@@ -80,8 +80,13 @@ export default function SettingsScreen() {
     });
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.replace('/onboarding');
+    try {
+      await supabase.auth.signOut();
+      router.replace('/onboarding');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -114,8 +119,16 @@ export default function SettingsScreen() {
               
               // 2. Sign out (Supabase auth session)
               await supabase.auth.signOut();
-              router.replace('/onboarding');
-              alert('Account deleted successfully, we hate to see you go');
+              Alert.alert(
+                'Account Deleted',
+                'Account deleted successfully, we hate to see you go',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => router.replace('/onboarding')
+                  }
+                ]
+              );
             } catch (error: any) {
               console.error('❌ Delete Account Error:', error);
               Alert.alert('Error', error.message || 'Failed to delete account');
@@ -194,7 +207,7 @@ export default function SettingsScreen() {
           <View style={styles.settingsSection}>
             
             
-            <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleDeleteAccount} disabled={isDeleting}>
+            <TouchableOpacity style={styles.settingsItem} onPress={handleDeleteAccount} disabled={isDeleting}>
               <View style={[styles.iconContainer, { backgroundColor: '#DC262615' }]}>
                 <Trash2 color="#DC2626" size={20} />
               </View>
@@ -208,7 +221,7 @@ export default function SettingsScreen() {
               
               <View style={{ width: 20 }} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
+            <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
               <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
                 <LogOut color="#64748B" size={20} />
               </View>

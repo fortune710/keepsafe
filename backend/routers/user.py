@@ -25,9 +25,8 @@ async def delete_user(user_id: str):
             index.delete(filter={"user_id": user_id})
             logger.info(f"Deleted Pinecone vectors for user_id: {user_id}")
         except Exception as e:
-            logger.error(f"Failed to delete Pinecone vectors: {e}")
+            logger.exception(f"Failed to delete Pinecone vectors for user_id: {user_id}")
             # We continue even if Pinecone fails, as we want to ensure the account is deleted
-            # But we should probably log this as a critical error
             pass
 
         # 2. Delete from Supabase
@@ -39,8 +38,8 @@ async def delete_user(user_id: str):
             supabase.table("profiles").delete().eq("id", user_id).execute()
             logger.info(f"Deleted user profile from public.profiles: {user_id}")
         except Exception as db_error:
-            logger.error(f"Failed to delete user profile: {db_error}")
-            raise HTTPException(status_code=500, detail=f"Failed to delete user data: {str(db_error)}")
+            logger.exception(f"Failed to delete user profile for user_id: {user_id}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete user data: {db_error!s}") from db_error
 
         # 2b. Try to delete from Auth (requires service role usually)
         try:
@@ -49,10 +48,11 @@ async def delete_user(user_id: str):
             logger.info(f"Deleted user from Supabase Auth: {user_id}")
         except Exception as auth_error:
             # If auth delete fails (e.g. permission), we just log it since we already cleaned up data
-            logger.warning(f"Failed to delete from Supabase Auth (likely permission issue): {auth_error}")
+            logger.exception(f"Failed to delete from Supabase Auth for user_id: {user_id}")
 
-        return {"message": "Account deletion processed", "user_id": user_id}
+        else:
+            return {"message": "Account deletion processed", "user_id": user_id}
 
     except Exception as e:
-        logger.error(f"Error during account deletion: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"Error during account deletion for user_id: {user_id}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
