@@ -62,7 +62,7 @@ const settingsItems: SettingsItem[] = [
 ];
 
 export default function SettingsScreen() {
-  const { profile } = useAuthContext();
+  const { profile, session } = useAuthContext();
   const [isDeleting, setIsDeleting] = useState(false);
   
   // Swipe down from top to close settings
@@ -103,6 +103,12 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             if (!profile?.id) return;
+            
+            // Guard clause for missing session/token
+            if (!session?.access_token) {
+              Alert.alert('Error', 'Authentication token missing. Please sign in again.');
+              return;
+            }
 
             try {
               setIsDeleting(true);
@@ -110,6 +116,10 @@ export default function SettingsScreen() {
               // 1. Call backend to delete user data (Pinecone, etc.)
               const response = await fetch(`${BACKEND_URL}/user/${profile.id}`, {
                 method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
               });
 
               if (!response.ok) {
