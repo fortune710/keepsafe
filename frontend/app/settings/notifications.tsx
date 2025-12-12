@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Switch } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Bell, MessageCircle, Users, Calendar } from 'lucide-react-native';
+import { ArrowLeft, Bell, MessageCircle, Users, Calendar, UserPlus } from 'lucide-react-native';
+import { NotificationSettings } from '@/types/notifications';
+import { useNotificationSettings } from '@/hooks/use-notification-settings';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface NotificationSetting {
-  id: string;
+  id: NotificationSettings;
   title: string;
   description: string;
   icon: any;
@@ -12,69 +15,48 @@ interface NotificationSetting {
   color: string;
 }
 
-export default function NotificationsScreen() {
-  const [settings, setSettings] = useState<NotificationSetting[]>([
-    {
-      id: 'push',
-      title: 'Push Notifications',
-      description: 'Receive notifications on your device',
-      icon: Bell,
-      enabled: true,
-      color: '#8B5CF6',
-    },
-    {
-      id: 'friends',
-      title: 'Friend Activity',
-      description: 'When friends share moments with you',
-      icon: Users,
-      enabled: true,
-      color: '#059669',
-    },
-    {
-      id: 'memories',
-      title: 'Memory Reminders',
-      description: 'Daily prompts to capture moments',
-      icon: Calendar,
-      enabled: false,
-      color: '#F59E0B',
-    },
-    {
-      id: 'comments',
-      title: 'Comments & Reactions',
-      description: 'When someone reacts to your moments',
-      icon: MessageCircle,
-      enabled: true,
-      color: '#EF4444',
-    },
-  ]);
+const DEFAULT_SETTINGS: NotificationSetting[] = [
+  {
+    id: NotificationSettings.PUSH_NOTIFICATIONS,
+    title: 'Push Notifications',
+    description: 'Receive notifications on your device',
+    icon: Bell,
+    enabled: true,
+    color: '#8B5CF6',
+  },
+  {
+    id: NotificationSettings.FRIEND_ACTIVITY,
+    title: 'Friend Activity',
+    description: 'When friends share moments with you',
+    icon: Users,
+    enabled: true,
+    color: '#059669',
+  },
+  {
+    id: NotificationSettings.ENTRY_REMINDER,
+    title: 'Memory Reminders',
+    description: 'Daily prompts to capture moments',
+    icon: Calendar,
+    enabled: false,
+    color: '#F59E0B',
+  },
+  {
+    id: NotificationSettings.FRIEND_REQUESTS,
+    title: 'Friend Requests',
+    description: 'When someone sends you a friend request or accepts your request',
+    icon: UserPlus,
+    enabled: true,
+    color: '#EF4444',
+  },
+];
 
-  const toggleSetting = (id: string) => {
-    setSettings(prev => {
-      if (id === 'push') {
-        // If turning off push notifications, turn off all others
-        const pushEnabled = !prev.find(s => s.id === 'push')?.enabled;
-        if (!pushEnabled) {
-          return prev.map(setting => ({ ...setting, enabled: false }));
-        } else {
-          return prev.map(setting => 
-            setting.id === 'push' ? { ...setting, enabled: true } : setting
-          );
-        }
-      } else {
-        // For other settings, only allow toggle if push is enabled
-        const pushEnabled = prev.find(s => s.id === 'push')?.enabled;
-        if (!pushEnabled) {
-          return prev; // Don't allow changes if push is disabled
-        }
-        
-        return prev.map(setting => 
-          setting.id === id 
-            ? { ...setting, enabled: !setting.enabled }
-            : setting
-        );
-      }
-    });
-  };
+export default function NotificationsScreen() {
+  const { settings: settingsMap, toggleSetting } = useNotificationSettings();
+
+  const settings: NotificationSetting[] = DEFAULT_SETTINGS.map((setting) => ({
+    ...setting,
+    enabled: settingsMap[setting.id] ?? setting.enabled,
+  }));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -100,6 +82,8 @@ export default function NotificationsScreen() {
         <View style={styles.settingsContainer}>
           {settings.map((setting) => {
             const IconComponent = setting.icon;
+            const pushEnabled = settingsMap[NotificationSettings.PUSH_NOTIFICATIONS];
+
             return (
               <View key={setting.id} style={styles.settingItem}>
                 <View style={[styles.iconContainer, { backgroundColor: `${setting.color}15` }]}>
@@ -114,7 +98,7 @@ export default function NotificationsScreen() {
                 <Switch
                   value={setting.enabled}
                   onValueChange={() => toggleSetting(setting.id)}
-                  disabled={setting.id !== 'push' && !settings.find(s => s.id === 'push')?.enabled}
+                  disabled={setting.id !== NotificationSettings.PUSH_NOTIFICATIONS && !pushEnabled}
                   trackColor={{ false: '#E5E7EB', true: '#C7D2FE' }}
                   thumbColor={setting.enabled ? '#8B5CF6' : '#F3F4F6'}
                 />
