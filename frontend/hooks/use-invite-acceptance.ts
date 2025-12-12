@@ -2,10 +2,6 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
-import { Database } from '@/types/database';
-
-type Invite = Database['public']['Tables']['invites']['Row'];
-type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export interface InviteData {
   id: string;
@@ -34,9 +30,18 @@ interface UseInviteAcceptanceResult {
 export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResult {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  
 
   const acceptInviteMutation = useMutation({
     mutationFn: async ({ inviteeId, userId }: { inviteeId: string; userId: string }) => {
+      if (!inviteeId || !userId) {
+        throw new Error('Invalid invitee or user ID');
+      }
+      
+      if (inviteeId === userId) {
+        throw new Error('You cannot connect with yourself');
+      }
+      
       const { data: existingFriendship } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .select('id')
@@ -47,15 +52,14 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
         throw new Error('You are already connected with this user');
       }
 
-      
 
-      // Create friendship with accepted status
+      // Create friendship with pending status (requires follow-up acceptance)
       const { data: friendship, error: friendshipError } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .insert({
           user_id: userId,
           friend_id: inviteeId,
-          status: FRIENDSHIP_STATUS.ACCEPTED,
+          status: FRIENDSHIP_STATUS.PENDING,
         } as never)
         .select()
         .single();

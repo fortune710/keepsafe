@@ -12,7 +12,11 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   profileLoading: boolean;
-  signUp: (email: string, password: string, userData?: Partial<Profile>) => Promise<{ error: any }>;
+  signUp: (
+    email: string,
+    password: string,
+    userData?: Partial<Profile>
+  ) => Promise<{ error: any; data?: { userId: string } }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;

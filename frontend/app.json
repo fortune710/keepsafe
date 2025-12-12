@@ -55,7 +55,9 @@
       ],
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "package": "com.fortune710.keepsafe"
     },
@@ -129,6 +131,12 @@
       "icon": "./assets/images/icon.png",
       "color": "#8B5CF6"
     },
-    "owner": "fortune710"
+    "owner": "fortune710",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/97eb5c9e-4f9a-47a1-9994-1351aca19f05"
+    }
   }
 }
