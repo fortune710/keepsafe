@@ -136,16 +136,20 @@ export function useFriends(userId?: string): UseFriendsResult {
 
   const updateFriendshipMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED }) => {
+      
+      console.log('Updating friendship:', { id, status });
       const { data, error } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .update({ status } as never)
         .eq('id', id)
-        .select()
-        .single();
+        .select();
 
       if (error) {
+        console.error('Error updating friendship:', error);
         throw new Error(error.message);
       }
+
+      console.log('Updated friendship:', data);
 
       return data;
     },

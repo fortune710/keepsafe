@@ -69,7 +69,7 @@ export default function FriendsSection({
             <Text style={styles.sectionTitle}>
               Connected
             </Text>
-            <Badge style={styles.connectedBadge} text={friends.length} />
+            <Badge style={styles.connectedBadge} text={connectedFriends.length} />
           </View>
           
           {connectedFriends.map((friend, index) => (
@@ -91,8 +91,9 @@ export default function FriendsSection({
           <View style={styles.sectionHeader}>
             <Users color="#F59E0B" size={16} />
             <Text style={styles.sectionTitle}>
-              Pending ({pendingFriends.length})
+              Pending
             </Text>
+            <Badge style={styles.pendingBadge} text={pendingFriends.length} />
           </View>
           
           {pendingFriends.map((friend, index) => (
@@ -114,6 +115,7 @@ export default function FriendsSection({
 
 const styles = StyleSheet.create({
   connectedBadge: { marginLeft: 5, backgroundColor: "#10B981" },
+  pendingBadge: { marginLeft: 5, backgroundColor: "#F59E0B" },
   container: {
     flex: 1,
   },
