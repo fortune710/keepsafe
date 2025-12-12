@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2 } from 'lucide-react-native';
-import { Gesture } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -63,20 +62,6 @@ const settingsItems: SettingsItem[] = [
 export default function SettingsScreen() {
   const { profile, session } = useAuthContext();
   const [isDeleting, setIsDeleting] = useState(false);
-  
-  // Swipe down from top to close settings
-  const swipeDownGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      // Only allow downward swipes from the top area
-      if (event.translationY > 0 && event.absoluteY < 100) {
-        // Handle swipe down animation here if needed
-      }
-    })
-    .onEnd((event) => {
-      if (event.translationY > 100 && event.velocityY > 500 && event.absoluteY < 200) {
-        router.back();
-      }
-    });
 
   const handleLogout = async () => {
     try {

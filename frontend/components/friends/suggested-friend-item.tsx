@@ -15,13 +15,12 @@ import { useToast } from '@/hooks/use-toast';
 
 interface FriendItemProps {
   friend: SuggestedFriend;
-  onAccept?: (friendshipId: string) => void;
-  index?: number;
+  index: number;
 }
 
-export default function SuggestedFriendItem({ friend, onAccept, index = 0 }: FriendItemProps) {
+export default function SuggestedFriendItem({ friend, index }: FriendItemProps) {
   const { profile } = useAuthContext();
-  const { acceptInvite: sendFriendRequest } = useInviteAcceptance();
+  const { acceptInvite: sendFriendRequest, isProcessing } = useInviteAcceptance();
   const { toast: showToast } = useToast();
 
   const handleAccept = async () => {
@@ -30,9 +29,9 @@ export default function SuggestedFriendItem({ friend, onAccept, index = 0 }: Fri
     }
     const result = await sendFriendRequest(friend.id, profile.id);
     if (result.success) {
-      showToast('Friend request sent', 'success');
+      return showToast('Friend request sent', 'success');
     } else {
-      showToast(result.message || 'Failed to send friend request', 'error');
+      return showToast(result.message || 'Failed to send friend request', 'error');
     }
   }
 
@@ -58,6 +57,7 @@ export default function SuggestedFriendItem({ friend, onAccept, index = 0 }: Fri
           style={styles.addButton}
           onPress={handleAccept}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          disabled={isProcessing}
         >
           <Plus color="#fff" size={20} />
           <Text style={styles.addButtonText}>Add</Text>
