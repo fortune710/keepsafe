@@ -1,10 +1,12 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
+import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2 } from 'lucide-react-native';
 import { Gesture } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '@/lib/supabase';
+import { BACKEND_URL } from '@/lib/constants';
 
 interface SettingsItem {
   id: string;
@@ -59,7 +61,8 @@ const settingsItems: SettingsItem[] = [
 ];
 
 export default function SettingsScreen() {
-  const { profile } = useAuthContext();
+  const { profile, session } = useAuthContext();
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Swipe down from top to close settings
   const swipeDownGesture = Gesture.Pan()
@@ -75,8 +78,76 @@ export default function SettingsScreen() {
       }
     });
 
-  const handleLogout = () => {
-    router.replace('/onboarding');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.replace('/onboarding');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!profile?.id) return;
+            
+            // Guard clause for missing session/token
+            if (!session?.access_token) {
+              Alert.alert('Error', 'You need to be signed in to delete your account.');
+              return;
+            }
+
+            try {
+              setIsDeleting(true);
+              
+              // 1. Call backend to delete user data (Pinecone, etc.)
+              const response = await fetch(`${BACKEND_URL}/user/${profile.id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to delete account data');
+              }
+              
+              // 2. Sign out (Supabase auth session)
+              await supabase.auth.signOut();
+              Alert.alert(
+                'Account Deleted',
+                'Account deleted successfully, we hate to see you go',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => router.replace('/onboarding')
+                  }
+                ]
+              );
+            } catch (error: any) {
+              console.error('❌ Delete Account Error:', error);
+              Alert.alert('Error', error.message || 'Failed to delete account');
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -143,18 +214,35 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.settingsSection}>
-            <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
+            
+            
+            <TouchableOpacity style={styles.settingsItem} onPress={handleDeleteAccount} disabled={isDeleting}>
               <View style={[styles.iconContainer, { backgroundColor: '#DC262615' }]}>
-                <LogOut color="#DC2626" size={20} />
+                <Trash2 color="#DC2626" size={20} />
               </View>
               
               <View style={styles.itemContent}>
-                <Text style={[styles.itemTitle, { color: '#DC2626' }]}>Sign Out</Text>
+                <Text style={[styles.itemTitle, { color: '#DC2626' }]}>
+                  {isDeleting ? 'Deleting Account...' : 'Delete Account'}
+                </Text>
+                <Text style={styles.itemSubtitle}>Permanently delete your data</Text>
+              </View>
+              
+              <View style={{ width: 20 }} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
+              <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
+                <LogOut color="#64748B" size={20} />
+              </View>
+              
+              <View style={styles.itemContent}>
+                <Text style={styles.itemTitle}>Sign Out</Text>
                 <Text style={styles.itemSubtitle}>Sign out of your account</Text>
               </View>
               
               <View style={{ width: 20 }} />
             </TouchableOpacity>
+
           </View>
         </ScrollView>
       </View>
@@ -236,6 +324,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    overflow: 'hidden',
   },
   settingsItem: {
     flexDirection: 'row',

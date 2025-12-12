@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import webhooks
 from routers import search
+from routers import user
 from config import settings
 import logging
 
@@ -31,6 +32,7 @@ app.add_middleware(
 # Include routers
 app.include_router(webhooks.router)
 app.include_router(search.router)
+app.include_router(user.router)
 
 @app.get("/")
 async def root():
