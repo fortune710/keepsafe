@@ -1,30 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, Share } from 'react-native';
-import { router } from 'expo-router';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Share } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Copy, Share as ShareIcon, Users, ArrowRight } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
+import { generateDeepLinkUrl } from '@/lib/utils';
+import { InviteService } from '@/services/invite-service';
+import { useUserInvite } from '@/hooks/use-user-invite';
 
-const { width } = Dimensions.get('window');
 
 export default function InviteScreen() {
-  const [inviteLink, setInviteLink] = useState('');
-  const [isGenerating, setIsGenerating] = useState(true);
+  const { user_id } = useLocalSearchParams();
+  const userId = Array.isArray(user_id) ? user_id[0] : user_id;
 
-  useEffect(() => {
-    generateInviteLink();
-  }, []);
+  const { invite, isLoading, isError } = useUserInvite(
+    typeof userId === 'string' ? userId : undefined
+  );
 
-  const generateInviteLink = async () => {
-    setIsGenerating(true);
-    
-    // Simulate generating invite link
-    setTimeout(() => {
-      const mockCode = Math.random().toString(36).substring(2, 10);
-      setInviteLink(`https://keepsafe.app/invite/${mockCode}`);
-      setIsGenerating(false);
-    }, 1500);
-  };
+  const baseUrl = generateDeepLinkUrl();
+  const inviteCode = invite?.invite_code;
+  const inviteLink = inviteCode ? `${baseUrl}/invite/${inviteCode}` : `${baseUrl}/invite`;
 
   const handleCopyLink = async () => {
     try {
@@ -48,12 +43,66 @@ export default function InviteScreen() {
   };
 
   const handleSkip = () => {
-    router.replace('/capture');
+    return router.replace('/onboarding/auth?mode=signin');
   };
 
   const handleContinue = () => {
-    router.replace('/capture');
+    return router.replace('/onboarding/auth?mode=signup');
   };
+
+  // If we don't have a user id, just let the user skip this step.
+  if (!userId) {
+    return (
+      <View style={styles.container}>
+        <Animated.View entering={FadeInUp.delay(200)} style={styles.content}>
+          <Text style={styles.title}>Invite Your Friends</Text>
+          <Text style={styles.subtitle}>
+            We couldn&apos;t find your account information. You can skip this step and start
+            using Keepsafe.
+          </Text>
+          <TouchableOpacity style={styles.continueButton} onPress={handleSkip}>
+            <Text style={styles.continueButtonText}>Skip for now</Text>
+            <ArrowRight color="#8B5CF6" size={20} />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <Animated.View entering={FadeInUp.delay(200)} style={styles.content}>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Preparing your invite link...</Text>
+          </View>
+        </Animated.View>
+        <Animated.View entering={FadeInDown.delay(800)} style={styles.footer}>
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <Text style={styles.skipText}>Skip for now</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  if (isError || !inviteCode) {
+    return (
+      <View style={styles.container}>
+        <Animated.View entering={FadeInUp.delay(200)} style={styles.content}>
+          <Text style={styles.title}>Invite Unavailable</Text>
+          <Text style={styles.subtitle}>
+            We couldn&apos;t load your invite link right now. You can skip this step and start
+            using Keepsafe.
+          </Text>
+          <TouchableOpacity style={styles.continueButton} onPress={handleSkip}>
+            <Text style={styles.continueButtonText}>Skip for now</Text>
+            <ArrowRight color="#8B5CF6" size={20} />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -67,38 +116,32 @@ export default function InviteScreen() {
           Share moments with the people who matter most. Send them your invite link to get started.
         </Text>
 
-        {isGenerating ? (
-          <Animated.View entering={FadeInDown.delay(400)} style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Generating your invite link...</Text>
-          </Animated.View>
-        ) : (
-          <Animated.View entering={FadeInDown.delay(600)} style={styles.linkContainer}>
-            <View style={styles.linkBox}>
-              <Text style={styles.linkText} numberOfLines={1}>
-                {inviteLink}
-              </Text>
-              <TouchableOpacity style={styles.copyButton} onPress={handleCopyLink}>
-                <Copy color="#8B5CF6" size={20} />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.linkInfo}>
-              This link can be used 10 times
+        <Animated.View entering={FadeInDown.delay(600)} style={styles.linkContainer}>
+          <View style={styles.linkBox}>
+            <Text style={styles.linkText} numberOfLines={1}>
+              {inviteLink}
             </Text>
+            <TouchableOpacity style={styles.copyButton} onPress={handleCopyLink}>
+              <Copy color="#8B5CF6" size={20} />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.linkInfo}>
+            This link can be used {InviteService.MAX_INVITE_USES} times
+          </Text>
 
-            <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
-                <ShareIcon color="white" size={20} />
-                <Text style={styles.shareButtonText}>Share Link</Text>
-              </TouchableOpacity>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
+              <ShareIcon color="white" size={20} />
+              <Text style={styles.shareButtonText}>Share Link</Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-                <Text style={styles.continueButtonText}>Continue to App</Text>
-                <ArrowRight color="#8B5CF6" size={20} />
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
+            <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
+              <Text style={styles.continueButtonText}>Continue to Login</Text>
+              <ArrowRight color="#8B5CF6" size={20} />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(800)} style={styles.footer}>
