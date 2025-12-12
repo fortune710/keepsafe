@@ -5,13 +5,14 @@ import { TABLES } from '@/constants/supabase';
 import { generateInviteCode } from '@/lib/utils';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
 
 interface UseProfileResult {
   profile: Profile | null;
   isLoading: boolean;
   error: string | null;
   fetchProfile: (userId: string) => Promise<void>;
-  updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
+  updateProfile: (updates: Partial<ProfileUpdate>) => Promise<{ error: Error | null }>;
   refreshProfile: (userId: string) => Promise<void>;
 }
 
@@ -81,14 +82,14 @@ export function useProfile(): UseProfileResult {
     }
   }, []);
 
-  const updateProfile = useCallback(async (updates: Partial<Omit<Profile, "id">>) => {
+  const updateProfile = useCallback(async (updates: Partial<ProfileUpdate>) => {
     if (!profile) {
       return { error: new Error('No profile loaded') };
     }
 
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from(TABLES.PROFILES)
         .update(updates as never)
         .eq('id', profile.id)
         .select()

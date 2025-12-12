@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { SlideInDown, SlideOutUp } from 'react-native-reanimated';
+import { Gesture } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
