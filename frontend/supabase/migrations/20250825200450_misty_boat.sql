@@ -145,7 +145,8 @@ CREATE TABLE IF NOT EXISTS push_tokens (
   platform text CHECK (platform IN ('ios', 'android', 'web')),
   device_id text,
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+  updated_at timestamptz DEFAULT now(),
+  CONSTRAINT push_tokens_user_device_key UNIQUE (user_id, device_id)
 );
 
 -- Enable Row Level Security

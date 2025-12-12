@@ -25,10 +25,23 @@ CREATE TABLE IF NOT EXISTS notification_settings (
   push_notifications boolean NOT NULL DEFAULT true,
   entry_reminder boolean NOT NULL DEFAULT false,
   friend_activity boolean NOT NULL DEFAULT true,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(user_id)
 );
+
+-- Backfill and enforce NOT NULL constraints for existing rows (if any)
+UPDATE notification_settings
+SET created_at = now()
+WHERE created_at IS NULL;
+
+UPDATE notification_settings
+SET updated_at = now()
+WHERE updated_at IS NULL;
+
+ALTER TABLE notification_settings
+  ALTER COLUMN created_at SET NOT NULL,
+  ALTER COLUMN updated_at SET NOT NULL;
 
 -- Enable Row Level Security
 ALTER TABLE notification_settings ENABLE ROW LEVEL SECURITY;

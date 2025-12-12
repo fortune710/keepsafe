@@ -75,7 +75,13 @@ export class PushNotificationService {
   static async savePushToken(token: string, userId: string): Promise<void> {
     try {
       const deviceId = Constants.installationId || Device.osName;
-      const platform = Platform.OS as 'ios' | 'android';
+      // Only persist tokens for native platforms we support
+      if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+        console.warn('Skipping push token save for unsupported platform:', Platform.OS);
+        return;
+      }
+
+      const platform: 'ios' | 'android' = Platform.OS;
 
       const { error } = await supabase
         .from('push_tokens')
