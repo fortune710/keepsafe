@@ -1,18 +1,14 @@
 import { TABLES } from "@/constants/supabase";
 import { supabase } from "@/lib/supabase";
 import { Database } from "@/types/database";
+import { generateInviteCode } from "@/lib/utils";
 
 type Invite = Database['public']['Tables']['invites']['Row'];
 
 export class InviteService {
     static readonly MAX_INVITE_USES = 10;
-    static generateInviteCode(): string {
-        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        let result = '';
-        for (let i = 0; i < 8; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-        }
-        return result;
+    static async generateInviteCode(): Promise<string> {
+        return generateInviteCode();
     }
 
     static async createInvite(inviterId: string, inviteCode: string): Promise<void> {
@@ -20,7 +16,7 @@ export class InviteService {
             inviter_id: inviterId,
             invite_code: inviteCode,
             max_uses: this.MAX_INVITE_USES,
-        } as never, { onConflict: 'invite_code' });
+        } as never, { onConflict: 'inviter_id' });
 
         if (invite.error) {
             throw new Error(invite.error.message);
@@ -32,9 +28,13 @@ export class InviteService {
             .from(TABLES.INVITES)
             .select('*')
             .eq('inviter_id', userId)
-            .single();
+            .maybeSingle();
         if (error) {
             throw new Error(error.message);
+        }
+
+        if (!invite) {
+            throw new Error('Invite not found');
         }
         return invite;
     }

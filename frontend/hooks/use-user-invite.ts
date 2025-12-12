@@ -9,10 +9,11 @@ interface UseUserInviteResult {
   isLoading: boolean;
   isError: boolean;
   error: unknown;
+  refetch: () => void;
 }
 
 export function useUserInvite(userId?: string): UseUserInviteResult {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: ['user-invite', userId],
     enabled: !!userId,
     queryFn: async () => {
@@ -25,9 +26,10 @@ export function useUserInvite(userId?: string): UseUserInviteResult {
 
   return {
     invite: data,
-    isLoading,
+    isLoading: isPending,
     isError,
     error,
+    refetch,
   };
 }
 

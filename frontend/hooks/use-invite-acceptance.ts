@@ -2,10 +2,6 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
-import { Database } from '@/types/database';
-
-type Invite = Database['public']['Tables']['invites']['Row'];
-type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export interface InviteData {
   id: string;
@@ -57,7 +53,7 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
       }
 
 
-      // Create friendship with accepted status
+      // Create friendship with pending status (requires follow-up acceptance)
       const { data: friendship, error: friendshipError } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .insert({

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { TABLES } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { deviceStorage } from './device-storage';
-import { generateDeepLinkUrl } from '@/lib/utils';
+import { generateDeepLinkUrl, generateInviteCode } from '@/lib/utils';
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
@@ -16,7 +16,7 @@ export class FriendService {
   static async generateInviteLink(): Promise<InviteResult> {
     try {
       // Generate a unique invite code
-      const inviteCode = this.generateInviteCode();
+      const inviteCode = await generateInviteCode();
       
       // Create invite link
       const inviteLink: InviteLink = {
@@ -161,17 +161,6 @@ export class FriendService {
       console.error('Failed to get contacts:', error);
       throw error;
     }
-  }
-
-  private static generateInviteCode(): string {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    
-    for (let i = 0; i < 8; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    
-    return result;
   }
 
   static formatInviteUrl(code: string): string {

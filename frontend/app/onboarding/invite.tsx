@@ -47,7 +47,7 @@ export default function InviteScreen() {
   };
 
   const handleContinue = () => {
-    return router.replace('/onboarding/auth?mode=signup');
+    return router.replace('/onboarding/auth?mode=signin');
   };
 
   // If we don't have a user id, just let the user skip this step.

@@ -1,6 +1,7 @@
 import { EntryWithProfile } from "@/types/entries";
 import { MediaType } from "@/types/media"
 import { TZDate } from "@date-fns/tz";
+import { getRandomBytesAsync } from 'expo-crypto';
 
 export const getDefaultAvatarUrl = (fullName: string) => {
     return `https://api.dicebear.com/9.x/adventurer-neutral/png?seed=${fullName}`
@@ -37,18 +38,31 @@ export const isLocalFile = (uri: string) => {
 }
 
 export const isBase64File = (uri: string) => {
-    return uri.startsWith('data:');
+  return uri.startsWith('data:');
 }
 
-export function generateInviteCode(): string {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    
-    for (let i = 0; i < 8; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length));
+const INVITE_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const INVITE_CODE_LENGTH = 8;
+
+export async function generateInviteCode(): Promise<string> {
+  const charsetSize = INVITE_CHARSET.length;
+  const maxMultiple = Math.floor(256 / charsetSize) * charsetSize;
+  let result = '';
+
+  while (result.length < INVITE_CODE_LENGTH) {
+    const bytes = await getRandomBytesAsync(INVITE_CODE_LENGTH);
+
+    for (let i = 0; i < bytes.length && result.length < INVITE_CODE_LENGTH; i++) {
+      const randomByte = bytes[i];
+      // Rejection sampling to avoid modulo bias
+      if (randomByte >= maxMultiple) continue;
+
+      const index = randomByte % charsetSize;
+      result += INVITE_CHARSET[index];
     }
-    
-    return result;
+  }
+
+  return result;
 }
 
 export const generateDeepLinkUrl = () => {

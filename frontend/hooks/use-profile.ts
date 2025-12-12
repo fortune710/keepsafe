@@ -48,7 +48,7 @@ export function useProfile(): UseProfileResult {
               username: null,
               avatar_url: null,
               bio: null,
-              invite_code: generateInviteCode(),
+              invite_code: await generateInviteCode(),
             };
 
             const { data: newProfile, error: createError } = await supabase

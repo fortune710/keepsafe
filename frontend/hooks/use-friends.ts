@@ -137,20 +137,20 @@ export function useFriends(userId?: string): UseFriendsResult {
   const updateFriendshipMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED }) => {
       
-      console.log('Updating friendship:', { id, status });
+      if (__DEV__) console.log('Updating friendship:', { id, status });
       const { data, error } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .update({ status } as never)
         .eq('id', id)
-        .select();
-
+        .select()
+        .single();
+        
       if (error) {
-        console.error('Error updating friendship:', error);
+        if (__DEV__) console.error('Error updating friendship:', error);
         throw new Error(error.message);
       }
 
-      console.log('Updated friendship:', data);
-
+      if (__DEV__) console.log('Updated friendship:', data);
       return data;
     },
     onSuccess: async () => {
