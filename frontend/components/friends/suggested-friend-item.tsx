@@ -7,6 +7,9 @@ import { Colors } from '@/lib/constants';
 import { SuggestedFriend } from '@/types/friends';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { useInviteAcceptance } from '@/hooks/use-invite-acceptance';
+import { useAuthContext } from '@/providers/auth-provider';
+import { useToast } from '@/hooks/use-toast';
 
 
 
@@ -17,7 +20,21 @@ interface FriendItemProps {
 }
 
 export default function SuggestedFriendItem({ friend, onAccept, index = 0 }: FriendItemProps) {
-  const handleAccept = () => {}
+  const { profile } = useAuthContext();
+  const { acceptInvite: sendFriendRequest } = useInviteAcceptance();
+  const { toast: showToast } = useToast();
+
+  const handleAccept = async () => {
+    if (!profile?.id) {
+      return showToast('Please login to send a friend request', 'error');
+    }
+    const result = await sendFriendRequest(friend.id, profile.id);
+    if (result.success) {
+      showToast('Friend request sent', 'success');
+    } else {
+      showToast(result.message || 'Failed to send friend request', 'error');
+    }
+  }
 
 
   return (
