@@ -259,6 +259,35 @@ export interface Database {
           updated_at?: string
         }
       }
+      push_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          token: string
+          platform: 'ios' | 'android' | 'web'
+          device_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          token: string
+          platform: 'ios' | 'android' | 'web'
+          device_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          token?: string
+          platform?: 'ios' | 'android' | 'web'
+          device_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
