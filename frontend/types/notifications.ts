@@ -24,3 +24,10 @@ export interface SupabaseNotification extends NotificationPayload {
     expo_ticket_id?: string;
     expo_receipt_id?: string;
 }
+
+export enum NotificationSettings {
+    FRIEND_REQUESTS = 'friend_requests',
+    PUSH_NOTIFICATIONS = 'push_notifications',
+    ENTRY_REMINDER = 'entry_reminder',
+    FRIEND_ACTIVITY = 'friend_activity',
+}
