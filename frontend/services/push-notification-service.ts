@@ -196,28 +196,30 @@ export class PushNotificationService {
     userId: string,
     settings: NotificationSettingsMap,
   ): Promise<void> {
+    // 1. Save to local storage (best-effort cache; don't throw)
     try {
-      // 1. Save to local storage
       await deviceStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY(userId), settings);
-
-      // 2. Sync to Supabase (one row per user)
-      const row = {
-        user_id: userId,
-        friend_requests: settings[NotificationSettings.FRIEND_REQUESTS],
-        push_notifications: settings[NotificationSettings.PUSH_NOTIFICATIONS],
-        entry_reminder: settings[NotificationSettings.ENTRY_REMINDER],
-        friend_activity: settings[NotificationSettings.FRIEND_ACTIVITY],
-      };
-
-      const { error } = await supabase
-        .from('notification_settings')
-        .upsert(row as never, { onConflict: 'user_id' } as never);
-
-      if (error) {
-        console.error('Error saving notification settings to Supabase:', error);
-      }
     } catch (error) {
-      console.error('Error in saveNotificationSettings:', error);
+      console.error('Error caching notification settings locally:', error);
+      // Continue; remote save is the source of truth for mutations
+    }
+
+    // 2. Sync to Supabase (one row per user) - failures MUST throw
+    const row = {
+      user_id: userId,
+      friend_requests: settings[NotificationSettings.FRIEND_REQUESTS],
+      push_notifications: settings[NotificationSettings.PUSH_NOTIFICATIONS],
+      entry_reminder: settings[NotificationSettings.ENTRY_REMINDER],
+      friend_activity: settings[NotificationSettings.FRIEND_ACTIVITY],
+    };
+
+    const { error } = await supabase
+      .from('notification_settings')
+      .upsert(row as never, { onConflict: 'user_id' } as never);
+
+    if (error) {
+      console.error('Error saving notification settings to Supabase:', error);
+      throw new Error(error.message || 'Failed to save notification settings');
     }
   }
 }

@@ -51,6 +51,7 @@ CREATE POLICY "Users can update own notification settings"
   FOR UPDATE
   TO authenticated
   USING (auth.uid() = user_id);
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own notification settings"
   ON notification_settings

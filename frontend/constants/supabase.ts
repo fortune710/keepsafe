@@ -102,7 +102,7 @@ export const SCHEMA = {
     updated_at: 'timestamptz DEFAULT now()',
   },
   NOTIFICATION_SETTINGS: {
-    id: 'uuid PRIMARY KEY DEFAULT gen_random_uuid()',
+    id: 'bigserial PRIMARY KEY',
     user_id: 'uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE',
     friend_requests: 'boolean NOT NULL DEFAULT true',
     push_notifications: 'boolean NOT NULL DEFAULT true',
