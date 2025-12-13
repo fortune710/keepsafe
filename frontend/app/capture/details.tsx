@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { X, Sticker } from 'lucide-react-native';
@@ -57,28 +57,34 @@ export default function DetailsScreen() {
   const showEveryoneDefault = privacySettings[PrivacySettings.AUTO_SHARE] ?? false;
   const showPrivateDefault = !showEveryoneDefault;
 
+  // Type guard to ensure id is a defined string
+  const isStringId = (id: string | undefined): id is string => {
+    return typeof id === 'string' && id.length > 0;
+  };
+
   // Convert friends data to the format expected by the UI
-  const realFriends: Friend[] = friends.map(friendship => {
-    const friendProfile = friendship.friend_profile;
-    return {
-      id: friendProfile?.id,
-      name: friendProfile?.full_name || 'Unknown User',
-      username: friendProfile?.username ?? "",
-      avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
-    };
-  });
+  // Filter out friends with undefined IDs to ensure type safety
+  const realFriends: Friend[] = friends
+    .map(friendship => {
+      const friendProfile = friendship.friend_profile;
+      const id = friendProfile?.id;
+      if (!isStringId(id)) {
+        return null;
+      }
+      return {
+        id,
+        name: friendProfile?.full_name || 'Unknown User',
+        username: friendProfile?.username ?? "",
+        avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
+      };
+    })
+    .filter((friend): friend is Friend => friend !== null);
 
   const [isPrivate, setIsPrivate] = useState(showPrivateDefault);
   const [isEveryone, setIsEveryone] = useState(showEveryoneDefault);
   const [selectedFriends, setSelectedFriends] = useState<string[]>(
-    showEveryoneDefault ? realFriends.map(friend => friend.id) : []
-  );
-
-  useEffect(() => {  
-    if (showEveryoneDefault && realFriends.length > 0) {  
-      setSelectedFriends(realFriends.map(f => f.id).filter(Boolean));  
-    }  
-  }, [realFriends, showEveryoneDefault]); 
+    showEveryoneDefault ? realFriends.map(friend => friend.id).filter(isStringId) : []
+  ); 
   
 
   const { toast } = useToast();
