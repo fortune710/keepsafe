@@ -24,10 +24,7 @@ export function usePrivacySettings(): UsePrivacySettingsResult {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
 
-  const queryKey = useMemo(
-    () => ['privacy-settings', user?.id],
-    [user?.id],
-  );
+  const queryKey = ['privacy-settings', user?.id];
 
   const {
     data,

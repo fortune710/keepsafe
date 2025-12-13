@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { X, Sticker } from 'lucide-react-native';
@@ -73,6 +73,12 @@ export default function DetailsScreen() {
   const [selectedFriends, setSelectedFriends] = useState<string[]>(
     showEveryoneDefault ? realFriends.map(friend => friend.id) : []
   );
+
+  useEffect(() => {  
+    if (showEveryoneDefault && realFriends.length > 0) {  
+      setSelectedFriends(realFriends.map(f => f.id).filter(Boolean));  
+    }  
+  }, [realFriends, showEveryoneDefault]); 
   
 
   const { toast } = useToast();
@@ -155,7 +161,9 @@ export default function DetailsScreen() {
         }
       })
       const showLocation = privacySettings[PrivacySettings.LOCATION_SHARE] ?? false;
-      const locationTag = showLocation && location ? `${location?.city}, ${location?.region ?? location?.country ?? ""}` : null;
+      const locationTag = showLocation && location?.city 
+        ? [location.city, location.region ?? location.country].filter(Boolean).join(', ')
+        : null;
 
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {

@@ -51,6 +51,7 @@ export default function FriendsScreen() {
     const result = await blockFriend(friendshipId);
     if (result.success) {
       showToast('Friend blocked successfully', 'success');
+      await refetch();
     } else {
       showToast(result.error || 'Failed to block friend', 'error');
     }

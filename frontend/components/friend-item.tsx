@@ -104,6 +104,8 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
         return '#F59E0B';
       case 'invited':
         return '#6B7280';
+      case 'blocked':
+        return '#EF4444';
       default:
         return '#6B7280';
     }

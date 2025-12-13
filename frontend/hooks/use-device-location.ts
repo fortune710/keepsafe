@@ -54,7 +54,6 @@ export function useDeviceLocation(): UseDeviceLocationResult {
     data,
     isLoading,
     error,
-    refetch,
     isFetching,
   } = useQuery<LocationData | null, Error>({
     queryKey: ['device-location'],
@@ -110,6 +109,14 @@ export function useDeviceLocation(): UseDeviceLocationResult {
 
         throw new Error('An unexpected error occurred while getting location.');
       }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - adjust based on use case
+    retry: (failureCount, error) => {
+      // Don't retry permission or service availability errors
+      if (error.message.includes('unavailable') || error.message.includes('permission')) {
+        return false;
+      }
+      return failureCount < 2;
     },
   });
 

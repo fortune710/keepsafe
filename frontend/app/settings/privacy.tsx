@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS: PrivacySetting[] = [
 ];
 
 export default function PrivacyScreen() {
-  const { settings: settingsMap, toggleSetting } = usePrivacySettings();
+  const { settings: settingsMap, toggleSetting, isLoading, isSaving } = usePrivacySettings();
 
   const settings: PrivacySetting[] = DEFAULT_SETTINGS.map((setting) => ({
     ...setting,
@@ -103,6 +103,7 @@ export default function PrivacyScreen() {
                   </View>
                   
                   <Switch
+                    disabled={isSaving || isLoading}
                     value={setting.enabled}
                     onValueChange={() => toggleSetting(setting.id)}
                     trackColor={{ false: '#E5E7EB', true: '#C7D2FE' }}
@@ -112,7 +113,11 @@ export default function PrivacyScreen() {
               );
             })}
 
-            <Pressable 
+            <Pressable
+              accessibilityRole='button' 
+              accessibilityLabel='Blocked Users'
+              accessibilityHint='Manage users you have blocked'
+              testID='blocked-users-button'
               style={styles.settingItem}
               onPress={() => router.push('/settings/blocked-users')}
             >

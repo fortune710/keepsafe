@@ -46,7 +46,8 @@ CREATE POLICY "Users can update own privacy settings"
   ON privacy_settings
   FOR UPDATE
   TO authenticated
-  USING (auth.uid() = user_id);
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own privacy settings"
   ON privacy_settings

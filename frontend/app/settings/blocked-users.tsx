@@ -6,6 +6,7 @@ import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useToast } from '@/hooks/use-toast';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { router } from 'expo-router';
 
 export default function BlockedUsersScreen() {
   const { profile } = useAuthContext();
@@ -13,9 +14,7 @@ export default function BlockedUsersScreen() {
   const { toast } = useToast();
 
   const handleBack = () => {
-    // Using router from expo-router via global import to keep consistent with other screens
-    const { router } = require('expo-router');
-    router.back();
+    return router.back();
   };
 
   return (
@@ -113,9 +112,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(12),
     backgroundColor: '#F0F9FF',
-  },
-  back: {
-    width: 40,
   },
   backButton: {
     padding: 8,
