@@ -20,9 +20,11 @@ export default function FriendsScreen() {
   const { 
     friends, 
     pendingRequests, 
+    blockedFriends,
     isLoading, 
     error, 
     removeFriend,
+    blockFriend,
     acceptFriendRequest,
     declineFriendRequest,
     refetch 
@@ -42,6 +44,15 @@ export default function FriendsScreen() {
       showToast('Friend removed successfully', 'success');
     } else {
       showToast(result.error || 'Failed to remove friend', 'error');
+    }
+  };
+
+  const handleBlockFriend = async (friendshipId: string) => {
+    const result = await blockFriend(friendshipId);
+    if (result.success) {
+      showToast('Friend blocked successfully', 'success');
+    } else {
+      showToast(result.error || 'Failed to block friend', 'error');
     }
   };
 
@@ -161,6 +172,7 @@ export default function FriendsScreen() {
                     onRemoveFriend={handleRemoveFriend}
                     onAcceptRequest={handleAcceptRequest}
                     onDeclineRequest={handleDeclineRequest}
+                    onBlockFriend={handleBlockFriend}
                     isLoading={false}
                     searchQuery=""
                   />
@@ -178,6 +190,7 @@ export default function FriendsScreen() {
                     onRemoveFriend={handleRemoveFriend}
                     onAcceptRequest={handleAcceptRequest}
                     onDeclineRequest={handleDeclineRequest}
+                    onBlockFriend={handleBlockFriend}
                     isLoading={false}
                     searchQuery={searchQuery}
                   />
