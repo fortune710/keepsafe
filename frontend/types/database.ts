@@ -105,7 +105,7 @@ export interface Database {
           id: string
           user_id: string
           friend_id: string
-          status: 'pending' | 'accepted' | 'declined'
+          status: 'pending' | 'accepted' | 'declined' | 'blocked'
           created_at: string
           updated_at: string
         }
@@ -113,7 +113,7 @@ export interface Database {
           id?: string
           user_id: string
           friend_id: string
-          status?: 'pending' | 'accepted' | 'declined'
+          status?: 'pending' | 'accepted' | 'declined' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -121,7 +121,7 @@ export interface Database {
           id?: string
           user_id?: string
           friend_id?: string
-          status?: 'pending' | 'accepted' | 'declined'
+          status?: 'pending' | 'accepted' | 'declined' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -284,6 +284,32 @@ export interface Database {
           token?: string
           platform?: 'ios' | 'android' | 'web'
           device_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      privacy_settings: {
+        Row: {
+          id: number
+          user_id: string
+          auto_share: boolean
+          location_share: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          auto_share?: boolean
+          location_share?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          auto_share?: boolean
+          location_share?: boolean
           created_at?: string
           updated_at?: string
         }

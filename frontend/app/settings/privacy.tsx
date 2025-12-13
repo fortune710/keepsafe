@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Switch, Alert } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Shield, Eye, Lock, Trash2, Download } from 'lucide-react-native';
+import { PrivacySettings } from '@/types/privacy';
+import { usePrivacySettings } from '@/hooks/use-privacy-settings';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, verticalScale } from 'react-native-size-matters';
 
 interface PrivacySetting {
-  id: string;
+  id: PrivacySettings;
   title: string;
   description: string;
   icon: any;
@@ -12,43 +16,32 @@ interface PrivacySetting {
   color: string;
 }
 
-export default function PrivacyScreen() {
-  const [settings, setSettings] = useState<PrivacySetting[]>([
-    {
-      id: 'profile_visibility',
-      title: 'Profile Visibility',
-      description: 'Allow others to find you by email or username',
-      icon: Eye,
-      enabled: true,
-      color: '#8B5CF6',
-    },
-    {
-      id: 'auto_share',
-      title: 'Auto-Share New Moments',
-      description: 'Automatically share new captures with friends',
-      icon: Shield,
-      enabled: false,
-      color: '#059669',
-    },
-    {
-      id: 'location_sharing',
-      title: 'Location Sharing',
-      description: 'Include location data in your moments',
-      icon: Lock,
-      enabled: true,
-      color: '#F59E0B',
-    },
-  ]);
+const DEFAULT_SETTINGS: PrivacySetting[] = [
+  {
+    id: PrivacySettings.AUTO_SHARE,
+    title: 'Auto-Share New Moments',
+    description: 'Automatically share new captures with friends',
+    icon: Shield,
+    enabled: false,
+    color: '#059669',
+  },
+  {
+    id: PrivacySettings.LOCATION_SHARE,
+    title: 'Location Sharing',
+    description: 'Include location data in your moments',
+    icon: Lock,
+    enabled: true,
+    color: '#F59E0B',
+  },
+];
 
-  const toggleSetting = (id: string) => {
-    setSettings(prev => 
-      prev.map(setting => 
-        setting.id === id 
-          ? { ...setting, enabled: !setting.enabled }
-          : setting
-      )
-    );
-  };
+export default function PrivacyScreen() {
+  const { settings: settingsMap, toggleSetting } = usePrivacySettings();
+
+  const settings: PrivacySetting[] = DEFAULT_SETTINGS.map((setting) => ({
+    ...setting,
+    enabled: settingsMap[setting.id] ?? setting.enabled,
+  }));
 
   const handleExportData = () => {
     Alert.alert(
@@ -93,37 +86,48 @@ export default function PrivacyScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
+        <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>Privacy Settings</Text>
-          <Text style={styles.sectionDescription}>
-            Control how your information is shared and used
-          </Text>
+          <View style={styles.settingsContainer}>
+            {settings.map((setting) => {
+              const IconComponent = setting.icon;
+              return (
+                <View key={setting.id} style={styles.settingItem}>
+                  <View style={[styles.iconContainer, { backgroundColor: `${setting.color}15` }]}>
+                    <IconComponent color={setting.color} size={20} />
+                  </View>
+                  
+                  <View style={styles.settingContent}>
+                    <Text style={styles.settingTitle}>{setting.title}</Text>
+                    <Text style={styles.settingDescription}>{setting.description}</Text>
+                  </View>
+                  
+                  <Switch
+                    value={setting.enabled}
+                    onValueChange={() => toggleSetting(setting.id)}
+                    trackColor={{ false: '#E5E7EB', true: '#C7D2FE' }}
+                    thumbColor={setting.enabled ? '#8B5CF6' : '#F3F4F6'}
+                  />
+                </View>
+              );
+            })}
+
+            <Pressable 
+              style={styles.settingItem}
+              onPress={() => router.push('/settings/blocked-users')}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: `#DC262615` }]}>
+                <Trash2 color="#DC2626" size={20} />
+              </View>
+              
+              <View style={styles.settingContent}>
+                <Text style={styles.settingTitle}>Blocked Users</Text>
+                <Text style={styles.settingDescription}>Manage users you have blocked</Text>
+              </View>
+            </Pressable>
+          </View>
         </View>
 
-        <View style={styles.settingsContainer}>
-          {settings.map((setting) => {
-            const IconComponent = setting.icon;
-            return (
-              <View key={setting.id} style={styles.settingItem}>
-                <View style={[styles.iconContainer, { backgroundColor: `${setting.color}15` }]}>
-                  <IconComponent color={setting.color} size={20} />
-                </View>
-                
-                <View style={styles.settingContent}>
-                  <Text style={styles.settingTitle}>{setting.title}</Text>
-                  <Text style={styles.settingDescription}>{setting.description}</Text>
-                </View>
-                
-                <Switch
-                  value={setting.enabled}
-                  onValueChange={() => toggleSetting(setting.id)}
-                  trackColor={{ false: '#E5E7EB', true: '#C7D2FE' }}
-                  thumbColor={setting.enabled ? '#8B5CF6' : '#F3F4F6'}
-                />
-              </View>
-            );
-          })}
-        </View>
 
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>Data Management</Text>
@@ -162,9 +166,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(12),
   },
   backButton: {
     padding: 8,
@@ -176,6 +179,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingTop: verticalScale(20),
   },
   section: {
     paddingHorizontal: 20,
@@ -194,8 +198,6 @@ const styles = StyleSheet.create({
   },
   settingsContainer: {
     backgroundColor: 'white',
-    marginHorizontal: 20,
-    marginBottom: 32,
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
