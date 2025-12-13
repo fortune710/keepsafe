@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import * as Location from 'expo-location';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface LocationData {
   address: string;
@@ -13,81 +14,11 @@ interface UseDeviceLocationResult {
   location: LocationData | null;
   isLoading: boolean;
   error: string | null;
-  getCurrentLocation: () => Promise<void>;
   clearLocation: () => void;
 }
 
 export function useDeviceLocation(): UseDeviceLocationResult {
-  const [location, setLocation] = useState<LocationData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const getCurrentLocation = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Request location permissions
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      
-      if (status !== 'granted') {
-        throw new Error('Location permission denied. Please enable location access in settings.');
-      }
-
-      // Get current position
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-        timeout: 15000,
-      });
-
-      // Reverse geocode to get address
-      const reverseGeocode = await Location.reverseGeocodeAsync({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
-
-      if (reverseGeocode.length > 0) {
-        const address = reverseGeocode[0];
-        
-        const locationData: LocationData = {
-          address: `${address.streetNumber || ''} ${address.street || ''}`.trim(),
-          city: address.city || address.subregion || '',
-          region: address.region || '',
-          country: address.country || '',
-          formattedAddress: formatAddress(address),
-        };
-
-        setLocation(locationData);
-      } else {
-        throw new Error('Unable to determine location address');
-      }
-    } catch (err) {
-      console.error('Location error:', err);
-      
-      if (err instanceof Error) {
-        if (err.message.includes('Location request timed out')) {
-          setError('Location request timed out. Please try again.');
-        } else if (err.message.includes('permission')) {
-          setError('Location permission denied. Please enable location access in settings.');
-        } else if (err.message.includes('Location provider is unavailable')) {
-          setError('Location services are unavailable. Please check your settings.');
-        } else if (err.message.includes('Network')) {
-          setError('Network error while getting location. Please check your connection.');
-        } else {
-          setError(err.message || 'Failed to get location. Please try again.');
-        }
-      } else {
-        setError('An unexpected error occurred while getting location.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const clearLocation = useCallback(() => {
-    setLocation(null);
-    setError(null);
-  }, []);
+  const queryClient = useQueryClient();
 
   const formatAddress = (address: Location.LocationGeocodedAddress): string => {
     const parts = [];
@@ -119,11 +50,77 @@ export function useDeviceLocation(): UseDeviceLocationResult {
     return parts.join(', ') || 'Unknown location';
   };
 
-  return {
-    location,
+  const {
+    data,
     isLoading,
     error,
-    getCurrentLocation,
+    refetch,
+    isFetching,
+  } = useQuery<LocationData | null, Error>({
+    queryKey: ['device-location'],
+    queryFn: async () => {
+      // Request permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      // If permission not granted, return null (no error)
+      if (status !== 'granted') {
+        return null;
+      }
+
+      try {
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        const reverseGeocode = await Location.reverseGeocodeAsync({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+
+        if (!reverseGeocode || reverseGeocode.length === 0) {
+          throw new Error('Unable to determine location address');
+        }
+
+        const address = reverseGeocode[0];
+        const locationData: LocationData = {
+          address: `${address.streetNumber || ''} ${address.street || ''}`.trim(),
+          city: address.city || address.subregion || '',
+          region: address.region || '',
+          country: address.country || '',
+          formattedAddress: formatAddress(address),
+        };
+
+        return locationData;
+      } catch (err: any) {
+        console.error('Location error:', err);
+
+        // Translate known errors into a user-friendly message
+        if (err instanceof Error) {
+          if (err.message.includes('Location request failed') || err.message.includes('timeout')) {
+            throw new Error('Location request failed. Please try again.');
+          }
+          if (err.message.includes('Location provider is unavailable')) {
+            throw new Error('Location services are unavailable. Please check your settings.');
+          }
+          if (err.message.includes('Network')) {
+            throw new Error('Network error while getting location. Please check your connection.');
+          }
+          throw err;
+        }
+
+        throw new Error('An unexpected error occurred while getting location.');
+      }
+    },
+  });
+
+  const clearLocation = useCallback(() => {
+    queryClient.setQueryData(['device-location'], null);
+  }, [queryClient]);
+
+  return {
+    location: data ?? null,
+    isLoading: isLoading || isFetching,
+    error: error ? error.message : null,
     clearLocation,
   };
 }
