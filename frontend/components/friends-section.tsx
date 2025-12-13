@@ -11,6 +11,7 @@ interface FriendsSectionProps {
   onFriendPress?: (friend: Friend) => void;
   onAcceptRequest?: (friendshipId: string) => void;
   onDeclineRequest?: (friendshipId: string) => void;
+  onBlockFriend?: (friendshipId: string) => void;
   isLoading?: boolean;
   searchQuery?: string;
 }
@@ -21,6 +22,7 @@ export default function FriendsSection({
   onFriendPress, 
   onAcceptRequest,
   onDeclineRequest,
+  onBlockFriend,
   isLoading = false,
   searchQuery = ''
 }: FriendsSectionProps) {
@@ -80,6 +82,7 @@ export default function FriendsSection({
               onPress={onFriendPress}
               onAccept={onAcceptRequest}
               onDecline={onDeclineRequest}
+              onBlock={onBlockFriend}
               index={index}
             />
           ))}
@@ -104,6 +107,7 @@ export default function FriendsSection({
               onPress={onFriendPress}
               onAccept={onAcceptRequest}
               onDecline={onDeclineRequest}
+              onBlock={onBlockFriend}
               index={connectedFriends.length + index}
             />
           ))}

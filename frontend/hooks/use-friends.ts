@@ -17,12 +17,15 @@ interface FriendWithProfile extends Friendship {
 interface UseFriendsResult {
   friends: FriendWithProfile[];
   pendingRequests: FriendWithProfile[];
+  blockedFriends: FriendWithProfile[];
   isLoading: boolean;
   error: Error | null;
   sendFriendRequest: (friendId: string) => Promise<{ success: boolean; error?: string }>;
   acceptFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   declineFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   removeFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
+  blockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
+   unblockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   refetch: () => void;
   prefetchSuggestedFriends: () => Promise<{ success: boolean; error: string | null }>;
 }
@@ -106,6 +109,7 @@ export function useFriends(userId?: string): UseFriendsResult {
   const pendingRequests = friendships.filter(f => 
     f.status === FRIENDSHIP_STATUS.PENDING && f.friend_id === userId
   );
+  const blockedFriends = friendships.filter(f => f.status === FRIENDSHIP_STATUS.BLOCKED);
 
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (friendId: string) => {
@@ -135,23 +139,21 @@ export function useFriends(userId?: string): UseFriendsResult {
   });
 
   const updateFriendshipMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED }) => {
-      
+    mutationFn: async ({ id, status }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED | typeof FRIENDSHIP_STATUS.BLOCKED }) => {
       if (__DEV__) console.log('Updating friendship:', { id, status });
-      const { data, error } = await supabase
+
+      const { error } = await supabase
         .from(TABLES.FRIENDSHIPS)
         .update({ status } as never)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
         
       if (error) {
         if (__DEV__) console.error('Error updating friendship:', error);
         throw new Error(error.message);
       }
 
-      if (__DEV__) console.log('Updated friendship:', data);
-      return data;
+      if (__DEV__) console.log('Updated friendship status successfully');
+      return { id, status };
     },
     onSuccess: async () => {
       // Clear cached friends to force refresh
@@ -218,6 +220,30 @@ export function useFriends(userId?: string): UseFriendsResult {
     }
   }, [updateFriendshipMutation]);
 
+  const blockFriend = useCallback(async (friendshipId: string) => {
+    try {
+      await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.BLOCKED });
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to block friend',
+      };
+    }
+  }, [updateFriendshipMutation]);
+
+  const unblockFriend = useCallback(async (friendshipId: string) => {
+    try {
+      await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.ACCEPTED });
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to unblock friend',
+      };
+    }
+  }, [updateFriendshipMutation]);
+
   const removeFriend = useCallback(async (friendshipId: string) => {
     try {
       await deleteFriendshipMutation.mutateAsync(friendshipId);
@@ -256,12 +282,15 @@ export function useFriends(userId?: string): UseFriendsResult {
   return {
     friends,
     pendingRequests,
+    blockedFriends,
     isLoading,
     error,
     sendFriendRequest,
     acceptFriendRequest,
     declineFriendRequest,
     removeFriend,
+    blockFriend,
+    unblockFriend,
     refetch,
     prefetchSuggestedFriends
   };

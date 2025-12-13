@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Bell, MessageCircle, Users, Calendar, UserPlus } from 'lucide-react-native';
+import { ArrowLeft, Bell, Users, Calendar, UserPlus } from 'lucide-react-native';
 import { NotificationSettings } from '@/types/notifications';
 import { useNotificationSettings } from '@/hooks/use-notification-settings';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, verticalScale } from 'react-native-size-matters';
 
 interface NotificationSetting {
   id: NotificationSettings;
@@ -126,9 +127,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
+    paddingHorizontal: scale(20),
+    paddingVertical: verticalScale(12),
   },
   backButton: {
     padding: 8,

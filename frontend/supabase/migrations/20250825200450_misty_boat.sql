@@ -73,7 +73,7 @@
 
 -- Create custom types
 CREATE TYPE entry_type AS ENUM ('photo', 'video', 'audio');
-CREATE TYPE friendship_status AS ENUM ('pending', 'accepted', 'declined');
+CREATE TYPE friendship_status AS ENUM ('pending', 'accepted', 'declined', 'blocked');
 
 -- Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (

@@ -11,7 +11,7 @@ export interface Friend {
   email: string;
   username: string;
   avatar: string;
-  status: 'connected' | 'pending' | 'invited';
+  status: 'connected' | 'pending' | 'invited' | 'blocked';
   invitedAt?: Date;
   connectedAt?: Date;
   isOnline?: boolean;
@@ -23,10 +23,41 @@ interface FriendItemProps {
   onPress?: (friend: Friend) => void;
   onAccept?: (friendshipId: string) => void;
   onDecline?: (friendshipId: string) => void;
+  onBlock?: (friendshipId: string) => void;
   index?: number;
 }
 
-export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecline, index = 0 }: FriendItemProps) {
+export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecline, onBlock, index = 0 }: FriendItemProps) {
+  const confirmRemove = () => {
+    Alert.alert(
+      'Remove Friend',
+      `Are you sure you want to remove ${friend.name} from your friends?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Remove', 
+          style: 'destructive',
+          onPress: () => onRemove(friend.id)
+        },
+      ]
+    );
+  };
+
+  const confirmBlock = () => {
+    Alert.alert(
+      'Block Friend',
+      `Are you sure you want to block ${friend.name}? They will no longer be able to interact with you.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Block', 
+          style: 'destructive',
+          onPress: () => onBlock?.(friend.id),
+        },
+      ]
+    );
+  };
+
   const handleRemove = () => {
     if (friend.status === 'pending') {
       // For pending requests, show accept/decline options
@@ -39,16 +70,20 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
         ]
       );
     } else {
-      // For connected friends, show remove option
+      // For connected friends, show options to remove or block
       Alert.alert(
-        'Remove Friend',
-        `Are you sure you want to remove ${friend.name} from your friends?`,
+        'Friend Options',
+        `What would you like to do with ${friend.name}?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Remove', 
+          {
+            text: 'Remove Friend',
+            onPress: confirmRemove,
+          },
+          {
+            text: 'Block Friend',
             style: 'destructive',
-            onPress: () => onRemove(friend.id)
+            onPress: confirmBlock,
           },
         ]
       );
@@ -69,6 +104,8 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
         return '#F59E0B';
       case 'invited':
         return '#6B7280';
+      case 'blocked':
+        return '#EF4444';
       default:
         return '#6B7280';
     }

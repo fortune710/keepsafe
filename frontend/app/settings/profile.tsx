@@ -6,7 +6,6 @@ import { useAuthContext } from '@/providers/auth-provider';
 import ProfileUpdatePopover from '@/components/profile/profile-update-popover';
 import { useToast } from '@/hooks/use-toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { formatPhoneNumber } from '@/lib/utils';
 import { scale, verticalScale } from 'react-native-size-matters';
 
 
