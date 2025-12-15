@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2 } from 'lucide-react-native';
+import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2, DownloadIcon } from 'lucide-react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { SlideInDown, SlideOutUp } from 'react-native-reanimated';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { BACKEND_URL } from '@/lib/constants';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 interface SettingsItem {
   id: string;
@@ -64,6 +66,7 @@ const settingsItems: SettingsItem[] = [
 export default function SettingsScreen() {
   const { profile, session } = useAuthContext();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Swipe down from top to close settings
   const swipeDownGesture = Gesture.Pan()
@@ -86,6 +89,85 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error('Sign out error:', error);
       Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
+  };
+
+  const handleExportData = async () => {
+    Alert.alert(
+      "Export Data",
+      "Choose a format for your data export:",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "JSON (Raw Data)",
+          onPress: () => performExport('json'),
+        },
+        {
+          text: "HTML (Readable)",
+          onPress: () => performExport('html'),
+        },
+      ]
+    );
+  };
+
+  const performExport = async (format: 'json' | 'html') => {
+    if (!profile?.id || !session?.access_token) {
+      Alert.alert('Error', 'Authentication token missing. Please sign in again.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      
+      const extension = format === 'html' ? 'html' : 'json';
+      const fileUri = `${FileSystem.documentDirectory}keepsafe_export_${profile.id}.${extension}`;
+      const downloadUrl = `${BACKEND_URL}/user/${profile.id}/export?format=${format}`;
+
+      console.log(`Exporting ${format} data for user:`, profile.id);
+
+      const result = await FileSystem.downloadAsync(
+        downloadUrl,
+        fileUri,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      console.log('Download result:', result);
+
+      if (result.status !== 200) {
+        throw new Error('Failed to download export file');
+      }
+
+      // Success Alert
+      Alert.alert(
+        'Export Complete',
+        'Your data has been successfully exported.',
+        [
+          {
+            text: 'Share / Save',
+            onPress: async () => {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(result.uri, {
+                  mimeType: format === 'html' ? 'text/html' : 'application/json',
+                  dialogTitle: 'Export User Data'
+                });
+              } else {
+                Alert.alert('Success', 'File downloaded to: ' + result.uri);
+              }
+            }
+          },
+          { text: 'Close', style: 'cancel' }
+        ]
+      );
+
+    } catch (error: any) {
+      console.error('❌ Export Data Error:', error);
+      Alert.alert('Error', error.message || 'Failed to export account data');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -216,7 +298,22 @@ export default function SettingsScreen() {
 
           <View style={styles.settingsSection}>
             
-            
+            <TouchableOpacity style={styles.settingsItem} onPress={handleExportData} disabled={isExporting}>
+              <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
+                {isExporting ? (
+                  <ActivityIndicator color="#64748B" size="small" />
+                ) : (
+                  <DownloadIcon color="#64748B" size={20} />
+                )}
+              </View>
+              
+              <View style={styles.itemContent}>
+                <Text style={styles.itemTitle}>{isExporting ? 'Exporting Data...' : 'Export Data'}</Text>
+                <Text style={styles.itemSubtitle}>Export your account data</Text>
+              </View>
+              
+              <View style={{ width: 20 }} />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.settingsItem} onPress={handleDeleteAccount} disabled={isDeleting}>
               <View style={[styles.iconContainer, { backgroundColor: '#DC262615' }]}>
                 <Trash2 color="#DC2626" size={20} />
