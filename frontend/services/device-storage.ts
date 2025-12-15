@@ -162,7 +162,8 @@ class DeviceStorage {
   }
 
   async setSuggestedFriends(data: SuggestedFriend[]): Promise<void> {
-    await this.setItem('suggested_friends', data);
+    const cacheDurationMinutes = 60 * 24 * 7; // 7 days
+    await this.setItem('suggested_friends', data, cacheDurationMinutes);
   }
 }
 

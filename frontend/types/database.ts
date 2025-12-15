@@ -105,7 +105,7 @@ export interface Database {
           id: string
           user_id: string
           friend_id: string
-          status: 'pending' | 'accepted' | 'declined'
+          status: 'pending' | 'accepted' | 'declined' | 'blocked'
           created_at: string
           updated_at: string
         }
@@ -113,7 +113,7 @@ export interface Database {
           id?: string
           user_id: string
           friend_id: string
-          status?: 'pending' | 'accepted' | 'declined'
+          status?: 'pending' | 'accepted' | 'declined' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -121,7 +121,7 @@ export interface Database {
           id?: string
           user_id?: string
           friend_id?: string
-          status?: 'pending' | 'accepted' | 'declined'
+          status?: 'pending' | 'accepted' | 'declined' | 'blocked'
           created_at?: string
           updated_at?: string
         }
@@ -225,6 +225,93 @@ export interface Database {
           current_uses?: number
           is_active?: boolean
           created_at?: string
+        }
+      }
+      notification_settings: {
+        Row: {
+          id: number
+          user_id: string
+          friend_requests: boolean
+          push_notifications: boolean
+          entry_reminder: boolean
+          friend_activity: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          friend_requests?: boolean
+          push_notifications?: boolean
+          entry_reminder?: boolean
+          friend_activity?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          friend_requests?: boolean
+          push_notifications?: boolean
+          entry_reminder?: boolean
+          friend_activity?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      push_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          token: string
+          platform: 'ios' | 'android' | 'web'
+          device_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          token: string
+          platform: 'ios' | 'android' | 'web'
+          device_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          token?: string
+          platform?: 'ios' | 'android' | 'web'
+          device_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      privacy_settings: {
+        Row: {
+          id: number
+          user_id: string
+          auto_share: boolean
+          location_share: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          auto_share?: boolean
+          location_share?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          auto_share?: boolean
+          location_share?: boolean
+          created_at?: string
+          updated_at?: string
         }
       }
     }

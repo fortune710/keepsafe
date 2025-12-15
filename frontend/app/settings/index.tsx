@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2, DownloadIcon } from 'lucide-react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { SlideInDown, SlideOutUp } from 'react-native-reanimated';
+import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2 } from 'lucide-react-native';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -66,7 +64,6 @@ const settingsItems: SettingsItem[] = [
 export default function SettingsScreen() {
   const { profile, session } = useAuthContext();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   
   // Swipe down from top to close settings
   const swipeDownGesture = Gesture.Pan()
@@ -188,7 +185,7 @@ export default function SettingsScreen() {
             
             // Guard clause for missing session/token
             if (!session?.access_token) {
-              Alert.alert('Error', 'Authentication token missing. Please sign in again.');
+              Alert.alert('Error', 'You need to be signed in to delete your account.');
               return;
             }
 

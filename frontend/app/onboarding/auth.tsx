@@ -67,7 +67,7 @@ export default function AuthScreen() {
 
     try {
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
-      const { error } = await signUp(email, password, { 
+      const { error, data } = await signUp(email, password, { 
         full_name: fullName,
         username: username.trim()
       });
@@ -76,9 +76,22 @@ export default function AuthScreen() {
         showToast(error.message || 'Sign up failed. Please try again.', 'error');
         return;
       }
-      
-      // Navigate to invite page after successful signup
-      router.push('/onboarding/invite');
+
+      // Navigate to invite page after successful signup.
+      // We now rely on Supabase triggers to create the invite for this user,
+      // so we just pass the userId to the invite screen.
+      if (!data?.userId) {
+        // Fallback: if for some reason we don't have a userId, just continue.
+        router.replace('/capture');
+        return;
+      }
+
+      return router.push({
+        pathname: '/onboarding/invite',
+        params: {
+          user_id: data.userId,
+        },
+      });
     } catch (error) {
       showToast('An unexpected error occurred', 'error');
     } finally {

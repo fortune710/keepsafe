@@ -51,6 +51,15 @@
       - `is_active` (boolean)
       - `created_at` (timestamp)
 
+    - `push_tokens` - Device push notification tokens
+      - `id` (uuid, primary key)
+      - `user_id` (uuid, references auth.users)
+      - `token` (text, Expo push token)
+      - `platform` (text: ios, android, web)
+      - `device_id` (text, optional)
+      - `created_at` (timestamp)
+      - `updated_at` (timestamp)
+
   2. Security
     - Enable RLS on all tables
     - Add policies for authenticated users to manage their own data
@@ -64,7 +73,7 @@
 
 -- Create custom types
 CREATE TYPE entry_type AS ENUM ('photo', 'video', 'audio');
-CREATE TYPE friendship_status AS ENUM ('pending', 'accepted', 'declined');
+CREATE TYPE friendship_status AS ENUM ('pending', 'accepted', 'declined', 'blocked');
 
 -- Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
@@ -128,12 +137,25 @@ CREATE TABLE IF NOT EXISTS invites (
   created_at timestamptz DEFAULT now()
 );
 
+-- Create push_tokens table
+CREATE TABLE IF NOT EXISTS push_tokens (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  token text NOT NULL,
+  platform text CHECK (platform IN ('ios', 'android', 'web')),
+  device_id text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  CONSTRAINT push_tokens_user_device_key UNIQUE (user_id, device_id)
+);
+
 -- Enable Row Level Security
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entry_shares ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_tokens ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
 CREATE POLICY "Users can read own profile"
@@ -262,6 +284,31 @@ CREATE POLICY "Users can update own invites"
   TO authenticated
   USING (auth.uid() = inviter_id);
 
+-- Push tokens policies
+CREATE POLICY "Users can read own push tokens"
+  ON push_tokens
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own push tokens"
+  ON push_tokens
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own push tokens"
+  ON push_tokens
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own push tokens"
+  ON push_tokens
+  FOR DELETE
+  TO authenticated
+  USING (auth.uid() = user_id);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_entries_user_id ON entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_entries_created_at ON entries(created_at DESC);
@@ -272,6 +319,8 @@ CREATE INDEX IF NOT EXISTS idx_entry_shares_entry_id ON entry_shares(entry_id);
 CREATE INDEX IF NOT EXISTS idx_entry_shares_user_id ON entry_shares(shared_with_user_id);
 CREATE INDEX IF NOT EXISTS idx_invites_code ON invites(invite_code);
 CREATE INDEX IF NOT EXISTS idx_invites_expires_at ON invites(expires_at);
+CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_push_tokens_token ON push_tokens(token);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -295,6 +344,11 @@ CREATE TRIGGER update_entries_updated_at
 
 CREATE TRIGGER update_friendships_updated_at
   BEFORE UPDATE ON friendships
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_push_tokens_updated_at
+  BEFORE UPDATE ON push_tokens
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 

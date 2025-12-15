@@ -7,17 +7,33 @@ import { Colors } from '@/lib/constants';
 import { SuggestedFriend } from '@/types/friends';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { useInviteAcceptance } from '@/hooks/use-invite-acceptance';
+import { useAuthContext } from '@/providers/auth-provider';
+import { useToast } from '@/hooks/use-toast';
 
 
 
 interface FriendItemProps {
   friend: SuggestedFriend;
-  onAccept?: (friendshipId: string) => void;
-  index?: number;
+  index: number;
 }
 
-export default function SuggestedFriendItem({ friend, onAccept, index = 0 }: FriendItemProps) {
-  const handleAccept = () => {}
+export default function SuggestedFriendItem({ friend, index }: FriendItemProps) {
+  const { profile } = useAuthContext();
+  const { acceptInvite: sendFriendRequest, isProcessing } = useInviteAcceptance();
+  const { toast: showToast } = useToast();
+
+  const handleAccept = async () => {
+    if (!profile?.id) {
+      return showToast('Please login to send a friend request', 'error');
+    }
+    const result = await sendFriendRequest(friend.id, profile.id);
+    if (result.success) {
+      return showToast('Friend request sent', 'success');
+    } else {
+      return showToast(result.message || 'Failed to send friend request', 'error');
+    }
+  }
 
 
   return (
@@ -41,6 +57,7 @@ export default function SuggestedFriendItem({ friend, onAccept, index = 0 }: Fri
           style={styles.addButton}
           onPress={handleAccept}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          disabled={isProcessing}
         >
           <Plus color="#fff" size={20} />
           <Text style={styles.addButtonText}>Add</Text>

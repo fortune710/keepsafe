@@ -9,7 +9,9 @@ export const TABLES = {
   INVITES: 'invites',
   ENTRY_REACTIONS: 'entry_reactions',
   ENTRY_COMMENTS: 'entry_comments',
-  PUSH_TOKENS: 'push_tokens'
+  PUSH_TOKENS: 'push_tokens',
+  NOTIFICATION_SETTINGS: 'notification_settings',
+  PRIVACY_SETTINGS: 'privacy_settings',
 } as const;
 
 // Storage Bucket Names
@@ -30,6 +32,7 @@ export const FRIENDSHIP_STATUS = {
   PENDING: 'pending',
   ACCEPTED: 'accepted',
   DECLINED: 'declined',
+  BLOCKED: 'blocked',
 } as const;
 
 // File Upload Paths
@@ -97,6 +100,24 @@ export const SCHEMA = {
     token: 'text NOT NULL',
     platform: "text CHECK (platform IN ('ios', 'android', 'web'))",
     device_id: 'text',
+    created_at: 'timestamptz DEFAULT now()',
+    updated_at: 'timestamptz DEFAULT now()',
+  },
+  NOTIFICATION_SETTINGS: {
+    id: 'bigserial PRIMARY KEY',
+    user_id: 'uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE',
+    friend_requests: 'boolean NOT NULL DEFAULT true',
+    push_notifications: 'boolean NOT NULL DEFAULT true',
+    entry_reminder: 'boolean NOT NULL DEFAULT false',
+    friend_activity: 'boolean NOT NULL DEFAULT true',
+    created_at: 'timestamptz DEFAULT now()',
+    updated_at: 'timestamptz DEFAULT now()',
+  },
+  PRIVACY_SETTINGS: {
+    id: 'bigserial PRIMARY KEY',
+    user_id: 'uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE',
+    auto_share: 'boolean NOT NULL DEFAULT false',
+    location_share: 'boolean NOT NULL DEFAULT true',
     created_at: 'timestamptz DEFAULT now()',
     updated_at: 'timestamptz DEFAULT now()',
   }

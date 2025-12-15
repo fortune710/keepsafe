@@ -23,8 +23,12 @@ export default function SuggestedFriendsList({ friends }: SuggestedFriendsListPr
                 </Text>
             </View>
             {
-                friends.map((friend) => (
-                    <SuggestedFriendItem key={friend.id} friend={friend}/>
+                friends.map((friend, index) => (
+                    <SuggestedFriendItem 
+                        key={friend.id} 
+                        friend={friend} 
+                        index={index}
+                    />
                 ))
             }
         </View>

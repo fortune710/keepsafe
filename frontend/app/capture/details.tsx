@@ -7,6 +7,8 @@ import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useUserEntries } from '@/hooks/use-user-entries';
+import { usePrivacySettings } from '@/hooks/use-privacy-settings';
+import { PrivacySettings } from '@/types/privacy';
 import { MediaCapture } from '@/types/media';
 
 import { moderateScale, verticalScale } from 'react-native-size-matters';
@@ -49,19 +51,47 @@ export default function DetailsScreen() {
   const { saveEntry, isLoading } = useEntryOperations();
   const { friends } = useFriends(user?.id);
   const { addOptimisticEntry, replaceOptimisticEntry } = useUserEntries();
+  const { settings: privacySettings } = usePrivacySettings();
+  const { location } = useDeviceLocation();
 
-  
-  const [isPrivate, setIsPrivate] = useState(true);
-  const [isEveryone, setIsEveryone] = useState(false);
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const showEveryoneDefault = privacySettings[PrivacySettings.AUTO_SHARE] ?? false;
+  const showPrivateDefault = !showEveryoneDefault;
+
+  // Type guard to ensure id is a defined string
+  const isStringId = (id: string | undefined): id is string => {
+    return typeof id === 'string' && id.length > 0;
+  };
+
+  // Convert friends data to the format expected by the UI
+  // Filter out friends with undefined IDs to ensure type safety
+  const realFriends: Friend[] = friends
+    .map(friendship => {
+      const friendProfile = friendship.friend_profile;
+      const id = friendProfile?.id;
+      if (!isStringId(id)) {
+        return null;
+      }
+      return {
+        id,
+        name: friendProfile?.full_name || 'Unknown User',
+        username: friendProfile?.username ?? "",
+        avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
+      };
+    })
+    .filter((friend): friend is Friend => friend !== null);
+
+  const [isPrivate, setIsPrivate] = useState(showPrivateDefault);
+  const [isEveryone, setIsEveryone] = useState(showEveryoneDefault);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>(
+    showEveryoneDefault ? realFriends.map(friend => friend.id).filter(isStringId) : []
+  ); 
   
 
   const { toast } = useToast();
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   
-  const { location, isLoading: locationLoading, getCurrentLocation } = useDeviceLocation();
-  const [locationTag, setLocationTag] = useState(location?.formattedAddress || '');
+
 
   const player = useVideoPlayer(uri as string, player => {
     player.loop = false;
@@ -73,17 +103,6 @@ export default function DetailsScreen() {
 
 
   const { isPlaying: videPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
-
-  // Convert friends data to the format expected by the UI
-  const realFriends: Friend[] = friends.map(friendship => {
-    const friendProfile = friendship.friend_profile;
-    return {
-      id: friendProfile?.id,
-      name: friendProfile?.full_name || 'Unknown User',
-      username: friendProfile?.username ?? "",
-      avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
-    };
-  });
 
 
   const hasSelectedSharing = () => {
@@ -135,8 +154,6 @@ export default function DetailsScreen() {
       return;
     }
 
-    console.log({ selectedFriends })
-
     // Generate a proper UUID for optimistic entry
     const tempId = Crypto.randomUUID();
     
@@ -149,6 +166,10 @@ export default function DetailsScreen() {
           transforms: attachments
         }
       })
+      const showLocation = privacySettings[PrivacySettings.LOCATION_SHARE] ?? false;
+      const locationTag = showLocation && location?.city 
+        ? [location.city, location.region ?? location.country].filter(Boolean).join(', ')
+        : null;
 
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
@@ -185,7 +206,7 @@ export default function DetailsScreen() {
         capture,
         textContent: '',
         musicTag: '',
-        locationTag: locationTag,
+        locationTag: locationTag || undefined,
         isPrivate,
         isEveryone,
         selectedFriends,
