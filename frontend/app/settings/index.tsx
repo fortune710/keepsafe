@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2, DownloadIcon } from 'lucide-react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -68,16 +68,19 @@ export default function SettingsScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   
+  const { height: screenHeight } = Dimensions.get('window');
+  const SWIPE_THRESHOLD = screenHeight * 0.15; // 15% of screen height
+
   // Swipe down from top to close settings
   const swipeDownGesture = Gesture.Pan()
     .onUpdate((event) => {
-      // Only allow downward swipes from the top area
-      if (event.translationY > 0 && event.absoluteY < 100) {
+      // Only allow downward swipes from the top area (10% of screen)
+      if (event.translationY > 0 && event.absoluteY < screenHeight * 0.1) {
         // Handle swipe down animation here if needed
       }
     })
     .onEnd((event) => {
-      if (event.translationY > 100 && event.velocityY > 500 && event.absoluteY < 200) {
+      if (event.translationY > 100 && event.velocityY > 500 && event.absoluteY < SWIPE_THRESHOLD) {
         router.back();
       }
     });
@@ -164,7 +167,7 @@ export default function SettingsScreen() {
       );
 
     } catch (error: any) {
-      console.error('❌ Export Data Error:', error);
+      logger.error('Export Data Error', error);
       Alert.alert('Error', error.message || 'Failed to export account data');
     } finally {
       setIsExporting(false);

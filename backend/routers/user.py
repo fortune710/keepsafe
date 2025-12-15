@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Response
 from services.pinecone_client import get_pinecone_index
 from services.supabase_client import get_supabase_client
@@ -95,15 +95,15 @@ def download_user_data(
         profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
         profile_data = profile_response.data[0] if profile_response.data else None
         
-        # 2. Fetch Entries
+        # 2. Fetch Entries (limit to 10000 to prevent timeout)
         logger.info(f"Fetching entries for user_id: {user_id}")
-        entries_response = supabase.table("entries").select("*").eq("user_id", user_id).execute()
+        entries_response = supabase.table("entries").select("*").eq("user_id", user_id).limit(10000).execute()
         entries_data = entries_response.data
         logger.info(f"Found {len(entries_data)} entries")
         
-        # 3. Fetch Friendships (both as user and as friend)
+        # 3. Fetch Friendships (both as user and as friend, limit to 10000)
         logger.info(f"Fetching friendships for user_id: {user_id}")
-        friendships_response = supabase.table("friendships").select("*").or_(f"user_id.eq.{user_id},friend_id.eq.{user_id}").execute()
+        friendships_response = supabase.table("friendships").select("*").or_(f"user_id.eq.{user_id},friend_id.eq.{user_id}").limit(10000).execute()
         friendships_data = friendships_response.data
         logger.info(f"Found {len(friendships_data)} friendships")
 
@@ -123,7 +123,8 @@ def download_user_data(
             import html
             
             def validate_url(url: str) -> str:
-                if not url: return ""
+                if not url:
+                    return ""
                 # Simple scheme check to prevent javascript: or data: exploits
                 if url.lower().startswith(('http://', 'https://')):
                     return html.escape(url)
@@ -146,7 +147,7 @@ def download_user_data(
             </head>
             <body>
                 <h1>User Data Export</h1>
-                <div class="meta">Exported on: {html.escape(datetime.now().isoformat())}</div>
+                <div class="meta">Exported on: {html.escape(datetime.now(timezone.utc).isoformat())}</div>
                 
                 <div class="section">
                     <h2>Profile</h2>
@@ -200,7 +201,7 @@ def download_user_data(
         # Default to JSON
         export_data = {
             "user_id": user_id,
-            "exported_at": datetime.now().isoformat(),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
             "profile": profile_data,
             "entries": entries_data,
             "friendships": friendships_data
