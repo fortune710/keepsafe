@@ -95,17 +95,17 @@ def download_user_data(
         profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
         profile_data = profile_response.data[0] if profile_response.data else None
         
-        # 2. Fetch Entries (limit to 10000 to prevent timeout)
+        # 2. Fetch Entries
         logger.info(f"Fetching entries for user_id: {user_id}")
-        entries_response = supabase.table("entries").select("*").eq("user_id", user_id).limit(10000).execute()
+        entries_response = supabase.table("entries").select("*").eq("user_id", user_id).execute()
         entries_data = entries_response.data
         logger.info(f"Found {len(entries_data)} entries")
         
-        # 3. Fetch Friendships (both as user and as friend, limit to 10000)
+        # 3. Fetch Friendships (both as user and as friend)
         logger.info(f"Fetching friendships for user_id: {user_id}")
         # Note: user_id is already validated against current_user.user.id in the auth check above,
         # so string interpolation here is safe from injection/tampering.
-        friendships_response = supabase.table("friendships").select("*").or_(f"user_id.eq.{user_id},friend_id.eq.{user_id}").limit(10000).execute()
+        friendships_response = supabase.table("friendships").select("*").or_(f"user_id.eq.{user_id},friend_id.eq.{user_id}").execute()
         friendships_data = friendships_response.data
         logger.info(f"Found {len(friendships_data)} friendships")
 
