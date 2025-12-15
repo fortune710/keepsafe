@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2 } from 'lucide-react-native';
+import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2, DownloadIcon } from 'lucide-react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -64,6 +65,7 @@ const settingsItems: SettingsItem[] = [
 export default function SettingsScreen() {
   const { profile, session } = useAuthContext();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Swipe down from top to close settings
   const swipeDownGesture = Gesture.Pan()
