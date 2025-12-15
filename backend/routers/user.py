@@ -103,6 +103,8 @@ def download_user_data(
         
         # 3. Fetch Friendships (both as user and as friend, limit to 10000)
         logger.info(f"Fetching friendships for user_id: {user_id}")
+        # Note: user_id is already validated against current_user.user.id in the auth check above,
+        # so string interpolation here is safe from injection/tampering.
         friendships_response = supabase.table("friendships").select("*").or_(f"user_id.eq.{user_id},friend_id.eq.{user_id}").limit(10000).execute()
         friendships_data = friendships_response.data
         logger.info(f"Found {len(friendships_data)} friendships")

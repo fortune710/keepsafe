@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2, DownloadIcon } from 'lucide-react-native';
@@ -70,17 +70,20 @@ export default function SettingsScreen() {
   
   const { height: screenHeight } = Dimensions.get('window');
   const SWIPE_THRESHOLD = screenHeight * 0.15; // 15% of screen height
+  const startY = useRef(0);
 
   // Swipe down from top to close settings
   const swipeDownGesture = Gesture.Pan()
+    .runOnJS(true)
+    .onStart((event) => {
+      startY.current = event.absoluteY;
+    })
     .onUpdate((event) => {
-      // Only allow downward swipes from the top area (10% of screen)
-      if (event.translationY > 0 && event.absoluteY < screenHeight * 0.1) {
-        // Handle swipe down animation here if needed
-      }
+       // Optional: Add visual feedback logic here if needed
     })
     .onEnd((event) => {
-      if (event.translationY > 100 && event.velocityY > 500 && event.absoluteY < SWIPE_THRESHOLD) {
+      // Check if swipe started at the top area and moved down rapidly
+      if (startY.current < SWIPE_THRESHOLD && event.translationY > 100 && event.velocityY > 500) {
         router.back();
       }
     });
