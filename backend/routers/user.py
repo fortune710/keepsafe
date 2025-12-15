@@ -5,6 +5,11 @@ from services.pinecone_client import get_pinecone_index
 from services.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 import json
+from enum import Enum
+
+class ExportFormat(str, Enum):
+    json = "json"
+    html = "html"
 
 router = APIRouter(prefix="/user", tags=["user"])
 logger = logging.getLogger(__name__)
@@ -71,7 +76,7 @@ async def delete_user(
 @router.get("/{user_id}/export")
 def download_user_data(
     user_id: str,
-    format: str = "json",
+    format: ExportFormat = ExportFormat.json,
     current_user = Depends(get_current_user)
 ):
     """
@@ -79,6 +84,7 @@ def download_user_data(
     Includes profile, entries (with content URLs and attachments), and friendships.
     """
     if current_user.user.id != user_id:
+        logger.warning(f"Unauthorized export attempt. User {current_user.user.id} tried to export {user_id}")
         raise HTTPException(status_code=403, detail="Not authorized to export this user's data")
     
     supabase = get_supabase_client()
@@ -101,7 +107,28 @@ def download_user_data(
         friendships_data = friendships_response.data
         logger.info(f"Found {len(friendships_data)} friendships")
 
-        if format == "html":
+        # 4. Filter None values
+        def remove_none(obj):
+            if isinstance(obj, dict):
+                return {k: remove_none(v) for k, v in obj.items() if v is not None}
+            elif isinstance(obj, list):
+                return [remove_none(v) for v in obj if v is not None]
+            return obj
+
+        profile_data = remove_none(profile_data) if profile_data else None
+        entries_data = remove_none(entries_data)
+        friendships_data = remove_none(friendships_data)
+
+        if format == ExportFormat.html:
+            import html
+            
+            def validate_url(url: str) -> str:
+                if not url: return ""
+                # Simple scheme check to prevent javascript: or data: exploits
+                if url.lower().startswith(('http://', 'https://')):
+                    return html.escape(url)
+                return ""
+
             html_content = f"""
             <!DOCTYPE html>
             <html>
@@ -119,11 +146,11 @@ def download_user_data(
             </head>
             <body>
                 <h1>User Data Export</h1>
-                <div class="meta">Exported on: {datetime.now().isoformat()}</div>
+                <div class="meta">Exported on: {html.escape(datetime.now().isoformat())}</div>
                 
                 <div class="section">
                     <h2>Profile</h2>
-                    <pre>{json.dumps(profile_data, indent=2, default=str)}</pre>
+                    <pre>{html.escape(json.dumps(profile_data, indent=2, default=str))}</pre>
                 </div>
 
                 <div class="section">
@@ -131,16 +158,24 @@ def download_user_data(
             """
             
             for entry in entries_data:
-                content_url = entry.get('content_url')
-                link_html = f'<p><strong>Content:</strong> <a href="{content_url}" target="_blank">View Media</a></p>' if content_url else ''
+                # Sanitize Content URL
+                raw_url = entry.get('content_url')
+                safe_url = validate_url(str(raw_url)) if raw_url else ""
+                link_html = f'<p><strong>Content:</strong> <a href="{safe_url}" target="_blank">View Media</a></p>' if safe_url else ''
                 
+                # Escape all other fields
+                safe_id = html.escape(str(entry.get('id', '')))
+                safe_type = html.escape(str(entry.get('type', '')))
+                safe_text = html.escape(str(entry.get('text_content') or 'N/A'))
+                safe_date = html.escape(str(entry.get('created_at', '')))
+
                 html_content += f"""
                     <div class="entry">
-                        <p><strong>ID:</strong> {entry.get('id')}</p>
-                        <p><strong>Type:</strong> {entry.get('type')}</p>
-                        <p><strong>Text:</strong> {entry.get('text_content') or 'N/A'}</p>
+                        <p><strong>ID:</strong> {safe_id}</p>
+                        <p><strong>Type:</strong> {safe_type}</p>
+                        <p><strong>Text:</strong> {safe_text}</p>
                         {link_html}
-                        <p class="meta">Created: {entry.get('created_at')}</p>
+                        <p class="meta">Created: {safe_date}</p>
                     </div>
                 """
             
@@ -149,7 +184,7 @@ def download_user_data(
 
                 <div class="section">
                     <h2>Friendships ({len(friendships_data)})</h2>
-                    <pre>{json.dumps(friendships_data, indent=2, default=str)}</pre>
+                    <pre>{html.escape(json.dumps(friendships_data, indent=2, default=str))}</pre>
                 </div>
             </body>
             </html>

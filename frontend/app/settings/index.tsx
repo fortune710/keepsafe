@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { BACKEND_URL } from '@/lib/constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { logger } from '@/lib/logger';
 
 interface SettingsItem {
   id: string;
@@ -122,7 +123,7 @@ export default function SettingsScreen() {
       const fileUri = `${FileSystem.documentDirectory}keepsafe_export_${profile.id}.${extension}`;
       const downloadUrl = `${BACKEND_URL}/user/${profile.id}/export?format=${format}`;
 
-      console.log(`Exporting ${format} data for user:`, profile.id);
+      logger.info(`Exporting ${format} data for user: ${profile.id}`);
 
       const result = await FileSystem.downloadAsync(
         downloadUrl,
@@ -134,7 +135,7 @@ export default function SettingsScreen() {
         }
       );
 
-      console.log('Download result:', result);
+      logger.info('Download result:', result);
 
       if (result.status !== 200) {
         throw new Error('Failed to download export file');
@@ -236,7 +237,8 @@ export default function SettingsScreen() {
     <SafeAreaView
       style={styles.container}
     >
-      <View style={styles.container}>
+      <GestureDetector gesture={swipeDownGesture}>
+        <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Settings</Text>
           <TouchableOpacity 
@@ -343,6 +345,7 @@ export default function SettingsScreen() {
           </View>
         </ScrollView>
       </View>
+      </GestureDetector>
     </SafeAreaView>
   );
 }
