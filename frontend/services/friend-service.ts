@@ -1,12 +1,13 @@
-import { Friend, InviteLink, InviteResult, ShareOptions, SuggestedFriend } from '@/types/friends';
+import { Friend, FriendWithProfile, InviteLink, InviteResult, ShareOptions, SuggestedFriend } from '@/types/friends';
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { ContactsService } from './contacts-service';
 import { supabase } from '@/lib/supabase';
-import { TABLES } from '@/constants/supabase';
+import { FRIENDSHIP_STATUS, TABLES } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { deviceStorage } from './device-storage';
 import { generateDeepLinkUrl, generateInviteCode } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
@@ -87,14 +88,99 @@ export class FriendService {
     }
   }
 
-  static async sendFriendRequest(friendId: string): Promise<boolean> {
+  static async getFriends(userId: string): Promise<FriendWithProfile[]> {
+    if (!userId) {
+      logger.error('User ID is required to retrive friends');
+      throw new Error('User ID is required');
+    }
+
     try {
-      // In a real app, this would send a request to your backend
-      console.log('Sending friend request to:', friendId);
+      if (__DEV__) console.log('Fetching friendships for user:', userId);
+
+      const { data, error } = await supabase
+        .from(TABLES.FRIENDSHIPS)
+        .select(`
+          *,
+          user_profile:profiles!friendships_user_id_fkey(
+            id,
+            full_name,
+            avatar_url,
+            username
+          ),
+          friend_profile:profiles!friendships_friend_id_fkey(
+            id,
+            full_name,
+            avatar_url,
+            username
+          )
+        `)
+        //.eq('friend_id', userId)
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .order('created_at', { ascending: false }) as {
+          data: any[],
+          error: any,
+        };
+
+      const friends: FriendWithProfile[] = data.map(friend => {
+        const { 
+          user_profile: user, 
+          friend_profile: friend_, 
+          ...friend_record 
+        } = friend;
+
+        const profile = friend.friend_id === userId ? 
+        user : friend_;
+
+        return {
+          ...friend_record,
+          friend_profile: profile
+        }
+
+      })
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Cache the friends data
+      if (data) {
+        await deviceStorage.setFriends(userId, friends);
+      }
+
+      return friends as FriendWithProfile[];
+
+    } catch (error) {
+      logger.error('Failed to get friends:', error);
+      throw error;
+    }
+  }
+
+  static async sendFriendRequest(userId: string, friendId: string): Promise<boolean> { 
+    if (!userId || !friendId) {
+      if (__DEV__) logger.error('User ID and friend ID are required to send a friend request', { userId, friendId });
+      throw new Error('User ID and friend ID are required');
+    }
+
+    try {
+      logger.info(`Sending friend request`, { userId, friendId });
+      const { error } = await supabase
+        .from(TABLES.FRIENDSHIPS)
+        .insert({
+          user_id: userId,
+          friend_id: friendId,
+          status: FRIENDSHIP_STATUS.PENDING,
+        } as never)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
       return true;
     } catch (error) {
-      console.error('Failed to send friend request:', error);
-      return false;
+      logger.error('Failed to send friend request:', error);
+      throw error;
     }
   }
 
@@ -109,14 +195,22 @@ export class FriendService {
     }
   }
 
-  static async removeFriend(friendId: string): Promise<boolean> {
+  static async removeFriend(friendshipId: string): Promise<boolean> {
     try {
       // In a real app, this would remove the friend via your backend
-      console.log('Removing friend:', friendId);
+      logger.info('Removing friend record', { friendshipId });
+      const { error } = await supabase
+        .from(TABLES.FRIENDSHIPS)
+        .delete()
+        .eq('id', friendshipId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
       return true;
     } catch (error) {
-      console.error('Failed to remove friend:', error);
-      return false;
+      logger.error('Failed to remove friend record', error);
+      throw error;
     }
   }
 
@@ -127,10 +221,22 @@ export class FriendService {
         return savedSuggestions;
       }
 
+      await supabase.auth.refreshSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        logger.error('No Active Session Found');
+        throw new Error('No session found');
+      }
+
       const contacts = await ContactsService.getDeviceContacts();
       const emails = contacts?.map((contact) => contact.email).filter(Boolean).join(",");
       const numbers = contacts?.map((contact) => !!contact.phoneNumber && contact.phoneNumber).join(",");
     
+      logger.info(`Getting retriving saved friends for ${session.user.id}`);
+      const friends  = await deviceStorage.getFriends(session.user.id);
+      const excludedIds = friends?.map((friend) => friend.friend_profile.id.trim()) ?? [];
+      excludedIds.push(session.user.id);
+      
       const { data, error } = await supabase
         .from(TABLES.PROFILES)
         .select('id,full_name,avatar_url,username')
@@ -138,7 +244,8 @@ export class FriendService {
           email.in.(${emails}),
           phone_number.in.(${numbers})
         `.replace(/\s+/g, '')
-        ) as { data: Profile[], error: any }
+        )
+        .not('id', 'in', `(${excludedIds.join(',')})`) as { data: Profile[], error: any }
 
         if (error) {
           throw error;
@@ -151,9 +258,7 @@ export class FriendService {
           avatar: profile.avatar_url,
         }))
 
-        if (savedSuggestions.length < profiles.length) {
-          await deviceStorage.setSuggestedFriends(profiles);
-        }
+        await deviceStorage.setSuggestedFriends(profiles);
 
         return profiles;
 
