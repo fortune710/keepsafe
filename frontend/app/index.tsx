@@ -14,8 +14,10 @@ export default function RootScreen() {
   const { prefetchSuggestedFriends } = useFriends();
 
   useEffect(() => {
-    prefetchSuggestedFriends();
-  }, [])
+    if (user && session) {
+      prefetchSuggestedFriends();
+    } 
+  }, [user, session])
   
 
   // Show loading while checking auth
@@ -28,13 +30,12 @@ export default function RootScreen() {
   }
 
   // Redirect to onboarding if not authenticated
-  if (!user) {
+  if (!user && !session) {
     return <Redirect href="/onboarding" />;
   }
 
   // Redirect to capture screen if authenticated
   return <Redirect href="/capture" />;
-  //return <Redirect href="/invite/XS1hbOJw" />
 }
 
 const styles = StyleSheet.create({
