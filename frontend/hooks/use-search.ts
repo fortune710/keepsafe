@@ -25,9 +25,12 @@ interface UseSearchResult {
   reset: () => void;
 }
 
+import { usePostHog } from 'posthog-react-native';
+
 export function useSearch(params: UseSearchParams = {}): UseSearchResult {
   const { initialMessages = [], onFinish } = params;
   const { user } = useAuthContext();
+  const posthog = usePostHog();
 
   const [messages, setMessages] = useState<SearchMessage[]>(() => [...initialMessages]);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +59,11 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
 
       const query = overrideQuery ?? input.trim();
       if (!query) return;
+
+      posthog?.capture('ai_search', {
+        query: query,
+        user_id: user.id
+      });
 
       // Cancel any in-flight request
       if (abortRef.current) {

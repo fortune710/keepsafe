@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
 import AudioEntry from '@/components/audio/audio-entry';
 import EntryShareList from '@/components/friends/entry-share-list';
+import { usePostHog } from 'posthog-react-native';
 
 interface Friend {
   id: string;
@@ -53,6 +54,7 @@ export default function DetailsScreen() {
   const { addOptimisticEntry, replaceOptimisticEntry } = useUserEntries();
   const { settings: privacySettings } = usePrivacySettings();
   const { location } = useDeviceLocation();
+  const posthog = usePostHog();
 
   const showEveryoneDefault = privacySettings[PrivacySettings.AUTO_SHARE] ?? false;
   const showPrivateDefault = !showEveryoneDefault;
@@ -91,7 +93,6 @@ export default function DetailsScreen() {
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   
-
 
   const player = useVideoPlayer(uri as string, player => {
     player.loop = false;
@@ -170,6 +171,14 @@ export default function DetailsScreen() {
       const locationTag = showLocation && location?.city 
         ? [location.city, location.region ?? location.country].filter(Boolean).join(', ')
         : null;
+
+       posthog?.capture('entry_captured', {
+        user_id: user.id,
+        entry_type: capture.type,
+        shared_with_count: selectedFriends.length,
+        is_private: isPrivate,
+        is_everyone: isEveryone
+       });
 
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
