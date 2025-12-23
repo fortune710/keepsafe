@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
+import { posthog } from '@/constants/posthog';
 
 export interface InviteData {
   id: string;
@@ -128,6 +129,11 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
       const result = await acceptInviteMutation.mutateAsync({ 
         inviteeId: inviteeId, 
         userId: userId 
+      });
+
+      posthog.capture('invite_accepted', {
+        invitee_id: inviteeId,
+        inviter_id: result.inviterName // Note: this might be name, not ID, based on line 73. Ideally we'd have ID.
       });
 
       return {

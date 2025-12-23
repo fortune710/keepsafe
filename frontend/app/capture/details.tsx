@@ -10,6 +10,7 @@ import { useUserEntries } from '@/hooks/use-user-entries';
 import { usePrivacySettings } from '@/hooks/use-privacy-settings';
 import { PrivacySettings } from '@/types/privacy';
 import { MediaCapture } from '@/types/media';
+import { posthog } from '@/constants/posthog';
 
 import { moderateScale, verticalScale } from 'react-native-size-matters';
 import * as Crypto from 'expo-crypto';
@@ -26,7 +27,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
 import AudioEntry from '@/components/audio/audio-entry';
 import EntryShareList from '@/components/friends/entry-share-list';
-import { usePostHog } from 'posthog-react-native';
 
 interface Friend {
   id: string;
@@ -54,7 +54,6 @@ export default function DetailsScreen() {
   const { addOptimisticEntry, replaceOptimisticEntry } = useUserEntries();
   const { settings: privacySettings } = usePrivacySettings();
   const { location } = useDeviceLocation();
-  const posthog = usePostHog();
 
   const showEveryoneDefault = privacySettings[PrivacySettings.AUTO_SHARE] ?? false;
   const showPrivateDefault = !showEveryoneDefault;
@@ -93,6 +92,7 @@ export default function DetailsScreen() {
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   
+
 
   const player = useVideoPlayer(uri as string, player => {
     player.loop = false;
@@ -172,14 +172,6 @@ export default function DetailsScreen() {
         ? [location.city, location.region ?? location.country].filter(Boolean).join(', ')
         : null;
 
-       posthog?.capture('entry_captured', {
-        user_id: user.id,
-        entry_type: capture.type,
-        shared_with_count: selectedFriends.length,
-        is_private: isPrivate,
-        is_everyone: isEveryone
-       });
-
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
         id: tempId,
@@ -224,6 +216,12 @@ export default function DetailsScreen() {
       });
 
       if (result.success) {
+        posthog.capture('entry_captured', {
+          type: capture.type,
+          is_private: isPrivate,
+          is_everyone: isEveryone,
+          friends_count: selectedFriends.length
+        });
         toast(result.message, 'success');
         setTimeout(() => {
           router.push('/capture');

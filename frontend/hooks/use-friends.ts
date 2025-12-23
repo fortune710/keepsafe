@@ -6,7 +6,7 @@ import { Database } from '@/types/database';
 import { deviceStorage } from '@/services/device-storage';
 import { FriendService } from '@/services/friend-service';
 import { useAuthContext } from '@/providers/auth-provider';
-import { usePostHog } from 'posthog-react-native';
+import { posthog } from '@/constants/posthog';
 
 type Friendship = Database['public']['Tables']['friendships']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -34,7 +34,6 @@ interface UseFriendsResult {
 export function useFriends(userId?: string): UseFriendsResult {
   const queryClient = useQueryClient();
   const { profile } = useAuthContext();
-  const posthog = usePostHog();
 
   const {
     data: friendships = [],
@@ -201,10 +200,6 @@ export function useFriends(userId?: string): UseFriendsResult {
   const acceptFriendRequest = useCallback(async (friendshipId: string) => {
     try {
       await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.ACCEPTED });
-      posthog?.capture('invite_accepted', {
-        user_id: userId ?? '',
-        friendship_id: friendshipId
-      });
       return { success: true };
     } catch (error) {
       return { 
@@ -212,7 +207,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         error: error instanceof Error ? error.message : 'Failed to accept friend request' 
       };
     }
-  }, [updateFriendshipMutation, userId]);
+  }, [updateFriendshipMutation]);
 
   const declineFriendRequest = useCallback(async (friendshipId: string) => {
     try {
@@ -229,10 +224,7 @@ export function useFriends(userId?: string): UseFriendsResult {
   const blockFriend = useCallback(async (friendshipId: string) => {
     try {
       await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.BLOCKED });
-      posthog?.capture('user_blocked', {
-        user_id: userId ?? '',
-        friendship_id: friendshipId
-      });
+      posthog.capture('friend_blocked', { friendship_id: friendshipId });
       return { success: true };
     } catch (error) {
       return {
@@ -240,7 +232,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         error: error instanceof Error ? error.message : 'Failed to block friend',
       };
     }
-  }, [updateFriendshipMutation, userId]);
+  }, [updateFriendshipMutation]);
 
   const unblockFriend = useCallback(async (friendshipId: string) => {
     try {
