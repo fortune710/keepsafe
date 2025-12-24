@@ -9,6 +9,7 @@ interface UseDeepLinkingResult {
 export function useDeepLinking(): UseDeepLinkingResult {
   const handleDeepLink = (url: string) => {
     try {
+      console.log('Handling deep link:', url);
       const parsedUrl = new URL(url);
       const path = parsedUrl.pathname;
       const searchParams = parsedUrl.searchParams;
@@ -29,14 +30,11 @@ export function useDeepLinking(): UseDeepLinkingResult {
         router.push('/friends');
       } else if (path === '/settings') {
         router.push('/settings');
-      } else {
-        // Default to capture page for unknown routes
-        router.push('/capture');
       }
+      // Removed the else block that was forcing redirect to /capture
     } catch (error) {
       console.error('Failed to handle deep link:', error);
-      // Fallback to capture page
-      router.push('/capture');
+      // Removed the fallback redirect - let the app handle navigation naturally
     }
   };
 
@@ -44,6 +42,7 @@ export function useDeepLinking(): UseDeepLinkingResult {
     // Handle initial URL when app is opened from a link
     const handleInitialUrl = async () => {
       const initialUrl = await Linking.getInitialURL();
+      console.log('Initial URL from deep linking:', initialUrl);
       if (initialUrl) {
         handleDeepLink(initialUrl);
       }

@@ -29,41 +29,49 @@ export default function AudioPreviewPopover({ isVisible, onClose, music }: Music
     maxHeight: popoverHeight.value,
   }));
 
-  if (!isVisible) return null;
+  // Don't return null - let the exit animation play
+  if (!isVisible && !music) return null;
 
   return (
     <Animated.View
       style={styles.overlay}
+      pointerEvents={isVisible ? 'auto' : 'none'}
     >
-      <TouchableOpacity style={styles.backdrop} onPress={onClose} />
+      <TouchableOpacity 
+        style={styles.backdrop} 
+        onPress={onClose}
+        activeOpacity={1}
+      />
 
-      <Animated.View 
-        style={[styles.popover, animatedPopoverStyle]}
-        entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
-        exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
-      >
-        <View style={styles.handle} />
+      {isVisible && (
+        <Animated.View 
+          style={[styles.popover, animatedPopoverStyle]}
+          entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
+          exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
+        >
+          <View style={styles.handle} />
 
-        <View style={styles.header}>
-          <Text style={styles.title}>Now Playing</Text>
-        </View>
-
-        <View style={styles.previewContainer}>
-          <AudioPreview canvasRadius={35} audioSource={music.preview} />
-        </View>
-
-        <View style={styles.musicContainer}>
-          <Image source={{ uri: music.cover }} style={styles.coverImage} />
-          <View style={styles.textContainer}>
-            <Text style={styles.musicTitle}>{music.title}</Text>
-            <Text style={styles.musicArtist}>{music.artist}</Text>
+          <View style={styles.header}>
+            <Text style={styles.title}>Now Playing</Text>
           </View>
-        </View>
 
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeButtonText}>Close</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          <View style={styles.previewContainer}>
+            <AudioPreview canvasRadius={35} audioSource={music.preview} />
+          </View>
+
+          <View style={styles.musicContainer}>
+            <Image source={{ uri: music.cover }} style={styles.coverImage} />
+            <View style={styles.textContainer}>
+              <Text style={styles.musicTitle}>{music.title}</Text>
+              <Text style={styles.musicArtist}>{music.artist}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </Animated.View>
   );
 }
@@ -72,6 +80,7 @@ const styles = StyleSheet.create({
   overlay: {
     position: 'absolute',
     top: verticalScale(-50),
+    height: verticalScale(height),
     left: 0,
     right: 0,
     bottom: 0,
@@ -83,7 +92,7 @@ const styles = StyleSheet.create({
   },
   popover: {
     position: 'absolute',
-    bottom: verticalScale(-40),
+    bottom: verticalScale(50),
     left: 0,
     right: 0,
     backgroundColor: 'white',

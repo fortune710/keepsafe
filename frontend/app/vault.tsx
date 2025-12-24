@@ -15,6 +15,8 @@ import { verticalScale } from 'react-native-size-matters';
 import { FlashList } from '@shopify/flash-list';
 import { VaultHeader } from '@/components/vault/vault-header';
 import { DateContainer } from '@/components/date-container';
+import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
+import { MusicTag } from '@/types/capture';
 
 const { height, width } = Dimensions.get('window');
 
@@ -23,8 +25,11 @@ export default function VaultScreen() {
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
+  const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(false);
 
   const prevOffset = useRef(0);
+  const listRef = useRef<any>(null);
 
   const handleScroll = (event: any) => {
     const currentOffset = event.nativeEvent.contentOffset.y;
@@ -48,6 +53,19 @@ export default function VaultScreen() {
 
   const handleEntryComments = (entryId: string) => {
     showComments(entryId);
+  };
+
+  const handleMusicPress = (music: MusicTag) => {
+    setSelectedMusic(music);
+    setIsMusicPlayerVisible(true);
+  };
+
+  const closeMusicPlayer = () => {
+    setIsMusicPlayerVisible(false);
+    // Delay clearing the music to allow exit animation to complete
+    setTimeout(() => {
+      setSelectedMusic(null);
+    }, 350); // Slightly longer than the 300ms animation
   };
 
 
@@ -91,10 +109,12 @@ export default function VaultScreen() {
     return (
       <EntryPage>
         <FlashList
+          ref={listRef}
           data={Object.keys(entriesByDate)}
           contentContainerStyle={styles.contentContainer}
           keyExtractor={(item) => item}
           onScroll={handleScroll}
+          scrollEnabled={!isMusicPlayerVisible}
           renderItem={({ item }) => {
             const entries = entriesByDate[item];
             const entriesDate = new Date(item);
@@ -111,6 +131,7 @@ export default function VaultScreen() {
                       onReactions={handleEntryReactions}
                       onComments={handleEntryComments}
                       onRetry={retryEntry}
+                      onMusicPress={handleMusicPress}
                     />
                   ))
                 }
@@ -154,6 +175,15 @@ export default function VaultScreen() {
               />
             )}
           </>
+        )}
+
+        {/* Music Player Popover at screen level */}
+        {selectedMusic && (
+          <AudioPreviewPopover
+            music={selectedMusic}
+            isVisible={isMusicPlayerVisible}
+            onClose={closeMusicPlayer}
+          />
         )}
       </>
     </Animated.View>

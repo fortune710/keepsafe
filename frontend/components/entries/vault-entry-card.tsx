@@ -13,6 +13,7 @@ import VaultCanvas from '../capture/canvas/vault-canvas';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
 import TextTicker from 'react-native-text-ticker';
+import { MusicTag } from '@/types/capture';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -33,6 +34,7 @@ interface VaultEntryCardProps {
   onReactions?: (entryId: string) => void;
   onComments?: (entryId: string) => void;
   onRetry?: (entryId: string) => void;
+  onMusicPress?: (music: MusicTag) => void;
 }
 
 const { height } = Dimensions.get('window');
@@ -44,8 +46,10 @@ export default function VaultEntryCard({
   onReactions,
   onComments,
   onRetry,
+  onMusicPress,
 }: VaultEntryCardProps) {
   const [isPlaying, setIsPlaying] = React.useState(false);
+  
   const numberHash = useMemo(() => {
     return dateStringToNumber(entry.created_at);
   }, [])
@@ -202,10 +206,10 @@ export default function VaultEntryCard({
             type='photo' 
             items={entry.attachments}
             uri={entry.content_url} 
-            style={styles.entryImage} 
+            style={styles.entryImage}
+            onMusicPress={onMusicPress}
           />
         )}
-        
         {entry.type === 'audio' && (
           <View style={styles.audioContainer}>
             <TouchableOpacity style={styles.audioPlayButton} onPress={toggleAudioPlayback}>
@@ -420,6 +424,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 18,
   },
   audioPlayButton: {
     width: 80,
