@@ -14,5 +14,9 @@ CREATE POLICY "Users can update friendship status"
   ON friendships
   FOR UPDATE
   TO authenticated
-  USING (auth.uid() = friend_id OR auth.uid() = user_id);
+  USING (auth.uid() = friend_id OR auth.uid() = user_id)
+  WITH CHECK (
+    (auth.uid() = friend_id OR auth.uid() = user_id) 
+    AND (blocked_by IS NULL OR blocked_by = auth.uid())
+  );
 

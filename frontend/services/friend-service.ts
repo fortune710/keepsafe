@@ -14,6 +14,38 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 export class FriendService {
   private static readonly BASE_INVITE_URL = generateDeepLinkUrl() + "/invite";
 
+  /**
+   * Validates email format
+   */
+  private static isValidEmail(email: string): boolean {
+    if (!email || typeof email !== 'string') return false;
+    // RFC 5322 compliant email regex (simplified but practical)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim()) && email.length <= 254; // Max email length
+  }
+
+  /**
+   * Validates phone number format
+   * Accepts international format with optional + prefix and digits
+   */
+  private static isValidPhoneNumber(phone: string): boolean {
+    if (!phone || typeof phone !== 'string') return false;
+    // Remove common formatting characters for validation
+    const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
+    // Must start with + (optional) followed by 7-15 digits
+    const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+    return phoneRegex.test(cleaned);
+  }
+
+  /**
+   * Validates UUID format (v4)
+   */
+  private static isValidUUID(uuid: string): boolean {
+    if (!uuid || typeof uuid !== 'string') return false;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid.trim());
+  }
+
   static async generateInviteLink(): Promise<InviteResult> {
     try {
       // Generate a unique invite code
@@ -121,7 +153,7 @@ export class FriendService {
           error: any,
         };
 
-      const friends: FriendWithProfile[] = data.map(friend => {
+      const friends: FriendWithProfile[] = data?.map(friend => {
         const { 
           user_profile: user, 
           friend_profile: friend_, 
@@ -137,6 +169,8 @@ export class FriendService {
         }
 
       })
+
+      if (!data) return [];
 
       if (error) {
         throw new Error(error.message);
@@ -229,23 +263,53 @@ export class FriendService {
       }
 
       const contacts = await ContactsService.getDeviceContacts();
-      const emails = contacts?.map((contact) => contact.email).filter(Boolean).join(",");
-      const numbers = contacts?.map((contact) => !!contact.phoneNumber && contact.phoneNumber).join(",");
+      
+      // Validate and filter emails
+      const validEmails = (contacts
+        ?.map((contact) => contact.email)
+        .filter((email): email is string => Boolean(email) && typeof email === 'string')
+        .filter((email) => this.isValidEmail(email)) ?? []) as string[];
+      
+      // Validate and filter phone numbers
+      const validNumbers = (contacts
+        ?.map((contact) => contact.phoneNumber)
+        .filter((phone): phone is string => Boolean(phone) && typeof phone === 'string')
+        .filter((phone) => this.isValidPhoneNumber(phone)) ?? []) as string[];
+      
+      // Early return if no valid contact data
+      if (validEmails.length === 0 && validNumbers.length === 0) {
+        logger.info('No valid email or phone contacts found');
+        return [];
+      }
     
       logger.info(`Getting retriving saved friends for ${session.user.id}`);
       const friends  = await deviceStorage.getFriends(session.user.id);
-      const excludedIds = friends?.map((friend) => friend.friend_profile.id.trim()) ?? [];
-      excludedIds.push(session.user.id);
       
-      const { data, error } = await supabase
+      // Validate and filter excluded IDs (UUIDs)
+      const validExcludedIds = [
+        ...(friends?.map((friend) => friend.friend_profile.id.trim()) ?? []),
+        session.user.id
+      ].filter((id) => this.isValidUUID(id));
+      
+      // Build query with validated data
+      let query = supabase
         .from(TABLES.PROFILES)
-        .select('id,full_name,avatar_url,username')
-        .or(`
-          email.in.(${emails}),
-          phone_number.in.(${numbers})
-        `.replace(/\s+/g, '')
-        )
-        .not('id', 'in', `(${excludedIds.join(',')})`) as { data: Profile[], error: any }
+        .select('id,full_name,avatar_url,username');
+      
+      // Only add .or() clause if we have valid contact data
+      if (validEmails.length > 0 || validNumbers.length > 0) {
+        const emailFilter = validEmails.length > 0 ? `email.in.(${validEmails.join(',')})` : '';
+        const phoneFilter = validNumbers.length > 0 ? `phone_number.in.(${validNumbers.join(',')})` : '';
+        const orClause = [emailFilter, phoneFilter].filter(Boolean).join(',');
+        query = query.or(orClause);
+      }
+      
+      // Only add .not() clause if we have valid excluded IDs
+      if (validExcludedIds.length > 0) {
+        query = query.not('id', 'in', `(${validExcludedIds.join(',')})`);
+      }
+      
+      const { data, error } = await query as { data: Profile[], error: any }
 
         if (error) {
           throw error;

@@ -17,7 +17,7 @@ export default function RootScreen() {
     if (user && session) {
       prefetchSuggestedFriends();
     } 
-  }, [user, session])
+  }, [user, session, prefetchSuggestedFriends])
   
 
   // Show loading while checking auth

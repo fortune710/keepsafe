@@ -76,7 +76,9 @@ export default function BlockedUsersScreen() {
                 );
               };
 
-              const avatarUrl = friend.friend_profile?.avatar_url ?? getDefaultAvatarUrl(friend.friend_profile?.full_name ?? "");
+              const avatarUrl = friend.friend_profile?.avatar_url ?? getDefaultAvatarUrl(
+                friend.friend_profile?.full_name || friend.friend_profile?.username || ""
+              );
               
               return (
                 <View key={friend.id} style={styles.userItem}>

@@ -190,7 +190,7 @@ export function useFriends(userId?: string): UseFriendsResult {
     }
   }, [deleteFriendshipMutation]);
 
-  const prefetchSuggestedFriends = async () => {
+  const prefetchSuggestedFriends = useCallback(async () => {
     try {
       await queryClient.prefetchQuery({
         queryKey: ["suggested-friends"],
@@ -212,7 +212,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         error: error instanceof Error ? error.message : 'Error getting suggested friends'
       }
     }
-  }
+  }, [queryClient, profile?.id])
   return {
     friends,
     pendingRequests,
