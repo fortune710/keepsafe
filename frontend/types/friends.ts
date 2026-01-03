@@ -1,3 +1,5 @@
+import { Database } from "./database";
+
 export interface SuggestedFriend {
   id: string;
   name: string;
@@ -29,4 +31,11 @@ export interface ShareOptions {
   message: string;
   url: string;
   title: string;
+}
+
+export type Friendship = Database['public']['Tables']['friendships']['Row'];
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+
+export interface FriendWithProfile extends Friendship {
+  friend_profile: Profile;
 }

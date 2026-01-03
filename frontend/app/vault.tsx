@@ -15,16 +15,25 @@ import { verticalScale } from 'react-native-size-matters';
 import { FlashList } from '@shopify/flash-list';
 import { VaultHeader } from '@/components/vault/vault-header';
 import { DateContainer } from '@/components/date-container';
+import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
+import { MusicTag } from '@/types/capture';
 
 const { height, width } = Dimensions.get('window');
+
+// Animation duration from AudioPreviewPopover (300ms) + buffer for cleanup
+const MUSIC_PLAYER_ANIMATION_DURATION = 300;
+const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 
 export default function VaultScreen() {
   const { entries, entriesByDate, isLoading, error, refetch, retryEntry } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
+  const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(false);
 
   const prevOffset = useRef(0);
+  const musicPlayerCleanupTimeoutRef = useRef<number | null>(null);
 
   const handleScroll = (event: any) => {
     const currentOffset = event.nativeEvent.contentOffset.y;
@@ -49,6 +58,39 @@ export default function VaultScreen() {
   const handleEntryComments = (entryId: string) => {
     showComments(entryId);
   };
+
+  const handleMusicPress = (music: MusicTag) => {
+    // Clear any existing cleanup timeout when reopening
+    if (musicPlayerCleanupTimeoutRef.current) {
+      clearTimeout(musicPlayerCleanupTimeoutRef.current);
+      musicPlayerCleanupTimeoutRef.current = null;
+    }
+    setSelectedMusic(music);
+    setIsMusicPlayerVisible(true);
+  };
+
+  const closeMusicPlayer = () => {
+    setIsMusicPlayerVisible(false);
+    // Clear any existing timeout before setting a new one
+    if (musicPlayerCleanupTimeoutRef.current) {
+      clearTimeout(musicPlayerCleanupTimeoutRef.current);
+    }
+    // Delay clearing the music to allow exit animation to complete
+    musicPlayerCleanupTimeoutRef.current = setTimeout(() => {
+      setSelectedMusic(null);
+      musicPlayerCleanupTimeoutRef.current = null;
+    }, MUSIC_PLAYER_CLEANUP_DELAY);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (musicPlayerCleanupTimeoutRef.current) {
+        clearTimeout(musicPlayerCleanupTimeoutRef.current);
+        musicPlayerCleanupTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
 
   const renderContent = () => {
@@ -95,6 +137,7 @@ export default function VaultScreen() {
           contentContainerStyle={styles.contentContainer}
           keyExtractor={(item) => item}
           onScroll={handleScroll}
+          scrollEnabled={!isMusicPlayerVisible}
           renderItem={({ item }) => {
             const entries = entriesByDate[item];
             const entriesDate = new Date(item);
@@ -111,6 +154,7 @@ export default function VaultScreen() {
                       onReactions={handleEntryReactions}
                       onComments={handleEntryComments}
                       onRetry={retryEntry}
+                      onMusicPress={handleMusicPress}
                     />
                   ))
                 }
@@ -154,6 +198,15 @@ export default function VaultScreen() {
               />
             )}
           </>
+        )}
+
+        {/* Music Player Popover at screen level */}
+        {selectedMusic && (
+          <AudioPreviewPopover
+            music={selectedMusic}
+            isVisible={isMusicPlayerVisible}
+            onClose={closeMusicPlayer}
+          />
         )}
       </>
     </Animated.View>

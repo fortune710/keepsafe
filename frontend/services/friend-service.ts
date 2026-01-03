@@ -1,17 +1,50 @@
-import { Friend, InviteLink, InviteResult, ShareOptions, SuggestedFriend } from '@/types/friends';
+import { Friend, FriendWithProfile, InviteLink, InviteResult, ShareOptions, SuggestedFriend } from '@/types/friends';
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { ContactsService } from './contacts-service';
 import { supabase } from '@/lib/supabase';
-import { TABLES } from '@/constants/supabase';
+import { FRIENDSHIP_STATUS, TABLES } from '@/constants/supabase';
 import { Database } from '@/types/database';
 import { deviceStorage } from './device-storage';
 import { generateDeepLinkUrl, generateInviteCode } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
 export class FriendService {
   private static readonly BASE_INVITE_URL = generateDeepLinkUrl() + "/invite";
+
+  /**
+   * Validates email format
+   */
+  private static isValidEmail(email: string): boolean {
+    if (!email || typeof email !== 'string') return false;
+    // RFC 5322 compliant email regex (simplified but practical)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim()) && email.length <= 254; // Max email length
+  }
+
+  /**
+   * Validates phone number format
+   * Accepts international format with optional + prefix and digits
+   */
+  private static isValidPhoneNumber(phone: string): boolean {
+    if (!phone || typeof phone !== 'string') return false;
+    // Remove common formatting characters for validation
+    const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
+    // Must start with + (optional) followed by 7-15 digits
+    const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+    return phoneRegex.test(cleaned);
+  }
+
+  /**
+   * Validates UUID format (v4)
+   */
+  private static isValidUUID(uuid: string): boolean {
+    if (!uuid || typeof uuid !== 'string') return false;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid.trim());
+  }
 
   static async generateInviteLink(): Promise<InviteResult> {
     try {
@@ -87,14 +120,101 @@ export class FriendService {
     }
   }
 
-  static async sendFriendRequest(friendId: string): Promise<boolean> {
+  static async getFriends(userId: string): Promise<FriendWithProfile[]> {
+    if (!userId) {
+      logger.error('User ID is required to retrive friends');
+      throw new Error('User ID is required');
+    }
+
     try {
-      // In a real app, this would send a request to your backend
-      console.log('Sending friend request to:', friendId);
+      if (__DEV__) console.log('Fetching friendships for user:', userId);
+
+      const { data, error } = await supabase
+        .from(TABLES.FRIENDSHIPS)
+        .select(`
+          *,
+          user_profile:profiles!friendships_user_id_fkey(
+            id,
+            full_name,
+            avatar_url,
+            username
+          ),
+          friend_profile:profiles!friendships_friend_id_fkey(
+            id,
+            full_name,
+            avatar_url,
+            username
+          )
+        `)
+        //.eq('friend_id', userId)
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .order('created_at', { ascending: false }) as {
+          data: any[],
+          error: any,
+        };
+
+      const friends: FriendWithProfile[] = data?.map(friend => {
+        const { 
+          user_profile: user, 
+          friend_profile: friend_, 
+          ...friend_record 
+        } = friend;
+
+        const profile = friend.friend_id === userId ? 
+        user : friend_;
+
+        return {
+          ...friend_record,
+          friend_profile: profile
+        }
+
+      })
+
+      if (!data) return [];
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Cache the friends data
+      if (data) {
+        await deviceStorage.setFriends(userId, friends);
+      }
+
+      return friends as FriendWithProfile[];
+
+    } catch (error) {
+      logger.error('Failed to get friends:', error);
+      throw error;
+    }
+  }
+
+  static async sendFriendRequest(userId: string, friendId: string): Promise<boolean> { 
+    if (!userId || !friendId) {
+      if (__DEV__) logger.error('User ID and friend ID are required to send a friend request', { userId, friendId });
+      throw new Error('User ID and friend ID are required');
+    }
+
+    try {
+      logger.info(`Sending friend request`, { userId, friendId });
+      const { error } = await supabase
+        .from(TABLES.FRIENDSHIPS)
+        .insert({
+          user_id: userId,
+          friend_id: friendId,
+          status: FRIENDSHIP_STATUS.PENDING,
+        } as never)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
       return true;
     } catch (error) {
-      console.error('Failed to send friend request:', error);
-      return false;
+      logger.error('Failed to send friend request:', error);
+      throw error;
     }
   }
 
@@ -109,14 +229,22 @@ export class FriendService {
     }
   }
 
-  static async removeFriend(friendId: string): Promise<boolean> {
+  static async removeFriend(friendshipId: string): Promise<boolean> {
     try {
       // In a real app, this would remove the friend via your backend
-      console.log('Removing friend:', friendId);
+      logger.info('Removing friend record', { friendshipId });
+      const { error } = await supabase
+        .from(TABLES.FRIENDSHIPS)
+        .delete()
+        .eq('id', friendshipId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
       return true;
     } catch (error) {
-      console.error('Failed to remove friend:', error);
-      return false;
+      logger.error('Failed to remove friend record', error);
+      throw error;
     }
   }
 
@@ -127,18 +255,61 @@ export class FriendService {
         return savedSuggestions;
       }
 
+      await supabase.auth.refreshSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        logger.error('No Active Session Found');
+        throw new Error('No session found');
+      }
+
       const contacts = await ContactsService.getDeviceContacts();
-      const emails = contacts?.map((contact) => contact.email).filter(Boolean).join(",");
-      const numbers = contacts?.map((contact) => !!contact.phoneNumber && contact.phoneNumber).join(",");
+      
+      // Validate and filter emails
+      const validEmails = (contacts
+        ?.map((contact) => contact.email)
+        .filter((email): email is string => Boolean(email) && typeof email === 'string')
+        .filter((email) => this.isValidEmail(email)) ?? []) as string[];
+      
+      // Validate and filter phone numbers
+      const validNumbers = (contacts
+        ?.map((contact) => contact.phoneNumber)
+        .filter((phone): phone is string => Boolean(phone) && typeof phone === 'string')
+        .filter((phone) => this.isValidPhoneNumber(phone)) ?? []) as string[];
+      
+      // Early return if no valid contact data
+      if (validEmails.length === 0 && validNumbers.length === 0) {
+        logger.info('No valid email or phone contacts found');
+        return [];
+      }
     
-      const { data, error } = await supabase
+      logger.info(`Getting retriving saved friends for ${session.user.id}`);
+      const friends  = await deviceStorage.getFriends(session.user.id);
+      
+      // Validate and filter excluded IDs (UUIDs)
+      const validExcludedIds = [
+        ...(friends?.map((friend) => friend.friend_profile.id.trim()) ?? []),
+        session.user.id
+      ].filter((id) => this.isValidUUID(id));
+      
+      // Build query with validated data
+      let query = supabase
         .from(TABLES.PROFILES)
-        .select('id,full_name,avatar_url,username')
-        .or(`
-          email.in.(${emails}),
-          phone_number.in.(${numbers})
-        `.replace(/\s+/g, '')
-        ) as { data: Profile[], error: any }
+        .select('id,full_name,avatar_url,username');
+      
+      // Only add .or() clause if we have valid contact data
+      if (validEmails.length > 0 || validNumbers.length > 0) {
+        const emailFilter = validEmails.length > 0 ? `email.in.(${validEmails.join(',')})` : '';
+        const phoneFilter = validNumbers.length > 0 ? `phone_number.in.(${validNumbers.join(',')})` : '';
+        const orClause = [emailFilter, phoneFilter].filter(Boolean).join(',');
+        query = query.or(orClause);
+      }
+      
+      // Only add .not() clause if we have valid excluded IDs
+      if (validExcludedIds.length > 0) {
+        query = query.not('id', 'in', `(${validExcludedIds.join(',')})`);
+      }
+      
+      const { data, error } = await query as { data: Profile[], error: any }
 
         if (error) {
           throw error;
@@ -151,9 +322,7 @@ export class FriendService {
           avatar: profile.avatar_url,
         }))
 
-        if (savedSuggestions.length < profiles.length) {
-          await deviceStorage.setSuggestedFriends(profiles);
-        }
+        await deviceStorage.setSuggestedFriends(profiles);
 
         return profiles;
 

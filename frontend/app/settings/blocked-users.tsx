@@ -7,6 +7,7 @@ import { useFriends } from '@/hooks/use-friends';
 import { useToast } from '@/hooks/use-toast';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { router } from 'expo-router';
+import { getDefaultAvatarUrl } from '@/lib/utils';
 
 export default function BlockedUsersScreen() {
   const { profile } = useAuthContext();
@@ -75,13 +76,25 @@ export default function BlockedUsersScreen() {
                 );
               };
 
+              const avatarUrl = friend.friend_profile?.avatar_url ?? getDefaultAvatarUrl(
+                friend.friend_profile?.full_name || friend.friend_profile?.username || ""
+              );
+              
               return (
                 <View key={friend.id} style={styles.userItem}>
                   <View style={styles.avatarContainer}>
-                    <Image
-                      source={{ uri: friend.friend_profile?.avatar_url || undefined }}
-                      style={styles.avatar}
-                    />
+                    {avatarUrl ? (
+                      <Image
+                        source={{ uri: avatarUrl }}
+                        style={styles.avatar}
+                      />
+                    ) : (
+                      <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                        <Text style={styles.avatarText}>
+                          {(friend.friend_profile?.full_name?.[0] || friend.friend_profile?.username?.[0] || '?').toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{friend.friend_profile?.full_name || 'Unknown User'}</Text>
@@ -191,6 +204,16 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#E5E7EB',
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   userInfo: {
     flex: 1,

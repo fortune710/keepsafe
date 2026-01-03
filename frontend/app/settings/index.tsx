@@ -45,14 +45,14 @@ const settingsItems: SettingsItem[] = [
     route: '/settings/privacy',
     color: '#DC2626',
   },
-  {
-    id: 'storage',
-    title: 'Storage & Data',
-    subtitle: 'Manage your data and storage',
-    icon: HardDrive,
-    route: '/settings/storage',
-    color: '#7C2D12',
-  },
+  // {
+  //   id: 'storage',
+  //   title: 'Storage & Data',
+  //   subtitle: 'Manage your data and storage',
+  //   icon: HardDrive,
+  //   route: '/settings/storage',
+  //   color: '#7C2D12',
+  // },
   {
     id: 'about',
     title: 'About',

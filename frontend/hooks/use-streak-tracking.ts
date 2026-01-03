@@ -16,7 +16,6 @@ export function useStreakTracking(userId?: string): UseStreakTrackingResult {
     maxStreak: 0,
     lastEntryDate: null,
     lastAccessTime: null,
-    userTimeZone: StreakService.getUserTimeZone(),
   });
   const [isLoading, setIsLoading] = useState(true);
 
