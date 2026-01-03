@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from services.ingestion_service import IngestionService
+from services.notification_enqueue_service import NotificationEnqueueService
 from services.supabase_client import get_supabase_client
 import logging
 import hmac
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 ingestion_service = IngestionService()
+notification_enqueue_service = NotificationEnqueueService()
 
 class EntryWebhookPayload(BaseModel):
     """Payload structure for entry webhook."""
@@ -47,19 +49,27 @@ async def entry_webhook(
             entry_id = payload.record.get("id")
             logger.info(f"Processing INSERT webhook for entry {entry_id}")
             
+            # Ingest entry into vector database
             success = await ingestion_service.ingest_entry(payload.record)
             
-            if success:
-                return {
-                    "status": "success",
-                    "message": f"Entry {entry_id} ingested successfully",
-                    "entry_id": entry_id
-                }
-            else:
+            if not success:
                 raise HTTPException(
                     status_code=500,
                     detail=f"Failed to ingest entry {entry_id}"
                 )
+            
+            # Enqueue notification for shared entry
+            try:
+                await notification_enqueue_service.enqueue_entry_notification(payload.record)
+            except Exception as e:
+                # Log error but don't fail the webhook if notification fails
+                logger.error(f"Failed to enqueue entry notification: {str(e)}", exc_info=True)
+            
+            return {
+                "status": "success",
+                "message": f"Entry {entry_id} ingested successfully",
+                "entry_id": entry_id
+            }
         
         elif payload.type == "UPDATE":
             if not payload.record:
