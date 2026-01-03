@@ -51,7 +51,16 @@ class NotificationEnqueueService:
     """Service for enqueuing different types of notifications."""
     
     def __init__(self):
-        """Initialize the notification enqueue service."""
+        """
+        Initialize NotificationEnqueueService.
+        
+        Sets up the Supabase client, a NotificationService, and a CacheService, and logs completion.
+        
+        Attributes:
+            supabase: Supabase client used for database queries.
+            notification_service: Service responsible for enqueuing notifications.
+            cache_service: Cache service used for batching settings and push tokens.
+        """
         self.supabase = get_supabase_client()
         self.notification_service = NotificationService()
         self.cache_service = CacheService()
@@ -62,18 +71,21 @@ class NotificationEnqueueService:
         entry: EntryDict
     ) -> bool:
         """
-        Enqueue notification for a new entry shared with users.
+        Enqueue push notifications for users when an entry is shared.
         
-        Args:
-            entry: Entry dictionary with fields:
-                - id: Entry ID
-                - user_id: Owner's user ID
-                - type: Entry type (photo, video, audio)
-                - shared_with: List of user IDs the entry is shared with (optional)
-                - shared_with_everyone: Boolean indicating if shared with everyone
+        Determines recipients from the entry's sharing fields, filters them by their friend-activity notification setting, resolves push tokens, and enqueues a notification payload describing the shared entry.
+        
+        Parameters:
+            entry (EntryDict): Dictionary representing the entry. Expected keys:
+                - id (str): Entry ID.
+                - user_id (str): Owner's user ID.
+                - type (str, optional): Entry type (e.g., "photo", "video", "audio").
+                - shared_with (List[str], optional): User IDs explicitly shared with.
+                - shared_with_everyone (bool, optional): True if shared with all friends.
+                - is_private (bool, optional): True if the entry is private.
         
         Returns:
-            True if notification was enqueued successfully, False otherwise
+            bool: `True` if the notification was enqueued successfully, `False` otherwise.
         """
         try:
             entry_id = entry.get("id")
@@ -170,7 +182,12 @@ class NotificationEnqueueService:
             return False
     
     def _get_user_profile(self, user_id: str) -> Optional[ProfileDict]:
-        """Get user profile information."""
+        """
+        Retrieve the profile for a given user.
+        
+        Returns:
+            ProfileDict: Profile dictionary with keys `id`, `username`, `full_name`, and `email` if the user exists, `None` otherwise.
+        """
         try:
             response = self.supabase.table("profiles").select("id, username, full_name, email").eq("id", user_id).single().execute()
             return response.data if response.data else None
@@ -179,7 +196,17 @@ class NotificationEnqueueService:
             return None
     
     def _get_user_friends(self, user_id: str) -> List[FriendDict]:
-        """Get all accepted friends of a user."""
+        """
+        Return the list of accepted friends for the given user.
+        
+        Each item in the returned list is a dict containing the key `friend_id` for a friend of the specified user. If an error occurs while fetching friends, an empty list is returned.
+        
+        Parameters:
+            user_id (str): The ID of the user whose accepted friends should be retrieved.
+        
+        Returns:
+            List[FriendDict]: A list of friend records with `friend_id` fields.
+        """
         try:
             # Get friends where user_id is the requester and status is accepted
             response1 = self.supabase.table("friendships").select("friend_id").eq("user_id", user_id).eq("status", "accepted").execute()
@@ -202,15 +229,14 @@ class NotificationEnqueueService:
         notification_type: str = "friend_activity"
     ) -> List[str]:
         """
-        Filter user IDs based on their notification settings.
-        Uses Redis cache with lazy loading and fallback to Supabase.
+        Filter a list of user IDs to those who have a specific notification type enabled.
         
-        Args:
-            user_ids: List of user IDs to filter
-            notification_type: Type of notification to check (e.g., "friend_activity", "push_notifications")
+        Parameters:
+        	user_ids (List[str]): User IDs to evaluate.
+        	notification_type (str): Notification setting key to check (e.g., "friend_activity", "push_notifications").
         
         Returns:
-            List of user IDs who have the notification type enabled
+        	List[str]: Subset of `user_ids` with the given notification type enabled. If a user's settings are missing, the user is included by default. On error, returns the original `user_ids` (fail-open).
         """
         if not user_ids:
             return []
@@ -240,14 +266,13 @@ class NotificationEnqueueService:
     
     def _get_push_tokens_for_users(self, user_ids: List[str]) -> List[str]:
         """
-        Get push tokens for a list of users.
-        Uses Redis cache with lazy loading and fallback to Supabase.
+        Collects Expo push tokens for the given users.
         
-        Args:
-            user_ids: List of user IDs to get tokens for
+        Parameters:
+            user_ids (List[str]): User IDs to retrieve push tokens for.
         
         Returns:
-            List of Expo push tokens
+            List[str]: Flattened list of Expo push tokens for the provided users. Returns an empty list if `user_ids` is empty or if an error occurs while fetching tokens.
         """
         if not user_ids:
             return []
@@ -267,4 +292,3 @@ class NotificationEnqueueService:
         except Exception as e:
             logger.error(f"Error fetching push tokens for users: {str(e)}")
             return []
-
