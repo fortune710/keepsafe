@@ -26,3 +26,5 @@ wheels/
 *.log
 .DS_Store
 
+# Blog posts
+blogs/
