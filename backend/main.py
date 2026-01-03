@@ -4,6 +4,7 @@ from routers import webhooks
 from routers import search
 from routers import user
 from config import settings
+from services.notification_scheduler import NotificationScheduler
 import logging
 
 # Configure logging
@@ -19,6 +20,9 @@ app = FastAPI(
     description="Backend API for KeepSafe with vector search capabilities",
     version="1.0.0"
 )
+
+# Initialize notification scheduler
+notification_scheduler = NotificationScheduler()
 
 # CORS middleware
 app.add_middleware(
@@ -50,6 +54,26 @@ async def health():
         "status": "healthy",
         "environment": settings.ENVIRONMENT
     }
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on application startup."""
+    logger.info("Starting up application...")
+    try:
+        notification_scheduler.start()
+        logger.info("Application startup complete")
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}", exc_info=True)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop background tasks on application shutdown."""
+    logger.info("Shutting down application...")
+    try:
+        notification_scheduler.stop()
+        logger.info("Application shutdown complete")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}", exc_info=True)
 
 if __name__ == "__main__":
     import uvicorn
