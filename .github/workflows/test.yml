@@ -37,6 +37,9 @@ jobs:
         REDIS_URL: ${{ secrets.REDIS_URL }}
         POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
         POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+        GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+        PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        PINECONE_INDEX_NAME: keepsafe-search
         NOTIFICATION_QUEUE_NAME: notifications_queue
         NOTIFICATION_DLQ_NAME: notifications_dlq
         NOTIFICATION_CONCURRENCY: 20
