@@ -29,12 +29,12 @@ export default function RootScreen() {
     );
   }
 
-  // Redirect to onboarding if not authenticated
-  if (!user && !session) {
+  // Redirect to onboarding if not fully authenticated (either user or session missing)
+  if (!user || !session) {
     return <Redirect href="/onboarding" />;
   }
 
-  // Redirect to capture screen if authenticated
+  // Redirect to capture screen only when both user and session are present
   return <Redirect href="/capture" />;
 }
 

@@ -147,11 +147,19 @@ export function useFriends(userId?: string): UseFriendsResult {
   }, [updateFriendshipMutation]);
 
   const blockFriend = useCallback(async (friendshipId: string) => {
+    // Guard: ensure userId is present before proceeding
+    if (!userId) {
+      return {
+        success: false,
+        error: 'User ID is required to block a friend',
+      };
+    }
+
     try {
       await updateFriendshipMutation.mutateAsync({ 
         id: friendshipId, 
         status: FRIENDSHIP_STATUS.BLOCKED,
-        blocked_by: userId!
+        blocked_by: userId
       });
       return { success: true };
     } catch (error) {

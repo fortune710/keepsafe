@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft, FileText, ChevronRight } from 'lucide-react-native';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { logger } from '@/lib/logger';
 
 type LegalDocument = 'terms' | 'eula' | 'privacy';
 
@@ -193,7 +194,21 @@ export default function LegalScreen() {
         );
 
       default:
-        return null;
+        logger.error('Invalid document ID passed to renderDocumentContent', {
+          invalidId: docId,
+          validIds: ['terms', 'eula', 'privacy'],
+          context: 'LegalScreen.renderDocumentContent',
+        });
+        return (
+          <View style={styles.documentContent}>
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorTitle}>Document Not Found</Text>
+              <Text style={styles.errorMessage}>
+                The requested document could not be found. Please try selecting a document from the list.
+              </Text>
+            </View>
+          </View>
+        );
     }
   };
 
@@ -344,6 +359,25 @@ const styles = StyleSheet.create({
     color: '#475569',
     lineHeight: 24,
     marginBottom: 16,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 15,
+    color: '#64748B',
+    lineHeight: 22,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });
 
