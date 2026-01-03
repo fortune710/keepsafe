@@ -25,7 +25,14 @@ def mock_supabase_client():
 
 @pytest.fixture
 def notification_service(monkeypatch, mock_supabase_client):
-    """Create a NotificationService instance with mocked dependencies."""
+    """
+    Create a NotificationService configured for tests with mocked dependencies and settings.
+    
+    The returned service has its Supabase client replaced by the provided mock and is initialized with test values for queue names, concurrency, batch size, DLQ limit, and Posthog configuration.
+    
+    Returns:
+        NotificationService: An instance whose `supabase` attribute is set to `mock_supabase_client` and whose external dependencies are patched for testing.
+    """
     from services import notification_service as notification_module
     monkeypatch.setattr(
         notification_module,
@@ -95,6 +102,18 @@ async def test_full_flow_enqueue_to_success(notification_service, mock_supabase_
     
     # Mock delete - need to handle multiple RPC calls (read and delete)
     def mock_rpc_side_effect(*args, **kwargs):
+        """
+        Create a MagicMock that mimics Supabase RPC calls used in tests.
+        
+        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        
+        Parameters:
+            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
+            **kwargs: Ignored in this helper.
+        
+        Returns:
+            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
+        """
         mock_rpc_result = MagicMock()
         if args[0] == "pgmq_public.read":
             mock_rpc_result.execute.return_value = read_response
@@ -148,6 +167,18 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     
     # Mock delete and DLQ send - need to handle multiple RPC calls
     def mock_rpc_side_effect(*args, **kwargs):
+        """
+        Create a MagicMock that mimics Supabase RPC calls used in tests.
+        
+        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        
+        Parameters:
+            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
+            **kwargs: Ignored in this helper.
+        
+        Returns:
+            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
+        """
         mock_rpc_result = MagicMock()
         if args[0] == "pgmq_public.read":
             mock_rpc_result.execute.return_value = read_response
@@ -212,6 +243,18 @@ async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supaba
     
     # Mock delete - need to handle multiple RPC calls
     def mock_rpc_side_effect(*args, **kwargs):
+        """
+        Create a MagicMock that mimics Supabase RPC calls used in tests.
+        
+        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        
+        Parameters:
+            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
+            **kwargs: Ignored in this helper.
+        
+        Returns:
+            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
+        """
         mock_rpc_result = MagicMock()
         if args[0] == "pgmq_public.read":
             mock_rpc_result.execute.return_value = read_response
@@ -271,6 +314,18 @@ async def test_concurrent_processing(notification_service, mock_supabase_client)
     
     # Mock delete - need to handle multiple RPC calls
     def mock_rpc_side_effect(*args, **kwargs):
+        """
+        Create a MagicMock that mimics Supabase RPC calls used in tests.
+        
+        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        
+        Parameters:
+            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
+            **kwargs: Ignored in this helper.
+        
+        Returns:
+            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
+        """
         mock_rpc_result = MagicMock()
         if args[0] == "pgmq_public.read":
             mock_rpc_result.execute.return_value = read_response
@@ -320,6 +375,18 @@ async def test_process_dlq(notification_service, mock_supabase_client):
     
     # Mock delete - need to handle multiple RPC calls
     def mock_rpc_side_effect(*args, **kwargs):
+        """
+        Create a MagicMock that mimics Supabase RPC calls used in tests.
+        
+        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        
+        Parameters:
+            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
+            **kwargs: Ignored in this helper.
+        
+        Returns:
+            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
+        """
         mock_rpc_result = MagicMock()
         if args[0] == "pgmq_public.read":
             mock_rpc_result.execute.return_value = read_response
@@ -395,7 +462,12 @@ async def test_scheduler_job_execution(notification_service, mock_supabase_clien
 
 @pytest.mark.asyncio
 async def test_exponential_backoff_calculation(notification_service):
-    """Test that exponential backoff delays are calculated correctly."""
+    """
+    Verify that exponential backoff delays are applied when a rate-limit (429) error occurs during publish and that the delay is capped (<= 60 seconds).
+    
+    Parameters:
+        notification_service: Test fixture providing a configured NotificationService instance used to call _send_notification and observe retry/backoff behavior.
+    """
     # This test verifies the backoff logic is applied
     # The actual delay calculation happens in _send_notification
     
@@ -410,6 +482,17 @@ async def test_exponential_backoff_calculation(notification_service):
     call_times = []
     
     def mock_publish(*args, **kwargs):
+        """
+        Simulate an Expo publish call that records invocation times and fails on the first attempt.
+        
+        Appends the current datetime to the outer-scope `call_times` list. On the first invocation raises the outer-scope `rate_limit_error`. On subsequent invocations returns a MagicMock response whose `validate_response` attribute is a MagicMock.
+        
+        Returns:
+            A mock response object with a `validate_response` attribute.
+        
+        Raises:
+            rate_limit_error: The error object provided in the enclosing scope on the first call.
+        """
         call_times.append(datetime.now())
         if len(call_times) == 1:
             raise rate_limit_error
@@ -424,6 +507,14 @@ async def test_exponential_backoff_calculation(notification_service):
     original_sleep = asyncio.sleep
     
     async def mock_sleep(delay):
+        """
+        Record the requested sleep delay and perform a short real sleep to speed tests.
+        
+        Appends the provided delay to the shared `sleep_calls` list so tests can inspect backoff timings, then awaits the original sleep function with a short fixed duration (0.01 seconds) to avoid long test delays.
+        
+        Parameters:
+            delay (float): The requested sleep duration to record.
+        """
         sleep_calls.append(delay)
         await original_sleep(0.01)  # Minimal delay for test
     
@@ -477,6 +568,18 @@ async def test_batch_size_limit(notification_service, mock_supabase_client):
     
     # Mock delete - need to handle multiple RPC calls
     def mock_rpc_side_effect(*args, **kwargs):
+        """
+        Create a MagicMock that mimics Supabase RPC calls used in tests.
+        
+        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        
+        Parameters:
+            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
+            **kwargs: Ignored in this helper.
+        
+        Returns:
+            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
+        """
         mock_rpc_result = MagicMock()
         if args[0] == "pgmq_public.read":
             mock_rpc_result.execute.return_value = read_response
@@ -492,4 +595,3 @@ async def test_batch_size_limit(notification_service, mock_supabase_client):
     # Assert - Should only process batch_size messages
     assert stats["processed"] == batch_size
     assert notification_service.expo_client.publish.call_count == batch_size
-

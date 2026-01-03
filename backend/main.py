@@ -49,7 +49,14 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
+    """
+    Return the application's health status and current environment.
+    
+    Returns:
+        dict: Mapping with keys:
+            - "status": Service health indicator (e.g., "healthy").
+            - "environment": Current environment name from settings.ENVIRONMENT.
+    """
     return {
         "status": "healthy",
         "environment": settings.ENVIRONMENT
@@ -57,7 +64,11 @@ async def health():
 
 @app.on_event("startup")
 async def startup_event():
-    """Start background tasks on application startup."""
+    """
+    Start application background tasks during startup.
+    
+    Initiates the module-level NotificationScheduler to run background notification jobs. Any exceptions raised while starting the scheduler are logged and not propagated.
+    """
     logger.info("Starting up application...")
     try:
         notification_scheduler.start()
@@ -83,4 +94,3 @@ if __name__ == "__main__":
         port=settings.PORT,
         reload=settings.ENVIRONMENT == "development"
     )
-

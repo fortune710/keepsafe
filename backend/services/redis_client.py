@@ -17,11 +17,12 @@ _redis_client: Optional[Any] = None
 
 def get_redis_client() -> Optional[Any]:
     """
-    Get or create Redis client instance.
-    Returns None if Redis is not available or connection fails.
+    Get or create a cached Redis client instance for the module; returns None if Redis is unavailable or initialization fails.
+    
+    The created client is stored in the module-level cache so subsequent calls return the same instance.
     
     Returns:
-        Redis client instance or None if connection fails
+        The initialized Redis client instance, or `None` if Redis is not installed, unavailable, or the connection test fails.
     """
     global _redis_client
     
@@ -56,4 +57,3 @@ def get_redis_client() -> Optional[Any]:
         logger.warning(f"Failed to initialize Redis client: {str(e)}. Falling back to Supabase only.")
         _redis_client = None
         return None
-

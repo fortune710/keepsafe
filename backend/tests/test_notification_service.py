@@ -15,7 +15,13 @@ from services.notification_service import NotificationService
 
 @pytest.fixture
 def mock_supabase_client():
-    """Create a mock Supabase client."""
+    """
+    Create a MagicMock that simulates a Supabase client for tests.
+    
+    Returns:
+        mock_client (MagicMock): A mock Supabase client where calling rpc(...).execute()
+        returns a mock response object with a `data` attribute set to None.
+    """
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.data = None
@@ -25,7 +31,16 @@ def mock_supabase_client():
 
 @pytest.fixture
 def notification_service(monkeypatch, mock_supabase_client):
-    """Create a NotificationService instance with mocked dependencies."""
+    """
+    Create a NotificationService instance configured for tests with a mocked Supabase client and PostHog.
+    
+    Parameters:
+        monkeypatch: pytest monkeypatch fixture used to replace attributes on the notification service module.
+        mock_supabase_client: A MagicMock acting as the Supabase client that will be returned by the patched get_supabase_client.
+    
+    Returns:
+        NotificationService: An instance whose Supabase client is set to mock_supabase_client and whose settings are configured for testing.
+    """
     # Mock get_supabase_client
     from services import notification_service as notification_module
     monkeypatch.setattr(
@@ -325,6 +340,18 @@ async def test_process_queue_with_messages(notification_service, mock_supabase_c
     
     # Mock delete - need to handle multiple RPC calls (read and delete)
     def mock_rpc_side_effect(*args, **kwargs):
+        """
+        Create a MagicMock that simulates a Supabase RPC call.
+        
+        When the first positional argument is "pgmq_public.read", the mock's execute() returns the test's `mock_response`; for any other RPC name, execute() returns a fresh generic MagicMock.
+        
+        Parameters:
+            *args: Positional arguments from the RPC call; the first argument is treated as the RPC function name.
+            **kwargs: Ignored.
+        
+        Returns:
+            MagicMock: A mock object whose `execute()` method yields the appropriate response as described above.
+        """
         mock_rpc_result = MagicMock()
         if args[0] == "pgmq_public.read":
             mock_rpc_result.execute.return_value = mock_response
@@ -396,4 +423,3 @@ async def test_delete_message(notification_service, mock_supabase_client):
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
     assert params.get("queue_name") == "test_queue"
     assert params.get("msg_id") == msg_id
-

@@ -11,13 +11,21 @@ class NotificationScheduler:
     """Scheduler for processing notification queue every 15 minutes."""
     
     def __init__(self):
-        """Initialize the scheduler and notification service."""
+        """
+        Initialize the notification scheduler, its NotificationService, and the running state.
+        
+        Creates an AsyncIOScheduler assigned to `self.scheduler`, instantiates `self.notification_service`, and sets `self.is_running` to False.
+        """
         self.scheduler = AsyncIOScheduler()
         self.notification_service = NotificationService()
         self.is_running = False
         
     def start(self):
-        """Start the scheduler."""
+        """
+        Start the notification scheduler to process the notification queue every 15 minutes.
+        
+        If the scheduler is already running this method does nothing; otherwise it schedules the recurring background job, starts the scheduler, and marks the scheduler as running.
+        """
         if self.is_running:
             logger.warning("Scheduler is already running")
             return
@@ -36,7 +44,11 @@ class NotificationScheduler:
         logger.info("Notification scheduler started (runs every 15 minutes)")
     
     def stop(self):
-        """Stop the scheduler gracefully."""
+        """
+        Stop the scheduler and mark it as not running.
+        
+        If the scheduler is not running, the method is a no-op (a warning is logged). Otherwise it shuts down the underlying scheduler, waiting for running jobs to finish, and sets the running flag to False.
+        """
         if not self.is_running:
             logger.warning("Scheduler is not running")
             return
@@ -46,11 +58,14 @@ class NotificationScheduler:
         logger.info("Notification scheduler stopped")
     
     async def _process_queue_job(self):
-        """Job function to process the notification queue."""
+        """
+        Invoke the notification service to process the notification queue and record run results.
+        
+        Calls NotificationService.process_queue(), logs the start and completion (including returned stats), and logs any exceptions encountered.
+        """
         try:
             logger.info("Starting scheduled queue processing")
             stats = await self.notification_service.process_queue()
             logger.info(f"Scheduled processing completed: {stats}")
         except Exception as e:
             logger.error(f"Error in scheduled queue processing: {str(e)}", exc_info=True)
-
