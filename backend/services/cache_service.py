@@ -12,7 +12,16 @@ class CacheService:
     """Service for caching notification settings and push tokens with lazy loading."""
     
     def __init__(self):
-        """Initialize the cache service."""
+        """
+        Initialize the CacheService and configure its backend clients and TTL.
+        
+        Sets the following attributes:
+        - redis_client: Redis client instance or None when Redis is unavailable.
+        - supabase: Supabase client used as the primary data source/fallback.
+        - cache_ttl: Time-to-live for cached entries in seconds (from settings).
+        
+        Logs whether Redis was found or if the service will operate with Supabase only.
+        """
         self.redis_client = get_redis_client()
         self.supabase = get_supabase_client()
         self.cache_ttl = settings.REDIS_CACHE_TTL
@@ -24,13 +33,13 @@ class CacheService:
     
     def get_notification_settings(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get notification settings for a user with lazy loading.
+        Retrieve a user's notification settings, using the Redis cache when available and falling back to Supabase on a cache miss.
         
-        Args:
-            user_id: User ID to get settings for
+        Parameters:
+            user_id (str): ID of the user whose notification settings to retrieve.
         
         Returns:
-            Notification settings dictionary or None if not found
+            dict: Notification settings for the user (keys include `user_id`, `friend_requests`, `push_notifications`, `entry_reminder`, `friend_activity`), or `None` if no settings are found or an error occurs.
         """
         cache_key = f"notification_settings:{user_id}"
         
@@ -64,13 +73,13 @@ class CacheService:
         user_ids: List[str]
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Get notification settings for multiple users with batch caching.
+        Retrieve notification settings for multiple users using Redis batch cache with Supabase fallback.
         
-        Args:
-            user_ids: List of user IDs to get settings for
+        Parameters:
+            user_ids (List[str]): List of user IDs to fetch settings for.
         
         Returns:
-            Dictionary mapping user_id to settings dictionary
+            Dict[str, Dict[str, Any]]: Mapping from user_id to its settings dictionary for users found; user IDs with no stored settings are omitted.
         """
         if not user_ids:
             return {}
@@ -162,13 +171,13 @@ class CacheService:
     
     def get_push_tokens_batch(self, user_ids: List[str]) -> Dict[str, List[str]]:
         """
-        Get push tokens for multiple users with batch caching.
+        Retrieve Expo push tokens for multiple users, using cached values when available and falling back to Supabase for misses.
         
-        Args:
-            user_ids: List of user IDs to get tokens for
+        Parameters:
+            user_ids (List[str]): User IDs to retrieve tokens for.
         
         Returns:
-            Dictionary mapping user_id to list of tokens
+            Dict[str, List[str]]: Mapping from each requested `user_id` to a list of push tokens; users with no tokens are mapped to an empty list.
         """
         if not user_ids:
             return {}
@@ -230,13 +239,13 @@ class CacheService:
     
     def _get_from_redis(self, key: str) -> Optional[Any]:
         """
-        Get value from Redis cache.
+        Retrieve a value from the Redis cache by key, decoding JSON strings when present.
         
-        Args:
-            key: Cache key
+        Parameters:
+            key (str): Cache key to look up.
         
         Returns:
-            Cached value or None if not found or error
+            The cached value: parsed JSON for JSON-encoded strings, the raw string for non-JSON strings, the stored object for non-string values, or `None` if Redis is unavailable, the key is missing, or an error occurs.
         """
         if not self.redis_client:
             return None
@@ -262,15 +271,17 @@ class CacheService:
     
     def _set_in_redis(self, key: str, value: Any, ttl: int) -> bool:
         """
-        Set value in Redis cache.
+        Store a value in Redis under the given key with the specified TTL.
         
-        Args:
-            key: Cache key
-            value: Value to cache
-            ttl: Time to live in seconds
+        If `value` is a dict or list it will be serialized to JSON before storing. If no Redis client is available or an error occurs, the operation is a no-op and returns `False`.
+        
+        Parameters:
+            key (str): Cache key under which to store the value.
+            value (Any): Value to store; dicts and lists are serialized to JSON.
+            ttl (int): Time-to-live in seconds for the cached entry.
         
         Returns:
-            True if successful, False otherwise
+            bool: `True` if the value was successfully written to Redis, `False` otherwise.
         """
         if not self.redis_client:
             return False
@@ -288,4 +299,3 @@ class CacheService:
         except Exception as e:
             logger.warning(f"Error setting in Redis cache (key: {key}): {str(e)}")
             return False
-

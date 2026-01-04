@@ -15,21 +15,41 @@ from services.cache_service import CacheService
 
 @pytest.fixture
 def mock_redis_client():
-    """Create a mock Redis client."""
+    """
+    Create a MagicMock configured to act as a Redis client for tests.
+    
+    Returns:
+        mock_client (MagicMock): A MagicMock instance intended to mimic Redis client methods.
+    """
     mock_client = MagicMock()
     return mock_client
 
 
 @pytest.fixture
 def mock_supabase_client():
-    """Create a mock Supabase client."""
+    """
+    Create a MagicMock that simulates a Supabase client for use in tests.
+    
+    Returns:
+        MagicMock: A mock Supabase client instance.
+    """
     mock_client = MagicMock()
     return mock_client
 
 
 @pytest.fixture
 def cache_service(monkeypatch, mock_redis_client, mock_supabase_client):
-    """Create a CacheService instance with mocked dependencies."""
+    """
+    Create a CacheService instance configured with mocked Redis and Supabase clients for testing.
+    
+    Parameters:
+        monkeypatch: pytest MonkeyPatch fixture used to patch module-level client getters.
+        mock_redis_client: MagicMock that will be used as the Redis client on the service.
+        mock_supabase_client: MagicMock that will be used as the Supabase client on the service.
+    
+    Returns:
+        CacheService: An instance whose `redis_client` and `supabase` attributes are set to the provided mocks and whose settings.REDIS_CACHE_TTL is set to 3600.
+    """
     from services import cache_service as cache_module
     from services import redis_client as redis_module
     
@@ -59,7 +79,18 @@ def cache_service(monkeypatch, mock_redis_client, mock_supabase_client):
 
 @pytest.fixture
 def cache_service_no_redis(monkeypatch, mock_supabase_client):
-    """Create a CacheService instance without Redis."""
+    """
+    Create and return a CacheService instance configured to operate without Redis.
+    
+    This uses the provided pytest `monkeypatch` to make `get_redis_client` return `None`, injects `mock_supabase_client` as the Supabase client, and sets `settings.REDIS_CACHE_TTL` to 3600 on the service.
+    
+    Parameters:
+        monkeypatch: The pytest monkeypatch fixture used to patch module attributes.
+        mock_supabase_client: A mock or MagicMock representing the Supabase client.
+    
+    Returns:
+        CacheService: A CacheService instance with `supabase` set to `mock_supabase_client` and no Redis client.
+    """
     from services import cache_service as cache_module
     from services import redis_client as redis_module
     
@@ -471,4 +502,3 @@ def test_get_notification_settings_not_found(cache_service, mock_redis_client, m
     assert result is None
     # Should not cache None
     mock_redis_client.setex.assert_not_called()
-
