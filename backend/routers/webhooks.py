@@ -31,7 +31,7 @@ async def entry_webhook(
     """
     Process entry change webhooks for the "entries" table.
     
-    Validates the incoming payload and handles INSERT, UPDATE, and DELETE events for entries. On successful INSERT, an ingestion is performed and a notification is enqueued; notification failures are logged but do not cause the webhook to fail. Returns an "ignored" response for payloads targeting other tables. Raises HTTPException for invalid payloads, unsupported webhook types, or ingestion/delete/update failures.
+    Validates the incoming payload and handles INSERT, UPDATE, and DELETE events for entries. On INSERT, both ingestion and notification enqueue are performed independently - if one fails, the other still executes. Failures are logged but do not cause the webhook to fail. Returns an "ignored" response for payloads targeting other tables. Raises HTTPException for invalid payloads, unsupported webhook types, or UPDATE/DELETE failures.
     
     Parameters:
         payload (EntryWebhookPayload): Webhook payload describing the change.
@@ -39,7 +39,7 @@ async def entry_webhook(
         x_supabase_signature (Optional[str]): Optional Supabase webhook signature header (used if signature verification is implemented).
     
     Returns:
-        dict: Response object containing `status`, `message`, and, when applicable, `entry_id`.
+        dict: Response object containing `status`, `message`, and, when applicable, `entry_id`, `ingestion`, and `notification` status fields.
     """
     try:
         # Verify webhook signature if needed (optional security check)
@@ -58,27 +58,59 @@ async def entry_webhook(
             entry_id = payload.record.get("id")
             logger.info(f"Processing INSERT webhook for entry {entry_id}")
             
-            # Ingest entry into vector database
-            success = await ingestion_service.ingest_entry(payload.record)
+            ingestion_success = False
+            notification_success = False
             
-            if not success:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to ingest entry {entry_id}"
-                )
+            # Ingest entry into vector database
+            try:
+                ingestion_success = await ingestion_service.ingest_entry(payload.record)
+                if not ingestion_success:
+                    logger.error(f"Failed to ingest entry {entry_id}")
+            except Exception as e:
+                # Log error but don't fail the webhook if ingestion fails
+                logger.error(f"Error ingesting entry {entry_id}: {str(e)}", exc_info=True)
             
             # Enqueue notification for shared entry
             try:
                 await notification_enqueue_service.enqueue_entry_notification(payload.record)
+                notification_success = True
             except Exception as e:
                 # Log error but don't fail the webhook if notification fails
                 logger.error(f"Failed to enqueue entry notification: {str(e)}", exc_info=True)
             
-            return {
-                "status": "success",
-                "message": f"Entry {entry_id} ingested successfully",
-                "entry_id": entry_id
-            }
+            # Determine response status based on what succeeded
+            if ingestion_success and notification_success:
+                return {
+                    "status": "success",
+                    "message": f"Entry {entry_id} processed successfully",
+                    "entry_id": entry_id,
+                    "ingestion": "success",
+                    "notification": "success"
+                }
+            elif ingestion_success:
+                return {
+                    "status": "partial_success",
+                    "message": f"Entry {entry_id} ingested successfully, but notification enqueue failed",
+                    "entry_id": entry_id,
+                    "ingestion": "success",
+                    "notification": "failed"
+                }
+            elif notification_success:
+                return {
+                    "status": "partial_success",
+                    "message": f"Entry {entry_id} notification enqueued successfully, but ingestion failed",
+                    "entry_id": entry_id,
+                    "ingestion": "failed",
+                    "notification": "success"
+                }
+            else:
+                return {
+                    "status": "partial_failure",
+                    "message": f"Both ingestion and notification failed for entry {entry_id}",
+                    "entry_id": entry_id,
+                    "ingestion": "failed",
+                    "notification": "failed"
+                }
         
         elif payload.type == "UPDATE":
             if not payload.record:
