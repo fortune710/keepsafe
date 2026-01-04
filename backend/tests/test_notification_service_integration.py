@@ -213,7 +213,7 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     assert len(send_calls) > 0
     dlq_call = send_calls[0]
     params = dlq_call[1]
-    msg_data = json.loads(params.get("msg", "{}"))
+    msg_data = json.loads(params.get("message", "{}"))
     assert msg_data["failure_count"] == 1
 
 

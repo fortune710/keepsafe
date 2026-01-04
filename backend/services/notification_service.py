@@ -97,7 +97,7 @@ class NotificationService:
                 "send",
                 {
                     "queue_name": self.queue_name,
-                    "msg": json.dumps(message)
+                    "message": json.dumps(message)
                 }
             ).execute()
             
@@ -364,7 +364,7 @@ class NotificationService:
                     "send",
                     {
                         "queue_name": self.dlq_name,
-                        "msg": json.dumps(message_data)
+                        "message": json.dumps(message_data)
                     }
                 ).execute()
                 

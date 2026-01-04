@@ -114,7 +114,7 @@ async def test_enqueue_notification_success(notification_service, mock_supabase_
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
     assert params.get("queue_name") == "test_queue"
     import json
-    msg_data = json.loads(params.get("msg", "{}"))
+    msg_data = json.loads(params.get("message", "{}"))
     assert msg_data["title"] == title
     assert msg_data["body"] == body
     assert msg_data["recipients"] == recipients
@@ -171,7 +171,7 @@ async def test_enqueue_notification_invalid_priority(notification_service, mock_
     call_args = mock_schema.rpc.call_args
     import json
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
-    msg_data = json.loads(params.get("msg", "{}"))
+    msg_data = json.loads(params.get("message", "{}"))
     assert msg_data["priority"] == "default"
 
 
