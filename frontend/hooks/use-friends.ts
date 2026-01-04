@@ -7,13 +7,11 @@ import { deviceStorage } from '@/services/device-storage';
 import { FriendService } from '@/services/friend-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { posthog } from '@/constants/posthog';
+import { FriendWithProfile } from '@/types/friends';
 
-type Friendship = Database['public']['Tables']['friendships']['Row'];
-type Profile = Database['public']['Tables']['profiles']['Row'];
 
-interface FriendWithProfile extends Friendship {
-  friend_profile: Profile;
-}
+
+
 
 interface UseFriendsResult {
   friends: FriendWithProfile[];
@@ -43,65 +41,7 @@ export function useFriends(userId?: string): UseFriendsResult {
   } = useQuery({
     queryKey: ['friendships', userId],
     queryFn: async () => {
-      if (!userId) return [];
-
-      // Try to get cached friends first
-      // const cachedFriends = await deviceStorage.getFriends(userId);
-      // if (cachedFriends) {
-      //   return cachedFriends;
-      // }
-
-      const { data, error } = await supabase
-        .from(TABLES.FRIENDSHIPS)
-        .select(`
-          *,
-          user_profile:profiles!friendships_user_id_fkey(
-            id,
-            full_name,
-            avatar_url,
-            username
-          ),
-          friend_profile:profiles!friendships_friend_id_fkey(
-            id,
-            full_name,
-            avatar_url,
-            username
-          )
-        `)
-        //.eq('friend_id', userId)
-        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
-        .order('created_at', { ascending: false }) as {
-          data: any[],
-          error: any,
-        };
-
-      const friends: FriendWithProfile[] = data.map(friend => {
-        const { 
-          user_profile: user, 
-          friend_profile: friend_, 
-          ...friend_record 
-        } = friend;
-
-        const profile = friend.friend_id === userId ? 
-        user : friend_;
-
-        return {
-          ...friend_record,
-          friend_profile: profile
-        }
-
-      })
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Cache the friends data
-      if (data) {
-        await deviceStorage.setFriends(userId, friends);
-      }
-
-      return friends as FriendWithProfile[];
+      return await FriendService.getFriends(userId!);
     },
     enabled: !!userId,
   });
@@ -110,25 +50,13 @@ export function useFriends(userId?: string): UseFriendsResult {
   const pendingRequests = friendships.filter(f => 
     f.status === FRIENDSHIP_STATUS.PENDING && f.friend_id === userId
   );
-  const blockedFriends = friendships.filter(f => f.status === FRIENDSHIP_STATUS.BLOCKED);
+  const blockedFriends = friendships.filter(f => 
+    f.status === FRIENDSHIP_STATUS.BLOCKED && f.blocked_by === userId
+  );
 
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (friendId: string) => {
-      const { data, error } = await supabase
-        .from(TABLES.FRIENDSHIPS)
-        .insert({
-          user_id: userId!,
-          friend_id: friendId,
-          status: FRIENDSHIP_STATUS.PENDING,
-        } as never)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return data;
+      return await FriendService.sendFriendRequest(userId!, friendId);
     },
     onSuccess: async () => {
       // Clear cached friends to force refresh
@@ -140,12 +68,17 @@ export function useFriends(userId?: string): UseFriendsResult {
   });
 
   const updateFriendshipMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED | typeof FRIENDSHIP_STATUS.BLOCKED }) => {
-      if (__DEV__) console.log('Updating friendship:', { id, status });
+    mutationFn: async ({ id, status, blocked_by }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED | typeof FRIENDSHIP_STATUS.BLOCKED; blocked_by?: string | null }) => {
+      if (__DEV__) console.log('Updating friendship:', { id, status, blocked_by });
+
+      const updateData: any = { status };
+      if (blocked_by !== undefined) {
+        updateData.blocked_by = blocked_by;
+      }
 
       const { error } = await supabase
         .from(TABLES.FRIENDSHIPS)
-        .update({ status } as never)
+        .update(updateData as never)
         .eq('id', id);
         
       if (error) {
@@ -167,14 +100,7 @@ export function useFriends(userId?: string): UseFriendsResult {
 
   const deleteFriendshipMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from(TABLES.FRIENDSHIPS)
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      return await FriendService.removeFriend(id);
     },
     onSuccess: async () => {
       // Clear cached friends to force refresh
@@ -222,9 +148,22 @@ export function useFriends(userId?: string): UseFriendsResult {
   }, [updateFriendshipMutation]);
 
   const blockFriend = useCallback(async (friendshipId: string) => {
+    // Guard: ensure userId is present before proceeding
+    if (!userId) {
+      return {
+        success: false,
+        error: 'User ID is required to block a friend',
+      };
+    }
+
     try {
       await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.BLOCKED });
       posthog.capture('friend_blocked', { friendship_id: friendshipId });
+      await updateFriendshipMutation.mutateAsync({ 
+        id: friendshipId, 
+        status: FRIENDSHIP_STATUS.BLOCKED,
+        blocked_by: userId
+      });
       return { success: true };
     } catch (error) {
       return {
@@ -232,11 +171,15 @@ export function useFriends(userId?: string): UseFriendsResult {
         error: error instanceof Error ? error.message : 'Failed to block friend',
       };
     }
-  }, [updateFriendshipMutation]);
+  }, [updateFriendshipMutation, userId]);
 
   const unblockFriend = useCallback(async (friendshipId: string) => {
     try {
-      await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.ACCEPTED });
+      await updateFriendshipMutation.mutateAsync({ 
+        id: friendshipId, 
+        status: FRIENDSHIP_STATUS.ACCEPTED,
+        blocked_by: null
+      });
       return { success: true };
     } catch (error) {
       return {
@@ -258,7 +201,7 @@ export function useFriends(userId?: string): UseFriendsResult {
     }
   }, [deleteFriendshipMutation]);
 
-  const prefetchSuggestedFriends = async () => {
+  const prefetchSuggestedFriends = useCallback(async () => {
     try {
       await queryClient.prefetchQuery({
         queryKey: ["suggested-friends"],
@@ -266,7 +209,7 @@ export function useFriends(userId?: string): UseFriendsResult {
           const contacts = await FriendService.getSuggestedFriendsFromContacts();
           console.log({ contacts });
           return contacts.filter(contact => contact.id !== profile?.id);
-        },
+        }
       })
 
       return {
@@ -280,7 +223,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         error: error instanceof Error ? error.message : 'Error getting suggested friends'
       }
     }
-  }
+  }, [queryClient, profile?.id])
   return {
     friends,
     pendingRequests,

@@ -1,5 +1,5 @@
 import { MusicTag } from "@/types/capture"
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
 
 interface MusicCanvasItemProps {
@@ -9,10 +9,10 @@ interface MusicCanvasItemProps {
 
 export function MusicCanvasItem({ music, onPress }: MusicCanvasItemProps) {
     return (
-        <View style={styles.musicContainer} onTouchEnd={onPress}>
+        <TouchableOpacity style={styles.musicContainer} onPress={onPress}>
             <Image source={{ uri: music.cover }} style={styles.musicImage} />
             <Text style={styles.textStyle}>{music.title} - {music.artist}</Text>
-        </View>
+        </TouchableOpacity>
     )
 }
 
