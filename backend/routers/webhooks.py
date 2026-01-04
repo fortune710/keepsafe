@@ -29,8 +29,17 @@ async def entry_webhook(
     x_supabase_signature: Optional[str] = Header(None, alias="x-supabase-signature")
 ):
     """
-    Webhook endpoint for processing entry changes.
-    Handles INSERT, UPDATE, and DELETE operations.
+    Process entry change webhooks for the "entries" table.
+    
+    Validates the incoming payload and handles INSERT, UPDATE, and DELETE events for entries. On successful INSERT, an ingestion is performed and a notification is enqueued; notification failures are logged but do not cause the webhook to fail. Returns an "ignored" response for payloads targeting other tables. Raises HTTPException for invalid payloads, unsupported webhook types, or ingestion/delete/update failures.
+    
+    Parameters:
+        payload (EntryWebhookPayload): Webhook payload describing the change.
+        request (Request): The incoming HTTP request object.
+        x_supabase_signature (Optional[str]): Optional Supabase webhook signature header (used if signature verification is implemented).
+    
+    Returns:
+        dict: Response object containing `status`, `message`, and, when applicable, `entry_id`.
     """
     try:
         # Verify webhook signature if needed (optional security check)
@@ -132,4 +141,3 @@ async def entry_webhook(
 async def health_check():
     """Health check endpoint for webhooks."""
     return {"status": "healthy", "service": "webhooks"}
-

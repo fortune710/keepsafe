@@ -122,10 +122,15 @@ class NotificationService:
     
     async def process_queue(self) -> Dict[str, int]:
         """
-        Process messages from the notification queue.
+        Process up to the configured batch of messages from the notification queue and aggregate processing statistics.
         
         Returns:
-            Dictionary with processing statistics
+            stats (Dict[str, int]): Dictionary with processing counts:
+                - "processed": total messages attempted,
+                - "succeeded": notifications successfully sent,
+                - "failed": notifications that failed and were handled (including moved/discarded),
+                - "moved_to_dlq": messages moved to the dead-letter queue for retry,
+                - "discarded": messages removed after exceeding the DLQ retry limit.
         """
         stats = {
             "processed": 0,
@@ -178,11 +183,13 @@ class NotificationService:
     
     async def _process_message(self, message: Dict[str, Any], stats: Dict[str, int]) -> None:
         """
-        Process a single notification message.
+        Process a single notification queue message: attempts delivery, updates stats, and handles success or failure.
+        
+        On success the message is deleted and stats["succeeded"] is incremented. On failure the message's failure count is incremented and the message is either moved to the dead-letter queue or discarded based on the service configuration; stats["failed"] is incremented accordingly. This function also increments stats["processed"] and logs/report errors to PostHog when configured.
         
         Args:
-            message: Message from queue with msg_id and read_ct
-            stats: Statistics dictionary to update
+            message: Queue message containing "msg_id", optional "read_ct", and "message" (either a dict or a JSON string) with keys "title", "body", "recipients", and optional "priority", "failure_count", "metadata", "data".
+            stats: Mutable dictionary of counters updated in-place (expected keys include "processed", "succeeded", "failed", "moved_to_dlq", "discarded").
         """
         msg_id = message.get("msg_id")
         read_ct = message.get("read_ct", 0)
@@ -259,19 +266,19 @@ class NotificationService:
         max_retries: int = 3
     ) -> bool:
         """
-        Send notification via Expo SDK with exponential backoff.
+        Send a push notification to the given Expo recipients, retrying on rate-limit errors with exponential backoff.
         
-        Args:
-            title: Notification title
-            body: Notification body
-            recipients: List of Expo push tokens
-            priority: Priority level
-            data: Optional data dictionary to be sent with the push notification
-            retry_count: Current retry attempt
-            max_retries: Maximum number of retries
+        Parameters:
+            title (str): Notification title shown to recipients.
+            body (str): Notification body text.
+            recipients (List[str]): Expo push tokens to receive the notification.
+            priority (str): Delivery priority for the notification.
+            data (Optional[Dict[str, Any]]): Optional payload delivered with the notification.
+            retry_count (int): Current retry attempt (starts at 0).
+            max_retries (int): Maximum number of retry attempts for rate-limit errors.
         
         Returns:
-            True if successful, False otherwise
+            bool: `True` if the notification was accepted/sent, `False` otherwise.
         """
         async with self.semaphore:
             try:
@@ -415,10 +422,13 @@ class NotificationService:
     
     async def _delete_message(self, msg_id: int) -> None:
         """
-        Delete a message from the queue.
+        Delete a message from the configured queue by its message ID.
         
-        Args:
-            msg_id: Message ID to delete
+        Parameters:
+            msg_id (int): The queue message identifier to remove.
+        
+        Raises:
+            Exception: Propagates any exception raised while calling the Supabase delete RPC.
         """
         try:
             self.supabase.rpc(
@@ -434,11 +444,17 @@ class NotificationService:
     
     def _log_error_to_posthog(self, error: Exception, context: Dict[str, Any]) -> None:
         """
-        Log error to PostHog with full context.
+        Send an error event to PostHog with contextual properties.
         
-        Args:
-            error: Exception that occurred
-            context: Additional context for error tracking
+        If a PostHog client is configured, captures a "notification_error" event whose properties include
+        `error_type`, `error_message`, `error_traceback` and all key/value pairs from `context`, then flushes
+        events by shutting down the PostHog client. If no PostHog client is configured this is a no-op.
+        Failures that occur while attempting to send the event are caught and logged locally.
+        
+        Parameters:
+            error (Exception): The exception to report.
+            context (Dict[str, Any]): Additional context to include in the event; keys and values should be
+                serializable for PostHog.
         """
         if not self.posthog_client:
             return
@@ -460,11 +476,17 @@ class NotificationService:
     
     async def process_dlq(self) -> Dict[str, int]:
         """
-        Process messages from the dead letter queue.
-        Same logic as process_queue but for DLQ.
+        Process messages from the dead-letter queue using the standard queue processing pipeline.
+        
+        Temporarily targets the configured DLQ (swapping the service's queue target) and restores the original queue name after processing completes.
         
         Returns:
-            Dictionary with processing statistics
+            stats (Dict[str, int]): Processing statistics with keys:
+                - "processed": total messages attempted
+                - "succeeded": messages successfully delivered
+                - "failed": messages that failed delivery and were handled
+                - "moved_to_dlq": messages moved into the DLQ during handling
+                - "discarded": messages discarded after exceeding DLQ retry limit
         """
         # Temporarily swap queue names
         original_queue = self.queue_name
@@ -483,10 +505,12 @@ class NotificationService:
         Shutdown the notification service and cleanup resources.
         This should be called once when the service is terminating.
         """
-        if self.posthog_client:
-            try:
-                self.posthog_client.shutdown()
-                logger.info("PostHog client shut down")
-            except Exception as e:
-                logger.error(f"Error shutting down PostHog client: {str(e)}", exc_info=True)
+        if not self.posthog_client:
+            return None
+            
+        try:
+            self.posthog_client.flush()
+            logger.info("PostHog client shut down")
+        except Exception as e:
+            logger.error(f"Error shutting down PostHog client: {str(e)}", exc_info=True)
 

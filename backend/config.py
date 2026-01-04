@@ -6,7 +6,19 @@ load_dotenv()
 
 
 def _get_int_env(key: str, default: int) -> int:
-    """Safely get integer from environment variable."""
+    """
+    Retrieve an integer value from an environment variable with a fallback.
+    
+    If the environment variable named by `key` is not set or cannot be converted to an integer,
+    the provided `default` is returned.
+    
+    Parameters:
+        key (str): Name of the environment variable to read.
+        default (int): Value to return if the environment variable is missing or invalid.
+    
+    Returns:
+        int: The parsed integer from the environment variable, or `default` if unset or not parseable.
+    """
     value = os.getenv(key)
     if value is None:
         return default
@@ -51,4 +63,3 @@ class Settings:
     REDIS_CACHE_TTL: int = _get_int_env("REDIS_CACHE_TTL", 3600)
 
 settings = Settings()
-

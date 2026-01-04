@@ -16,21 +16,41 @@ from services.notification_service import NotificationService
 
 @pytest.fixture
 def mock_supabase_client():
-    """Create a mock Supabase client."""
+    """
+    Create a MagicMock that simulates a Supabase client for tests.
+    
+    Returns:
+        MagicMock: Mocked Supabase client instance.
+    """
     mock_client = MagicMock()
     return mock_client
 
 
 @pytest.fixture
 def mock_redis_client():
-    """Create a mock Redis client."""
+    """
+    Create a MagicMock that simulates a Redis client for tests.
+    
+    Returns:
+        MagicMock: A mock Redis client instance suitable for stubbing Redis methods.
+    """
     mock_client = MagicMock()
     return mock_client
 
 
 @pytest.fixture
 def notification_enqueue_service(monkeypatch, mock_supabase_client, mock_redis_client):
-    """Create a NotificationEnqueueService instance with mocked dependencies."""
+    """
+    Create a NotificationEnqueueService configured with mocked Supabase, Redis, cache, and NotificationService for testing.
+    
+    Parameters:
+    	monkeypatch: pytest monkeypatch fixture used to patch module attributes.
+    	mock_supabase_client: MagicMock representing the Supabase client to inject.
+    	mock_redis_client: MagicMock (or None) representing the Redis client to inject.
+    
+    Returns:
+    	NotificationEnqueueService: An instance of NotificationEnqueueService with its supabase, cache_service, and notification_service wired to the provided mocks.
+    """
     from services import notification_enqueue_service as enqueue_module
     from services import redis_client as redis_module
     from services import cache_service as cache_module
@@ -95,6 +115,15 @@ async def test_enqueue_entry_notification_with_cache_hit(notification_enqueue_se
     # Mock cached notification settings and push tokens (cache hit)
     # Use side_effect to return different values for different calls
     def mget_side_effect(keys):
+        """
+        Simulates Redis mget responses for notification settings and push tokens based on the requested keys.
+        
+        Parameters:
+            keys (Sequence): Sequence of cache keys passed to mget. If the first key contains "notification_settings", the function returns serialized notification-setting objects; otherwise it returns serialized lists of push tokens.
+        
+        Returns:
+            list[str]: A list of JSON-encoded strings corresponding to the requested keys. When returning notification settings each item is a JSON object like {"user_id": "...", "friend_activity": <bool>}; when returning push tokens each item is a JSON array of token strings.
+        """
         if "notification_settings" in str(keys[0]):
             # First call: notification settings
             return [
@@ -148,6 +177,21 @@ async def test_enqueue_entry_notification_with_cache_miss(notification_enqueue_s
     
     # Setup Supabase table mock to return different responses
     def table_side_effect(table_name):
+        """
+        Return a MagicMock that simulates a Supabase table query response for the given table name.
+        
+        For table_name "profiles", the mock is configured so that calling
+        select().eq().single().execute() returns mock_profile_response.
+        For table_name "notification_settings", calling select().in_().execute() returns mock_settings_response.
+        For table_name "push_tokens", calling select().in_().execute() returns mock_tokens_response.
+        For any other table_name the function returns an unconfigured MagicMock.
+        
+        Parameters:
+            table_name (str): Name of the table to mock.
+        
+        Returns:
+            MagicMock: A MagicMock configured to emulate the expected Supabase query chain for the specified table.
+        """
         mock_table = MagicMock()
         if table_name == "profiles":
             mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_profile_response
@@ -161,6 +205,15 @@ async def test_enqueue_entry_notification_with_cache_miss(notification_enqueue_s
     
     # Cache miss for both - use side_effect to handle multiple calls
     def mget_side_effect(keys):
+        """
+        Simulate a Redis MGET that results in cache misses for every requested key.
+        
+        Parameters:
+            keys (Sequence): An iterable of cache key strings.
+        
+        Returns:
+            list: A list of `None` values whose length matches the number of provided `keys`, representing cache misses.
+        """
         return [None] * len(keys)  # All cache misses
     
     mock_redis_client.mget.side_effect = mget_side_effect
@@ -200,6 +253,21 @@ async def test_enqueue_entry_notification_redis_failure(notification_enqueue_ser
     mock_tokens_response.data = [{"user_id": "user-1", "token": "token1"}]
     
     def table_side_effect(table_name):
+        """
+        Return a MagicMock that simulates a Supabase table query response for the given table name.
+        
+        For table_name "profiles", the mock is configured so that calling
+        select().eq().single().execute() returns mock_profile_response.
+        For table_name "notification_settings", calling select().in_().execute() returns mock_settings_response.
+        For table_name "push_tokens", calling select().in_().execute() returns mock_tokens_response.
+        For any other table_name the function returns an unconfigured MagicMock.
+        
+        Parameters:
+            table_name (str): Name of the table to mock.
+        
+        Returns:
+            MagicMock: A MagicMock configured to emulate the expected Supabase query chain for the specified table.
+        """
         mock_table = MagicMock()
         if table_name == "profiles":
             mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_profile_response
@@ -251,6 +319,21 @@ async def test_enqueue_entry_notification_no_redis(notification_enqueue_service,
     mock_tokens_response.data = [{"user_id": "user-1", "token": "token1"}]
     
     def table_side_effect(table_name):
+        """
+        Return a MagicMock that simulates a Supabase table query response for the given table name.
+        
+        For table_name "profiles", the mock is configured so that calling
+        select().eq().single().execute() returns mock_profile_response.
+        For table_name "notification_settings", calling select().in_().execute() returns mock_settings_response.
+        For table_name "push_tokens", calling select().in_().execute() returns mock_tokens_response.
+        For any other table_name the function returns an unconfigured MagicMock.
+        
+        Parameters:
+            table_name (str): Name of the table to mock.
+        
+        Returns:
+            MagicMock: A MagicMock configured to emulate the expected Supabase query chain for the specified table.
+        """
         mock_table = MagicMock()
         if table_name == "profiles":
             mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_profile_response
@@ -321,4 +404,3 @@ async def test_get_push_tokens_batch_with_cache(notification_enqueue_service, mo
     assert "token1" in result
     assert "token2" in result
     assert "token3" in result
-
