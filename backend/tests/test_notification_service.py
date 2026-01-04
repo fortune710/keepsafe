@@ -19,13 +19,23 @@ def mock_supabase_client():
     Create a MagicMock that simulates a Supabase client for tests.
     
     Returns:
-        mock_client (MagicMock): A mock Supabase client where calling rpc(...).execute()
+        mock_client (MagicMock): A mock Supabase client where calling schema(...).rpc(...).execute()
         returns a mock response object with a `data` attribute set to None.
     """
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.data = None
+    
+    # Mock the schema().rpc().execute() chain
+    mock_schema = MagicMock()
+    mock_rpc_result = MagicMock()
+    mock_rpc_result.execute.return_value = mock_response
+    mock_schema.rpc.return_value = mock_rpc_result
+    mock_client.schema.return_value = mock_schema
+    
+    # Also support direct rpc() for backwards compatibility
     mock_client.rpc.return_value.execute.return_value = mock_response
+    
     return mock_client
 
 
@@ -78,7 +88,10 @@ async def test_enqueue_notification_success(notification_service, mock_supabase_
     
     mock_response = MagicMock()
     mock_response.data = {"msg_id": 1}
-    mock_supabase_client.rpc.return_value.execute.return_value = mock_response
+    # Set up the schema().rpc().execute() chain
+    mock_schema = mock_supabase_client.schema.return_value
+    mock_rpc_result = mock_schema.rpc.return_value
+    mock_rpc_result.execute.return_value = mock_response
     
     # Act
     result = notification_service.enqueue_notification(
@@ -90,10 +103,13 @@ async def test_enqueue_notification_success(notification_service, mock_supabase_
     
     # Assert
     assert result is True
-    mock_supabase_client.rpc.assert_called_once()
-    call_args = mock_supabase_client.rpc.call_args
+    # Verify schema was called with "pgmq_public"
+    mock_supabase_client.schema.assert_called_with("pgmq_public")
+    # Verify rpc was called on the schema result
+    mock_schema.rpc.assert_called_once()
+    call_args = mock_schema.rpc.call_args
     # RPC is called as rpc(function_name, params_dict)
-    assert call_args[0][0] == "pgmq_public.send"
+    assert call_args[0][0] == "send"
     # Second positional argument is the params dict
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
     assert params.get("queue_name") == "test_queue"
@@ -138,7 +154,10 @@ async def test_enqueue_notification_invalid_priority(notification_service, mock_
     """enqueue_notification should default to 'default' for invalid priority."""
     mock_response = MagicMock()
     mock_response.data = {"msg_id": 1}
-    mock_supabase_client.rpc.return_value.execute.return_value = mock_response
+    # Set up the schema().rpc().execute() chain
+    mock_schema = mock_supabase_client.schema.return_value
+    mock_rpc_result = mock_schema.rpc.return_value
+    mock_rpc_result.execute.return_value = mock_response
     
     result = notification_service.enqueue_notification(
         title="Test",
@@ -148,7 +167,8 @@ async def test_enqueue_notification_invalid_priority(notification_service, mock_
     )
     
     assert result is True
-    call_args = mock_supabase_client.rpc.call_args
+    mock_schema.rpc.assert_called_once()
+    call_args = mock_schema.rpc.call_args
     import json
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
     msg_data = json.loads(params.get("msg", "{}"))
@@ -243,8 +263,10 @@ async def test_handle_failure_move_to_dlq(notification_service, mock_supabase_cl
     }
     stats = {"failed": 0, "moved_to_dlq": 0, "discarded": 0}
     
-    # Mock delete and send to DLQ
-    mock_supabase_client.rpc.return_value.execute.return_value = MagicMock()
+    # Mock delete and send to DLQ using schema().rpc() pattern
+    mock_schema = mock_supabase_client.schema.return_value
+    mock_rpc_result = mock_schema.rpc.return_value
+    mock_rpc_result.execute.return_value = MagicMock()
     
     # Act
     await notification_service._handle_failure(
@@ -257,8 +279,8 @@ async def test_handle_failure_move_to_dlq(notification_service, mock_supabase_cl
     # Assert
     assert stats["moved_to_dlq"] == 1
     assert stats["failed"] == 1
-    # Should have called delete and send to DLQ
-    assert mock_supabase_client.rpc.call_count >= 2
+    # Should have called delete and send to DLQ (both use schema().rpc())
+    assert mock_schema.rpc.call_count >= 2
 
 
 @pytest.mark.asyncio
@@ -275,8 +297,10 @@ async def test_handle_failure_discard_exceeded_limit(notification_service, mock_
     }
     stats = {"failed": 0, "moved_to_dlq": 0, "discarded": 0}
     
-    # Mock delete
-    mock_supabase_client.rpc.return_value.execute.return_value = MagicMock()
+    # Mock delete using schema().rpc() pattern
+    mock_schema = mock_supabase_client.schema.return_value
+    mock_rpc_result = mock_schema.rpc.return_value
+    mock_rpc_result.execute.return_value = MagicMock()
     
     # Act
     await notification_service._handle_failure(
@@ -331,35 +355,30 @@ async def test_process_queue_with_messages(notification_service, mock_supabase_c
     
     mock_response = MagicMock()
     mock_response.data = mock_messages
-    mock_supabase_client.rpc.return_value.execute.return_value = mock_response
     
     # Mock successful send
     mock_push_response = MagicMock()
     mock_push_response.validate_response = MagicMock()
     notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
     
-    # Mock delete - need to handle multiple RPC calls (read and delete)
-    def mock_rpc_side_effect(*args, **kwargs):
-        """
-        Create a MagicMock that simulates a Supabase RPC call.
+    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
+    def mock_schema_side_effect(schema_name):
+        """Return a mock schema object that handles rpc calls."""
+        mock_schema = MagicMock()
         
-        When the first positional argument is "pgmq_public.read", the mock's execute() returns the test's `mock_response`; for any other RPC name, execute() returns a fresh generic MagicMock.
+        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+            """Handle different RPC calls."""
+            mock_rpc_result = MagicMock()
+            if rpc_name == "read":
+                mock_rpc_result.execute.return_value = mock_response
+            else:
+                mock_rpc_result.execute.return_value = MagicMock()
+            return mock_rpc_result
         
-        Parameters:
-            *args: Positional arguments from the RPC call; the first argument is treated as the RPC function name.
-            **kwargs: Ignored.
-        
-        Returns:
-            MagicMock: A mock object whose `execute()` method yields the appropriate response as described above.
-        """
-        mock_rpc_result = MagicMock()
-        if args[0] == "pgmq_public.read":
-            mock_rpc_result.execute.return_value = mock_response
-        else:
-            mock_rpc_result.execute.return_value = MagicMock()
-        return mock_rpc_result
+        mock_schema.rpc.side_effect = mock_rpc_side_effect
+        return mock_schema
     
-    mock_supabase_client.rpc.side_effect = mock_rpc_side_effect
+    mock_supabase_client.schema.side_effect = mock_schema_side_effect
     
     # Act
     stats = await notification_service.process_queue()
@@ -411,15 +430,18 @@ async def test_delete_message(notification_service, mock_supabase_client):
     """_delete_message should call pgmq.delete."""
     # Arrange
     msg_id = 123
-    mock_supabase_client.rpc.return_value.execute.return_value = MagicMock()
+    mock_schema = mock_supabase_client.schema.return_value
+    mock_rpc_result = mock_schema.rpc.return_value
+    mock_rpc_result.execute.return_value = MagicMock()
     
     # Act
     await notification_service._delete_message(msg_id)
     
     # Assert
-    mock_supabase_client.rpc.assert_called_once()
-    call_args = mock_supabase_client.rpc.call_args
-    assert call_args[0][0] == "pgmq_public.delete"
+    mock_supabase_client.schema.assert_called_with("pgmq_public")
+    mock_schema.rpc.assert_called_once()
+    call_args = mock_schema.rpc.call_args
+    assert call_args[0][0] == "delete"
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
     assert params.get("queue_name") == "test_queue"
     assert params.get("msg_id") == msg_id

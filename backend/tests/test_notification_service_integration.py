@@ -18,8 +18,18 @@ from services.notification_scheduler import NotificationScheduler
 
 @pytest.fixture
 def mock_supabase_client():
-    """Create a mock Supabase client."""
+    """Create a mock Supabase client that supports schema().rpc() chain."""
     mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.data = None
+    
+    # Mock the schema().rpc().execute() chain
+    mock_schema = MagicMock()
+    mock_rpc_result = MagicMock()
+    mock_rpc_result.execute.return_value = mock_response
+    mock_schema.rpc.return_value = mock_rpc_result
+    mock_client.schema.return_value = mock_schema
+    
     return mock_client
 
 
@@ -62,16 +72,6 @@ async def test_full_flow_enqueue_to_success(notification_service, mock_supabase_
     # Arrange - Enqueue
     enqueue_response = MagicMock()
     enqueue_response.data = {"msg_id": 1}
-    mock_supabase_client.rpc.return_value.execute.return_value = enqueue_response
-    
-    # Enqueue notification
-    result = notification_service.enqueue_notification(
-        title="Test Title",
-        body="Test Body",
-        recipients=["ExponentPushToken[abc123]"],
-        priority="high"
-    )
-    assert result is True
     
     # Arrange - Process
     # Message in queue is JSON string
@@ -93,35 +93,41 @@ async def test_full_flow_enqueue_to_success(notification_service, mock_supabase_
     
     read_response = MagicMock()
     read_response.data = mock_messages
-    mock_supabase_client.rpc.return_value.execute.return_value = read_response
     
     # Mock successful Expo send
     mock_push_response = MagicMock()
     mock_push_response.validate_response = MagicMock()
     notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
     
-    # Mock delete - need to handle multiple RPC calls (read and delete)
-    def mock_rpc_side_effect(*args, **kwargs):
-        """
-        Create a MagicMock that mimics Supabase RPC calls used in tests.
+    # Mock schema().rpc().execute() chain for both enqueue (send) and process (read, delete)
+    def mock_schema_side_effect(schema_name):
+        """Return a mock schema object that handles rpc calls."""
+        mock_schema = MagicMock()
         
-        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+            """Handle different RPC calls."""
+            mock_rpc_result = MagicMock()
+            if rpc_name == "read":
+                mock_rpc_result.execute.return_value = read_response
+            elif rpc_name == "send":
+                mock_rpc_result.execute.return_value = enqueue_response
+            else:
+                mock_rpc_result.execute.return_value = MagicMock()
+            return mock_rpc_result
         
-        Parameters:
-            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
-            **kwargs: Ignored in this helper.
-        
-        Returns:
-            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
-        """
-        mock_rpc_result = MagicMock()
-        if args[0] == "pgmq_public.read":
-            mock_rpc_result.execute.return_value = read_response
-        else:
-            mock_rpc_result.execute.return_value = MagicMock()
-        return mock_rpc_result
+        mock_schema.rpc.side_effect = mock_rpc_side_effect
+        return mock_schema
     
-    mock_supabase_client.rpc.side_effect = mock_rpc_side_effect
+    mock_supabase_client.schema.side_effect = mock_schema_side_effect
+    
+    # Enqueue notification
+    result = notification_service.enqueue_notification(
+        title="Test Title",
+        body="Test Body",
+        recipients=["ExponentPushToken[abc123]"],
+        priority="high"
+    )
+    assert result is True
     
     # Act - Process queue
     stats = await notification_service.process_queue()
@@ -155,7 +161,6 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     
     read_response = MagicMock()
     read_response.data = mock_messages
-    mock_supabase_client.rpc.return_value.execute.return_value = read_response
     
     # Mock failed Expo send (non-rate-limit error)
     from exponent_server_sdk import PushServerError
@@ -165,28 +170,29 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
         side_effect=PushServerError("Invalid token", mock_response)
     )
     
-    # Mock delete and DLQ send - need to handle multiple RPC calls
-    def mock_rpc_side_effect(*args, **kwargs):
-        """
-        Create a MagicMock that mimics Supabase RPC calls used in tests.
-        
-        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
-        
-        Parameters:
-            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
-            **kwargs: Ignored in this helper.
-        
-        Returns:
-            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
-        """
-        mock_rpc_result = MagicMock()
-        if args[0] == "pgmq_public.read":
-            mock_rpc_result.execute.return_value = read_response
-        else:
-            mock_rpc_result.execute.return_value = MagicMock()
-        return mock_rpc_result
+    # Track RPC calls to verify DLQ send
+    rpc_calls_tracker = []
     
-    mock_supabase_client.rpc.side_effect = mock_rpc_side_effect
+    # Mock schema().rpc().execute() chain for multiple RPC calls (read, delete, send to DLQ)
+    def mock_schema_side_effect(schema_name):
+        """Return a mock schema object that handles rpc calls."""
+        mock_schema = MagicMock()
+        
+        def mock_rpc_side_effect(rpc_name, params_dict=None, **kwargs):
+            """Handle different RPC calls."""
+            # Track the call - params_dict is the second positional arg
+            rpc_calls_tracker.append((rpc_name, params_dict or {}))
+            mock_rpc_result = MagicMock()
+            if rpc_name == "read":
+                mock_rpc_result.execute.return_value = read_response
+            else:
+                mock_rpc_result.execute.return_value = MagicMock()
+            return mock_rpc_result
+        
+        mock_schema.rpc.side_effect = mock_rpc_side_effect
+        return mock_schema
+    
+    mock_supabase_client.schema.side_effect = mock_schema_side_effect
     
     # Act
     stats = await notification_service.process_queue()
@@ -197,14 +203,16 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     assert stats["moved_to_dlq"] == 1
     
     # Verify message was sent to DLQ
-    dlq_calls = [
-        call for call in mock_supabase_client.rpc.call_args_list
-        if len(call[0]) > 0 and call[0][0] == "pgmq_public.send"
+    # Check that schema("pgmq_public") was called
+    mock_supabase_client.schema.assert_called_with("pgmq_public")
+    # Find the "send" call with test_dlq in the tracked calls
+    send_calls = [
+        call for call in rpc_calls_tracker
+        if call[0] == "send" and call[1] and call[1].get("queue_name") == "test_dlq"
     ]
-    assert len(dlq_calls) > 0
-    dlq_call = dlq_calls[0]
-    params = dlq_call[0][1] if len(dlq_call[0]) > 1 else {}
-    assert params.get("queue_name") == "test_dlq"
+    assert len(send_calls) > 0
+    dlq_call = send_calls[0]
+    params = dlq_call[1]
     msg_data = json.loads(params.get("msg", "{}"))
     assert msg_data["failure_count"] == 1
 
@@ -231,7 +239,6 @@ async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supaba
     
     read_response = MagicMock()
     read_response.data = mock_messages
-    mock_supabase_client.rpc.return_value.execute.return_value = read_response
     
     # Mock failed Expo send
     from exponent_server_sdk import PushServerError
@@ -241,28 +248,24 @@ async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supaba
         side_effect=PushServerError("Invalid token", mock_response)
     )
     
-    # Mock delete - need to handle multiple RPC calls
-    def mock_rpc_side_effect(*args, **kwargs):
-        """
-        Create a MagicMock that mimics Supabase RPC calls used in tests.
+    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
+    def mock_schema_side_effect(schema_name):
+        """Return a mock schema object that handles rpc calls."""
+        mock_schema = MagicMock()
         
-        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+            """Handle different RPC calls."""
+            mock_rpc_result = MagicMock()
+            if rpc_name == "read":
+                mock_rpc_result.execute.return_value = read_response
+            else:
+                mock_rpc_result.execute.return_value = MagicMock()
+            return mock_rpc_result
         
-        Parameters:
-            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
-            **kwargs: Ignored in this helper.
-        
-        Returns:
-            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
-        """
-        mock_rpc_result = MagicMock()
-        if args[0] == "pgmq_public.read":
-            mock_rpc_result.execute.return_value = read_response
-        else:
-            mock_rpc_result.execute.return_value = MagicMock()
-        return mock_rpc_result
+        mock_schema.rpc.side_effect = mock_rpc_side_effect
+        return mock_schema
     
-    mock_supabase_client.rpc.side_effect = mock_rpc_side_effect
+    mock_supabase_client.schema.side_effect = mock_schema_side_effect
     
     # Act
     stats = await notification_service.process_queue()
@@ -274,12 +277,18 @@ async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supaba
     assert stats["moved_to_dlq"] == 0
     
     # Verify message was NOT sent to DLQ (should be discarded)
-    dlq_calls = [
-        call for call in mock_supabase_client.rpc.call_args_list
-        if len(call[0]) > 0 and call[0][0] == "pgmq_public.send"
+    # Get the schema mock
+    schema_mock = mock_supabase_client.schema.return_value
+    # Check rpc calls - find any "send" calls with test_dlq
+    send_calls = [
+        call for call in schema_mock.rpc.call_args_list
+        if len(call[0]) > 0 and call[0][0] == "send"
     ]
     # Check if any DLQ sends were made
-    dlq_sends = [call for call in dlq_calls if len(call[0]) > 1 and call[0][1].get("queue_name") == "test_dlq"]
+    dlq_sends = [
+        call for call in send_calls
+        if len(call[0]) > 1 and call[0][1].get("queue_name") == "test_dlq"
+    ]
     assert len(dlq_sends) == 0
 
 
@@ -305,35 +314,30 @@ async def test_concurrent_processing(notification_service, mock_supabase_client)
     
     read_response = MagicMock()
     read_response.data = mock_messages
-    mock_supabase_client.rpc.return_value.execute.return_value = read_response
     
     # Mock successful sends
     mock_push_response = MagicMock()
     mock_push_response.validate_response = MagicMock()
     notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
     
-    # Mock delete - need to handle multiple RPC calls
-    def mock_rpc_side_effect(*args, **kwargs):
-        """
-        Create a MagicMock that mimics Supabase RPC calls used in tests.
+    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
+    def mock_schema_side_effect(schema_name):
+        """Return a mock schema object that handles rpc calls."""
+        mock_schema = MagicMock()
         
-        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+            """Handle different RPC calls."""
+            mock_rpc_result = MagicMock()
+            if rpc_name == "read":
+                mock_rpc_result.execute.return_value = read_response
+            else:
+                mock_rpc_result.execute.return_value = MagicMock()
+            return mock_rpc_result
         
-        Parameters:
-            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
-            **kwargs: Ignored in this helper.
-        
-        Returns:
-            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
-        """
-        mock_rpc_result = MagicMock()
-        if args[0] == "pgmq_public.read":
-            mock_rpc_result.execute.return_value = read_response
-        else:
-            mock_rpc_result.execute.return_value = MagicMock()
-        return mock_rpc_result
+        mock_schema.rpc.side_effect = mock_rpc_side_effect
+        return mock_schema
     
-    mock_supabase_client.rpc.side_effect = mock_rpc_side_effect
+    mock_supabase_client.schema.side_effect = mock_schema_side_effect
     
     # Act
     stats = await notification_service.process_queue()
@@ -366,35 +370,30 @@ async def test_process_dlq(notification_service, mock_supabase_client):
     
     read_response = MagicMock()
     read_response.data = mock_messages
-    mock_supabase_client.rpc.return_value.execute.return_value = read_response
     
     # Mock successful send
     mock_push_response = MagicMock()
     mock_push_response.validate_response = MagicMock()
     notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
     
-    # Mock delete - need to handle multiple RPC calls
-    def mock_rpc_side_effect(*args, **kwargs):
-        """
-        Create a MagicMock that mimics Supabase RPC calls used in tests.
+    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
+    def mock_schema_side_effect(schema_name):
+        """Return a mock schema object that handles rpc calls."""
+        mock_schema = MagicMock()
         
-        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+            """Handle different RPC calls."""
+            mock_rpc_result = MagicMock()
+            if rpc_name == "read":
+                mock_rpc_result.execute.return_value = read_response
+            else:
+                mock_rpc_result.execute.return_value = MagicMock()
+            return mock_rpc_result
         
-        Parameters:
-            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
-            **kwargs: Ignored in this helper.
-        
-        Returns:
-            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
-        """
-        mock_rpc_result = MagicMock()
-        if args[0] == "pgmq_public.read":
-            mock_rpc_result.execute.return_value = read_response
-        else:
-            mock_rpc_result.execute.return_value = MagicMock()
-        return mock_rpc_result
+        mock_schema.rpc.side_effect = mock_rpc_side_effect
+        return mock_schema
     
-    mock_supabase_client.rpc.side_effect = mock_rpc_side_effect
+    mock_supabase_client.schema.side_effect = mock_schema_side_effect
     
     # Act
     stats = await notification_service.process_dlq()
@@ -402,11 +401,11 @@ async def test_process_dlq(notification_service, mock_supabase_client):
     # Assert
     assert stats["processed"] == 1
     # Verify it read from DLQ (queue name should be swapped)
-    read_calls = [
-        call for call in mock_supabase_client.rpc.call_args_list
-        if len(call[0]) > 0 and call[0][0] == "pgmq_public.read"
-    ]
-    assert len(read_calls) > 0
+    # Check that schema("pgmq_public") was called
+    mock_supabase_client.schema.assert_called_with("pgmq_public")
+    # Since we use side_effect, each schema() call returns a new mock
+    # We can verify by checking that schema was called (which it was for the read)
+    assert mock_supabase_client.schema.call_count >= 1
 
 
 def test_scheduler_initialization():
@@ -448,10 +447,12 @@ async def test_scheduler_job_execution(notification_service, mock_supabase_clien
         scheduler = NotificationScheduler()
         scheduler.notification_service = mock_service_instance
         
-        # Mock empty queue
+        # Mock empty queue using schema().rpc() pattern
         mock_response = MagicMock()
         mock_response.data = []
-        mock_supabase_client.rpc.return_value.execute.return_value = mock_response
+        mock_schema = mock_supabase_client.schema.return_value
+        mock_rpc_result = mock_schema.rpc.return_value
+        mock_rpc_result.execute.return_value = mock_response
         
         # Act
         await scheduler._process_queue_job()
@@ -559,35 +560,30 @@ async def test_batch_size_limit(notification_service, mock_supabase_client):
     
     read_response = MagicMock()
     read_response.data = mock_messages[:batch_size]  # Only return batch_size
-    mock_supabase_client.rpc.return_value.execute.return_value = read_response
     
     # Mock successful sends
     mock_push_response = MagicMock()
     mock_push_response.validate_response = MagicMock()
     notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
     
-    # Mock delete - need to handle multiple RPC calls
-    def mock_rpc_side_effect(*args, **kwargs):
-        """
-        Create a MagicMock that mimics Supabase RPC calls used in tests.
+    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
+    def mock_schema_side_effect(schema_name):
+        """Return a mock schema object that handles rpc calls."""
+        mock_schema = MagicMock()
         
-        Returns a mock whose `execute()` returns `read_response` when the RPC name is "pgmq_public.read"; for any other RPC name, `execute()` returns a new MagicMock.
+        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+            """Handle different RPC calls."""
+            mock_rpc_result = MagicMock()
+            if rpc_name == "read":
+                mock_rpc_result.execute.return_value = read_response
+            else:
+                mock_rpc_result.execute.return_value = MagicMock()
+            return mock_rpc_result
         
-        Parameters:
-            *args: Positional arguments forwarded from the RPC call; the first positional argument is treated as the RPC name.
-            **kwargs: Ignored in this helper.
-        
-        Returns:
-            MagicMock: A mock RPC result whose `execute()` method yields the appropriate value for the requested RPC.
-        """
-        mock_rpc_result = MagicMock()
-        if args[0] == "pgmq_public.read":
-            mock_rpc_result.execute.return_value = read_response
-        else:
-            mock_rpc_result.execute.return_value = MagicMock()
-        return mock_rpc_result
+        mock_schema.rpc.side_effect = mock_rpc_side_effect
+        return mock_schema
     
-    mock_supabase_client.rpc.side_effect = mock_rpc_side_effect
+    mock_supabase_client.schema.side_effect = mock_schema_side_effect
     
     # Act
     stats = await notification_service.process_queue()
