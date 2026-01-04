@@ -13,12 +13,12 @@ export const posthog = apiKey && host
   ? new PostHog(apiKey, { host })
   : {
       // Provide a no-op mock for when PostHog is not configured
-      capture: (_event: string, _properties?: object) => {},
-      identify: (_distinctId: string, _properties?: object) => {},
-      reset: () => {},
-      screen: (_screenName: string, _properties?: object) => {},
-      group: (_groupType: string, _groupKey: string, _properties?: object) => {},
-      alias: (_alias: string) => {},
+      capture: (_event: string, _properties?: object) => Promise.resolve(),
+      identify: (_distinctId: string, _properties?: object) => Promise.resolve(),
+      reset: () => Promise.resolve(),
+      screen: (_screenName: string, _properties?: object) => Promise.resolve(),
+      group: (_groupType: string, _groupKey: string, _properties?: object) => Promise.resolve(),
+      alias: (_alias: string) => Promise.resolve(),
       reloadFeatureFlags: () => {},
       isFeatureEnabled: () => false,
       getFeatureFlag: () => null,
