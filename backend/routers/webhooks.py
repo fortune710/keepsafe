@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from services.ingestion_service import IngestionService
+from services.notification_enqueue_service import NotificationEnqueueService
 from services.supabase_client import get_supabase_client
 import logging
 import hmac
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 ingestion_service = IngestionService()
+notification_enqueue_service = NotificationEnqueueService()
 
 class EntryWebhookPayload(BaseModel):
     """Payload structure for entry webhook."""
@@ -27,8 +29,17 @@ async def entry_webhook(
     x_supabase_signature: Optional[str] = Header(None, alias="x-supabase-signature")
 ):
     """
-    Webhook endpoint for processing entry changes.
-    Handles INSERT, UPDATE, and DELETE operations.
+    Process entry change webhooks for the "entries" table.
+    
+    Validates the incoming payload and handles INSERT, UPDATE, and DELETE events for entries. On successful INSERT, an ingestion is performed and a notification is enqueued; notification failures are logged but do not cause the webhook to fail. Returns an "ignored" response for payloads targeting other tables. Raises HTTPException for invalid payloads, unsupported webhook types, or ingestion/delete/update failures.
+    
+    Parameters:
+        payload (EntryWebhookPayload): Webhook payload describing the change.
+        request (Request): The incoming HTTP request object.
+        x_supabase_signature (Optional[str]): Optional Supabase webhook signature header (used if signature verification is implemented).
+    
+    Returns:
+        dict: Response object containing `status`, `message`, and, when applicable, `entry_id`.
     """
     try:
         # Verify webhook signature if needed (optional security check)
@@ -47,19 +58,27 @@ async def entry_webhook(
             entry_id = payload.record.get("id")
             logger.info(f"Processing INSERT webhook for entry {entry_id}")
             
+            # Ingest entry into vector database
             success = await ingestion_service.ingest_entry(payload.record)
             
-            if success:
-                return {
-                    "status": "success",
-                    "message": f"Entry {entry_id} ingested successfully",
-                    "entry_id": entry_id
-                }
-            else:
+            if not success:
                 raise HTTPException(
                     status_code=500,
                     detail=f"Failed to ingest entry {entry_id}"
                 )
+            
+            # Enqueue notification for shared entry
+            try:
+                await notification_enqueue_service.enqueue_entry_notification(payload.record)
+            except Exception as e:
+                # Log error but don't fail the webhook if notification fails
+                logger.error(f"Failed to enqueue entry notification: {str(e)}", exc_info=True)
+            
+            return {
+                "status": "success",
+                "message": f"Entry {entry_id} ingested successfully",
+                "entry_id": entry_id
+            }
         
         elif payload.type == "UPDATE":
             if not payload.record:
@@ -122,4 +141,3 @@ async def entry_webhook(
 async def health_check():
     """Health check endpoint for webhooks."""
     return {"status": "healthy", "service": "webhooks"}
-

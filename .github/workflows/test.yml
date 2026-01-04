@@ -1,0 +1,51 @@
+name: Backend Tests
+
+on:
+  pull_request:
+    branches: [ main, staging ]
+    paths:
+      - 'backend/**'
+  push:
+    branches: [ main, staging, dev ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v5
+    
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.12.9'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests
+      working-directory: ./backend
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        REDIS_URL: ${{ secrets.REDIS_URL }}
+        POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+        GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+        PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        PINECONE_INDEX_NAME: keepsafe-search
+        NOTIFICATION_QUEUE_NAME: notifications_queue
+        NOTIFICATION_DLQ_NAME: notifications_dlq
+        NOTIFICATION_CONCURRENCY: 20
+        NOTIFICATION_BATCH_SIZE: 100
+        NOTIFICATION_DLQ_LIMIT: 3
+        REDIS_CACHE_TTL: 3600
+      run: |
+        pytest tests/ -v --tb=short
+
