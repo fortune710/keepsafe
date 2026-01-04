@@ -93,8 +93,8 @@ class NotificationService:
             
             # Send to queue using pgmq_public.send
             # Message needs to be JSON stringified
-            response = self.supabase.rpc(
-                "pgmq_public.send",
+            self.supabase.schema("pgmq_public").rpc(
+                "send",
                 {
                     "queue_name": self.queue_name,
                     "msg": json.dumps(message)
@@ -145,8 +145,8 @@ class NotificationService:
             
             # Read messages from queue (pgmq_public.read with visibility timeout)
             # Read up to batch_size messages
-            response = self.supabase.rpc(
-                "pgmq_public.read",
+            response = self.supabase.schema("pgmq_public").rpc(
+                "read",
                 {
                     "queue_name": self.queue_name,
                     "vt": 300,  # Visibility timeout: 5 minutes
@@ -360,8 +360,8 @@ class NotificationService:
                 await self._delete_message(msg_id)
                 
                 # Send to DLQ
-                response = self.supabase.rpc(
-                    "pgmq_public.send",
+                self.supabase.schema("pgmq_public").rpc(
+                    "send",
                     {
                         "queue_name": self.dlq_name,
                         "msg": json.dumps(message_data)
@@ -431,8 +431,8 @@ class NotificationService:
             Exception: Propagates any exception raised while calling the Supabase delete RPC.
         """
         try:
-            self.supabase.rpc(
-                "pgmq_public.delete",
+            self.supabase.schema("pgmq_public").rpc(
+                "delete",
                 {
                     "queue_name": self.queue_name,
                     "msg_id": msg_id
@@ -507,7 +507,7 @@ class NotificationService:
         """
         if not self.posthog_client:
             return None
-            
+
         try:
             self.posthog_client.flush()
             logger.info("PostHog client shut down")
