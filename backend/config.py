@@ -40,8 +40,8 @@ class Settings:
     # Notification Service
     NOTIFICATION_QUEUE_NAME: str = os.getenv("NOTIFICATION_QUEUE_NAME", "notifications_q")
     NOTIFICATION_DLQ_NAME: str = os.getenv("NOTIFICATION_DLQ_NAME", "notifications_dlq")
-    NOTIFICATION_CONCURRENCY: int = int(os.getenv("NOTIFICATION_CONCURRENCY", "20"))
-    NOTIFICATION_BATCH_SIZE: int = int(os.getenv("NOTIFICATION_BATCH_SIZE", "100"))
+    NOTIFICATION_CONCURRENCY: int = _get_int_env("NOTIFICATION_CONCURRENCY", 20)
+    NOTIFICATION_BATCH_SIZE: int = _get_int_env("NOTIFICATION_BATCH_SIZE", 100)
     NOTIFICATION_DLQ_LIMIT: int = int(os.getenv("NOTIFICATION_DLQ_LIMIT", "3"))
     
     # Redis
