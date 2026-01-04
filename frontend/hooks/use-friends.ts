@@ -158,7 +158,12 @@ export function useFriends(userId?: string): UseFriendsResult {
 
     try {
       await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.BLOCKED });
-      posthog.capture('friend_blocked', { friendship_id: friendshipId });
+      try {
+        // Omitting friendship_id for privacy compliance
+        posthog.capture('friend_blocked', {});
+      } catch (error) {
+        if (__DEV__) console.warn('Analytics capture failed:', error);
+      }
       await updateFriendshipMutation.mutateAsync({ 
         id: friendshipId, 
         status: FRIENDSHIP_STATUS.BLOCKED,
