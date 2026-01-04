@@ -6,7 +6,7 @@ on:
     paths:
       - 'backend/**'
   push:
-    branches: [ main, staging, dev ]
+    branches: [ main, staging ]
     paths:
       - 'backend/**'
 
