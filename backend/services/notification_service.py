@@ -454,7 +454,7 @@ class NotificationService:
                     **context
                 }
             )
-            self.posthog_client.shutdown()  # Flush events
+            self.posthog_client.flush()  # Flush events without stopping the client
         except Exception as e:
             logger.error(f"Error logging to PostHog: {str(e)}", exc_info=True)
     
@@ -477,4 +477,16 @@ class NotificationService:
             self.queue_name = original_queue
         
         return stats
+    
+    def shutdown(self) -> None:
+        """
+        Shutdown the notification service and cleanup resources.
+        This should be called once when the service is terminating.
+        """
+        if self.posthog_client:
+            try:
+                self.posthog_client.shutdown()
+                logger.info("PostHog client shut down")
+            except Exception as e:
+                logger.error(f"Error shutting down PostHog client: {str(e)}", exc_info=True)
 

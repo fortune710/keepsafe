@@ -43,6 +43,10 @@ class NotificationScheduler:
         
         self.scheduler.shutdown(wait=True)
         self.is_running = False
+        
+        # Shutdown the notification service (including PostHog client)
+        self.notification_service.shutdown()
+        
         logger.info("Notification scheduler stopped")
     
     async def _process_queue_job(self):
