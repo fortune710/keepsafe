@@ -216,12 +216,16 @@ export default function DetailsScreen() {
       });
 
       if (result.success) {
-        posthog.capture('entry_captured', {
-          type: capture.type,
-          is_private: isPrivate,
-          is_everyone: isEveryone,
-          friends_count: selectedFriends.length
-        });
+        try {
+          posthog.capture('entry_captured', {
+            type: capture.type,
+            is_private: isPrivate,
+            is_everyone: isEveryone,
+            friends_count: selectedFriends.length
+          });
+        } catch (error) {
+          if (__DEV__) console.warn('Analytics capture failed:', error);
+        }
         toast(result.message, 'success');
         setTimeout(() => {
           router.push('/capture');
