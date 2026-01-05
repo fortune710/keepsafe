@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
+import { posthog } from '@/constants/posthog';
 
 export interface InviteData {
   id: string;
@@ -129,6 +130,13 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
         inviteeId: inviteeId, 
         userId: userId 
       });
+
+      if (inviteeId && userId) {
+        posthog.capture('invite_accepted', {
+          inviter_id: inviteeId,
+          invitee_id: userId
+        });
+      }
 
       return {
         success: true,

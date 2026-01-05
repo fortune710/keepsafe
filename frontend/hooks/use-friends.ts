@@ -6,6 +6,7 @@ import { Database } from '@/types/database';
 import { deviceStorage } from '@/services/device-storage';
 import { FriendService } from '@/services/friend-service';
 import { useAuthContext } from '@/providers/auth-provider';
+import { posthog } from '@/constants/posthog';
 import { FriendWithProfile } from '@/types/friends';
 
 
@@ -161,6 +162,12 @@ export function useFriends(userId?: string): UseFriendsResult {
         status: FRIENDSHIP_STATUS.BLOCKED,
         blocked_by: userId
       });
+      try {
+        // Omitting friendship_id for privacy compliance
+        posthog.capture('friend_blocked', {});
+      } catch (error) {
+        if (__DEV__) console.warn('Analytics capture failed:', error);
+      }
       return { success: true };
     } catch (error) {
       return {

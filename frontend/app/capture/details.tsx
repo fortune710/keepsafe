@@ -10,6 +10,7 @@ import { useUserEntries } from '@/hooks/use-user-entries';
 import { usePrivacySettings } from '@/hooks/use-privacy-settings';
 import { PrivacySettings } from '@/types/privacy';
 import { MediaCapture } from '@/types/media';
+import { posthog } from '@/constants/posthog';
 
 import { moderateScale, verticalScale } from 'react-native-size-matters';
 import * as Crypto from 'expo-crypto';
@@ -215,6 +216,16 @@ export default function DetailsScreen() {
       });
 
       if (result.success) {
+        try {
+          posthog.capture('entry_captured', {
+            type: capture.type,
+            is_private: isPrivate,
+            is_everyone: isEveryone,
+            friends_count: selectedFriends.length
+          });
+        } catch (error) {
+          if (__DEV__) console.warn('Analytics capture failed:', error);
+        }
         toast(result.message, 'success');
         setTimeout(() => {
           router.push('/capture');

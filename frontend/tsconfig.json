@@ -16,9 +16,5 @@
     "expo-env.d.ts",
     "nativewind-env.d.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "**/*.flow.js",
-    "**/*.flow"
-  ]
+  "exclude": ["node_modules", "**/*.flow.js", "**/*.flow"]
 }
