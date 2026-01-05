@@ -55,6 +55,7 @@ class Settings:
     NOTIFICATION_CONCURRENCY: int = _get_int_env("NOTIFICATION_CONCURRENCY", 20)
     NOTIFICATION_BATCH_SIZE: int = _get_int_env("NOTIFICATION_BATCH_SIZE", 100)
     NOTIFICATION_DLQ_LIMIT: int = int(os.getenv("NOTIFICATION_DLQ_LIMIT", "3"))
+    NOTIFICATION_INTERVAL_MINUTES: int = _get_int_env("NOTIFICATION_INTERVAL_MINUTES", 5)
     
     # Redis
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
