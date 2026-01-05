@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from exponent_server_sdk import PushClient, PushMessage, PushServerError, DeviceNotRegisteredError
 from posthog import Posthog
 import json
+import httpx
 
 from services.supabase_client import get_supabase_client
 from config import settings
@@ -149,8 +150,8 @@ class NotificationService:
                 "read",
                 {
                     "queue_name": self.queue_name,
-                    "vt": 300,  # Visibility timeout: 5 minutes
-                    "qty": self.batch_size
+                    "sleep_seconds": 300,  # Visibility timeout: 5 minutes
+                    "n": self.batch_size
                 }
             ).execute()
             
@@ -263,10 +264,59 @@ class NotificationService:
         priority: str,
         data: Optional[Dict[str, Any]] = None,
         retry_count: int = 0,
-        max_retries: int = 3
+        max_retries: int = 3,
+        use_rest_api: bool = True
     ) -> bool:
         """
         Send a push notification to the given Expo recipients, retrying on rate-limit errors with exponential backoff.
+        
+        Parameters:
+            title (str): Notification title shown to recipients.
+            body (str): Notification body text.
+            recipients (List[str]): Expo push tokens to receive the notification.
+            priority (str): Delivery priority for the notification.
+            data (Optional[Dict[str, Any]]): Optional payload delivered with the notification.
+            retry_count (int): Current retry attempt (starts at 0).
+            max_retries (int): Maximum number of retry attempts for rate-limit errors.
+            use_rest_api (bool): If True, use REST API; if False, use Expo Server SDK. Defaults to True.
+        
+        Returns:
+            bool: `True` if the notification was accepted/sent, `False` otherwise.
+        """
+        async with self.semaphore:
+            if use_rest_api:
+                return await self._send_notification_via_rest_api(
+                    title=title,
+                    body=body,
+                    recipients=recipients,
+                    priority=priority,
+                    data=data,
+                    retry_count=retry_count,
+                    max_retries=max_retries
+                )
+            else:
+                return await self._send_notification_via_sdk(
+                    title=title,
+                    body=body,
+                    recipients=recipients,
+                    priority=priority,
+                    data=data,
+                    retry_count=retry_count,
+                    max_retries=max_retries
+                )
+    
+    async def _send_notification_via_rest_api(
+        self,
+        title: str,
+        body: str,
+        recipients: List[str],
+        priority: str,
+        data: Optional[Dict[str, Any]] = None,
+        retry_count: int = 0,
+        max_retries: int = 3
+    ) -> bool:
+        """
+        Send a push notification via Expo REST API with retry and backoff for rate limits.
         
         Parameters:
             title (str): Notification title shown to recipients.
@@ -280,58 +330,179 @@ class NotificationService:
         Returns:
             bool: `True` if the notification was accepted/sent, `False` otherwise.
         """
-        async with self.semaphore:
-            try:
-                # Create push message
-                push_message = PushMessage(
-                    to=recipients,
+        # Expo REST API endpoint
+        api_url = "https://exp.host/--/api/v2/push/send"
+        
+        # Prepare messages array for Expo API
+        messages = []
+        for recipient in recipients:
+            message = {
+                "to": recipient,
+                "title": title,
+                "body": body,
+                "priority": priority,
+            }
+            if data:
+                message["data"] = data
+            messages.append(message)
+        
+        # Headers for Expo API
+        headers = {
+            "Accept": "application/json",
+            "Accept-encoding": "gzip, deflate",
+            "Content-Type": "application/json",
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    api_url,
+                    json=messages,
+                    headers=headers
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                # Expo API returns an array of ticket objects
+                # Each ticket has a "status" field: "ok" or "error"
+                if isinstance(result, dict) and "data" in result:
+                    tickets = result["data"]
+                elif isinstance(result, list):
+                    tickets = result
+                else:
+                    tickets = [result]
+                
+                # Check if all tickets are successful
+                all_success = all(
+                    ticket.get("status") == "ok" 
+                    for ticket in tickets 
+                    if isinstance(ticket, dict)
+                )
+                
+                if all_success:
+                    logger.info(
+                        f"Notification sent successfully via REST API: recipients={len(recipients)}, "
+                        f"priority={priority}"
+                    )
+                    return True
+                else:
+                    # Some tickets failed
+                    error_tickets = [
+                        ticket for ticket in tickets 
+                        if isinstance(ticket, dict) and ticket.get("status") != "ok"
+                    ]
+                    error_msg = f"Some notifications failed: {error_tickets}"
+                    logger.warning(f"Expo REST API error: {error_msg}")
+                    return False
+                
+        except httpx.HTTPStatusError as e:
+            # Handle HTTP errors (like 429 rate limit)
+            error_msg = str(e)
+            is_rate_limit = e.response.status_code == 429
+            
+            logger.warning(
+                f"Expo REST API error (retry {retry_count}/{max_retries}): {error_msg}"
+            )
+            
+            if retry_count < max_retries and is_rate_limit:
+                # Apply exponential backoff for rate limits
+                delay = min(2 ** retry_count + random.uniform(0, 1), 60)
+                logger.info(f"Rate limit hit (HTTP 429), waiting {delay:.2f} seconds before retry")
+                await asyncio.sleep(delay)
+                return await self._send_notification_via_rest_api(
                     title=title,
                     body=body,
+                    recipients=recipients,
                     priority=priority,
-                    data=data or {}
+                    data=data,
+                    retry_count=retry_count + 1,
+                    max_retries=max_retries
                 )
-                
-                # Send via Expo SDK
-                response = self.expo_client.publish(push_message)
-                response.validate_response()
-                
-                logger.info(
-                    f"Notification sent successfully: recipients={len(recipients)}, "
-                    f"priority={priority}"
+            
+            # Non-rate-limit errors or max retries reached
+            return False
+            
+        except Exception as e:
+            logger.error(f"Unexpected error sending notification via REST API: {str(e)}", exc_info=True)
+            return False
+    
+    async def _send_notification_via_sdk(
+        self,
+        title: str,
+        body: str,
+        recipients: List[str],
+        priority: str,
+        data: Optional[Dict[str, Any]] = None,
+        retry_count: int = 0,
+        max_retries: int = 3
+    ) -> bool:
+        """
+        Send a push notification via Expo Server SDK with retry and backoff for rate limits.
+        
+        Parameters:
+            title (str): Notification title shown to recipients.
+            body (str): Notification body text.
+            recipients (List[str]): Expo push tokens to receive the notification.
+            priority (str): Delivery priority for the notification.
+            data (Optional[Dict[str, Any]]): Optional payload delivered with the notification.
+            retry_count (int): Current retry attempt (starts at 0).
+            max_retries (int): Maximum number of retry attempts for rate-limit errors.
+        
+        Returns:
+            bool: `True` if the notification was accepted/sent, `False` otherwise.
+        """
+        try:
+            # Create push message
+            push_message = PushMessage(
+                to=recipients,
+                title=title,
+                body=body,
+                priority=priority,
+                data=data or {}
+            )
+            
+            # Send via Expo SDK
+            response = self.expo_client.publish(push_message)
+            response.validate_response()
+            
+            logger.info(
+                f"Notification sent successfully via SDK: recipients={len(recipients)}, "
+                f"priority={priority}"
+            )
+            return True
+            
+        except (PushServerError, DeviceNotRegisteredError) as e:
+            # Handle Expo-specific errors
+            error_msg = str(e)
+            logger.warning(
+                f"Expo SDK error (retry {retry_count}/{max_retries}): {error_msg}"
+            )
+            
+            # Check if it's a rate limit error (HTTP 429)
+            is_rate_limit = "429" in error_msg or "rate limit" in error_msg.lower()
+            
+            if retry_count < max_retries and is_rate_limit:
+                # Apply exponential backoff for rate limits
+                delay = min(2 ** retry_count + random.uniform(0, 1), 60)
+                logger.info(f"Rate limit hit, waiting {delay:.2f} seconds before retry")
+                await asyncio.sleep(delay)
+                return await self._send_notification_via_sdk(
+                    title=title,
+                    body=body,
+                    recipients=recipients,
+                    priority=priority,
+                    data=data,
+                    retry_count=retry_count + 1,
+                    max_retries=max_retries
                 )
-                return True
-                
-            except (PushServerError, DeviceNotRegisteredError) as e:
-                # Handle Expo-specific errors
-                error_msg = str(e)
-                logger.warning(
-                    f"Expo push error (retry {retry_count}/{max_retries}): {error_msg}"
-                )
-                
-                # Check if it's a rate limit error (HTTP 429)
-                is_rate_limit = "429" in error_msg or "rate limit" in error_msg.lower()
-                
-                if retry_count < max_retries and is_rate_limit:
-                    # Apply exponential backoff for rate limits
-                    delay = min(2 ** retry_count + random.uniform(0, 1), 60)
-                    logger.info(f"Rate limit hit, waiting {delay:.2f} seconds before retry")
-                    await asyncio.sleep(delay)
-                    return await self._send_notification(
-                        title=title,
-                        body=body,
-                        recipients=recipients,
-                        priority=priority,
-                        data=data,
-                        retry_count=retry_count + 1,
-                        max_retries=max_retries
-                    )
-                
-                # Non-rate-limit errors or max retries reached
-                return False
-                
-            except Exception as e:
-                logger.error(f"Unexpected error sending notification: {str(e)}", exc_info=True)
-                return False
+            
+            # Non-rate-limit errors or max retries reached
+            return False
+            
+        except Exception as e:
+            logger.error(f"Unexpected error sending notification via SDK: {str(e)}", exc_info=True)
+            return False
     
     async def _handle_failure(
         self,
@@ -435,7 +606,7 @@ class NotificationService:
                 "delete",
                 {
                     "queue_name": self.queue_name,
-                    "msg_id": msg_id
+                    "message_id": msg_id
                 }
             ).execute()
         except Exception as e:
