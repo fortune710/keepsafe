@@ -5,6 +5,7 @@ import json
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch, Mock
 from datetime import datetime
+import httpx
 
 # Ensure the backend directory (which contains `services/`) is on sys.path
 CURRENT_DIR = os.path.dirname(__file__)
@@ -14,6 +15,24 @@ if BACKEND_DIR not in sys.path:
 
 from services.notification_service import NotificationService
 from services.notification_scheduler import NotificationScheduler
+
+
+def mock_httpx_success_response():
+    """Helper to create a mock successful httpx response for REST API."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = [{"status": "ok", "id": "test-id"}]
+    mock_response.raise_for_status = MagicMock()
+    return mock_response
+
+
+def mock_httpx_client_success():
+    """Helper to create a mock httpx AsyncClient that returns success."""
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+    mock_client.post = AsyncMock(return_value=mock_httpx_success_response())
+    return mock_client
 
 
 @pytest.fixture
@@ -94,49 +113,47 @@ async def test_full_flow_enqueue_to_success(notification_service, mock_supabase_
     read_response = MagicMock()
     read_response.data = mock_messages
     
-    # Mock successful Expo send
-    mock_push_response = MagicMock()
-    mock_push_response.validate_response = MagicMock()
-    notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
-    
-    # Mock schema().rpc().execute() chain for both enqueue (send) and process (read, delete)
-    def mock_schema_side_effect(schema_name):
-        """Return a mock schema object that handles rpc calls."""
-        mock_schema = MagicMock()
+    # Mock httpx for REST API
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client_class.return_value = mock_httpx_client_success()
         
-        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
-            """Handle different RPC calls."""
-            mock_rpc_result = MagicMock()
-            if rpc_name == "read":
-                mock_rpc_result.execute.return_value = read_response
-            elif rpc_name == "send":
-                mock_rpc_result.execute.return_value = enqueue_response
-            else:
-                mock_rpc_result.execute.return_value = MagicMock()
-            return mock_rpc_result
+        # Mock schema().rpc().execute() chain for both enqueue (send) and process (read, delete)
+        def mock_schema_side_effect(schema_name):
+            """Return a mock schema object that handles rpc calls."""
+            mock_schema = MagicMock()
+            
+            def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+                """Handle different RPC calls."""
+                mock_rpc_result = MagicMock()
+                if rpc_name == "read":
+                    mock_rpc_result.execute.return_value = read_response
+                elif rpc_name == "send":
+                    mock_rpc_result.execute.return_value = enqueue_response
+                else:
+                    mock_rpc_result.execute.return_value = MagicMock()
+                return mock_rpc_result
+            
+            mock_schema.rpc.side_effect = mock_rpc_side_effect
+            return mock_schema
         
-        mock_schema.rpc.side_effect = mock_rpc_side_effect
-        return mock_schema
-    
-    mock_supabase_client.schema.side_effect = mock_schema_side_effect
-    
-    # Enqueue notification
-    result = notification_service.enqueue_notification(
-        title="Test Title",
-        body="Test Body",
-        recipients=["ExponentPushToken[abc123]"],
-        priority="high"
-    )
-    assert result is True
-    
-    # Act - Process queue
-    stats = await notification_service.process_queue()
-    
-    # Assert
-    assert stats["processed"] == 1
-    assert stats["succeeded"] == 1
-    assert stats["failed"] == 0
-    notification_service.expo_client.publish.assert_called_once()
+        mock_supabase_client.schema.side_effect = mock_schema_side_effect
+        
+        # Enqueue notification
+        result = notification_service.enqueue_notification(
+            title="Test Title",
+            body="Test Body",
+            recipients=["ExponentPushToken[abc123]"],
+            priority="high"
+        )
+        assert result is True
+        
+        # Act - Process queue
+        stats = await notification_service.process_queue()
+        
+        # Assert
+        assert stats["processed"] == 1
+        assert stats["succeeded"] == 1
+        assert stats["failed"] == 0
 
 
 @pytest.mark.asyncio
@@ -315,37 +332,37 @@ async def test_concurrent_processing(notification_service, mock_supabase_client)
     read_response = MagicMock()
     read_response.data = mock_messages
     
-    # Mock successful sends
-    mock_push_response = MagicMock()
-    mock_push_response.validate_response = MagicMock()
-    notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
-    
-    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
-    def mock_schema_side_effect(schema_name):
-        """Return a mock schema object that handles rpc calls."""
-        mock_schema = MagicMock()
+    # Mock httpx for REST API
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = mock_httpx_client_success()
+        mock_client_class.return_value = mock_client
         
-        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
-            """Handle different RPC calls."""
-            mock_rpc_result = MagicMock()
-            if rpc_name == "read":
-                mock_rpc_result.execute.return_value = read_response
-            else:
-                mock_rpc_result.execute.return_value = MagicMock()
-            return mock_rpc_result
+        # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
+        def mock_schema_side_effect(schema_name):
+            """Return a mock schema object that handles rpc calls."""
+            mock_schema = MagicMock()
+            
+            def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+                """Handle different RPC calls."""
+                mock_rpc_result = MagicMock()
+                if rpc_name == "read":
+                    mock_rpc_result.execute.return_value = read_response
+                else:
+                    mock_rpc_result.execute.return_value = MagicMock()
+                return mock_rpc_result
+            
+            mock_schema.rpc.side_effect = mock_rpc_side_effect
+            return mock_schema
         
-        mock_schema.rpc.side_effect = mock_rpc_side_effect
-        return mock_schema
-    
-    mock_supabase_client.schema.side_effect = mock_schema_side_effect
-    
-    # Act
-    stats = await notification_service.process_queue()
-    
-    # Assert
-    assert stats["processed"] == 5
-    assert stats["succeeded"] == 5
-    assert notification_service.expo_client.publish.call_count == 5
+        mock_supabase_client.schema.side_effect = mock_schema_side_effect
+        
+        # Act
+        stats = await notification_service.process_queue()
+        
+        # Assert
+        assert stats["processed"] == 5
+        assert stats["succeeded"] == 5
+        assert mock_client.post.call_count == 5
 
 
 @pytest.mark.asyncio
@@ -472,36 +489,17 @@ async def test_exponential_backoff_calculation(notification_service):
     # This test verifies the backoff logic is applied
     # The actual delay calculation happens in _send_notification
     
-    from exponent_server_sdk import PushServerError
+    # Mock rate limit error for REST API
+    rate_limit_response = MagicMock()
+    rate_limit_response.status_code = 429
+    rate_limit_error = httpx.HTTPStatusError(
+        "429 Rate limit exceeded",
+        request=MagicMock(),
+        response=rate_limit_response
+    )
     
-    # Mock rate limit error
-    mock_response = MagicMock()
-    mock_response.status_code = 429
-    rate_limit_error = PushServerError("429 Rate limit exceeded", mock_response)
-    
-    # Track call times
-    call_times = []
-    
-    def mock_publish(*args, **kwargs):
-        """
-        Simulate an Expo publish call that records invocation times and fails on the first attempt.
-        
-        Appends the current datetime to the outer-scope `call_times` list. On the first invocation raises the outer-scope `rate_limit_error`. On subsequent invocations returns a MagicMock response whose `validate_response` attribute is a MagicMock.
-        
-        Returns:
-            A mock response object with a `validate_response` attribute.
-        
-        Raises:
-            rate_limit_error: The error object provided in the enclosing scope on the first call.
-        """
-        call_times.append(datetime.now())
-        if len(call_times) == 1:
-            raise rate_limit_error
-        mock_response = MagicMock()
-        mock_response.validate_response = MagicMock()
-        return mock_response
-    
-    notification_service.expo_client.publish = mock_publish
+    # Success response
+    success_response = mock_httpx_success_response()
     
     # Mock sleep to track delays
     sleep_calls = []
@@ -519,18 +517,27 @@ async def test_exponential_backoff_calculation(notification_service):
         sleep_calls.append(delay)
         await original_sleep(0.01)  # Minimal delay for test
     
-    with patch("asyncio.sleep", side_effect=mock_sleep):
-        result = await notification_service._send_notification(
-            title="Test",
-            body="Test",
-            recipients=["token"],
-            priority="default",
-            retry_count=0,
-            max_retries=3
-        )
-    
-    # Assert - should have retried with backoff
-    assert len(sleep_calls) > 0
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        # First call fails with rate limit, second succeeds
+        mock_client.post = AsyncMock(side_effect=[rate_limit_error, success_response])
+        mock_client_class.return_value = mock_client
+        
+        with patch("asyncio.sleep", side_effect=mock_sleep):
+            result = await notification_service._send_notification(
+                title="Test",
+                body="Test",
+                recipients=["token"],
+                priority="default",
+                retry_count=0,
+                max_retries=3
+            )
+        
+        # Assert - should have retried with backoff
+        assert len(sleep_calls) > 0
+        assert result is True
     # Backoff delay should be exponential (capped at 60)
     assert sleep_calls[0] <= 60
 
@@ -560,34 +567,34 @@ async def test_batch_size_limit(notification_service, mock_supabase_client):
     
     read_response = MagicMock()
     read_response.data = mock_messages[:batch_size]  # Only return batch_size
-    
-    # Mock successful sends
-    mock_push_response = MagicMock()
-    mock_push_response.validate_response = MagicMock()
-    notification_service.expo_client.publish = MagicMock(return_value=mock_push_response)
-    
-    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
-    def mock_schema_side_effect(schema_name):
-        """Return a mock schema object that handles rpc calls."""
-        mock_schema = MagicMock()
+
+    # Mock httpx for REST API
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = mock_httpx_client_success()
+        mock_client_class.return_value = mock_client
         
-        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
-            """Handle different RPC calls."""
-            mock_rpc_result = MagicMock()
-            if rpc_name == "read":
-                mock_rpc_result.execute.return_value = read_response
-            else:
-                mock_rpc_result.execute.return_value = MagicMock()
-            return mock_rpc_result
+        # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
+        def mock_schema_side_effect(schema_name):
+            """Return a mock schema object that handles rpc calls."""
+            mock_schema = MagicMock()
+            
+            def mock_rpc_side_effect(rpc_name, *args, **kwargs):
+                """Handle different RPC calls."""
+                mock_rpc_result = MagicMock()
+                if rpc_name == "read":
+                    mock_rpc_result.execute.return_value = read_response
+                else:
+                    mock_rpc_result.execute.return_value = MagicMock()
+                return mock_rpc_result
+            
+            mock_schema.rpc.side_effect = mock_rpc_side_effect
+            return mock_schema
         
-        mock_schema.rpc.side_effect = mock_rpc_side_effect
-        return mock_schema
-    
-    mock_supabase_client.schema.side_effect = mock_schema_side_effect
-    
-    # Act
-    stats = await notification_service.process_queue()
-    
-    # Assert - Should only process batch_size messages
-    assert stats["processed"] == batch_size
-    assert notification_service.expo_client.publish.call_count == batch_size
+        mock_supabase_client.schema.side_effect = mock_schema_side_effect
+        
+        # Act
+        stats = await notification_service.process_queue()
+        
+        # Assert - Should only process batch_size messages
+        assert stats["processed"] == batch_size
+        assert mock_client.post.call_count == batch_size
