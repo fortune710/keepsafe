@@ -122,7 +122,8 @@
           "microphonePermission": "Allow Keepsafe to access your microphone."
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
