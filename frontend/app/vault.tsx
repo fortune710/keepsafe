@@ -137,15 +137,15 @@ export default function VaultScreen() {
       <EntryPage>
         <FlashList
           data={Object.keys(entriesByDate)}
-          contentContainerStyle={[
-            styles.contentContainer,
-            responsive.isTablet && {
+          contentContainerStyle={{
+            ...styles.contentContainer,
+            ...(responsive.isTablet && {
               paddingHorizontal: responsive.contentPadding,
               maxWidth: responsive.maxContentWidth,
               alignSelf: 'center' as const,
               width: '100%',
-            }
-          ]}
+            }),
+          }}
           keyExtractor={(item) => item}
           onScroll={handleScroll}
           scrollEnabled={!isMusicPlayerVisible}

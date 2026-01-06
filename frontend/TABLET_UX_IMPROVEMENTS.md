@@ -77,7 +77,7 @@ Created a comprehensive responsive hook that provides:
    - iPad Pro 12.9" (1024x1366 portrait, 1366x1024 landscape)
    - iPad Pro 11" (834x1194 portrait, 1194x834 landscape)
    - iPad Air (820x1180 portrait, 1180x820 landscape)
-   - iPad Mini (768x1024 portrait, 1024x768 landscape)
+   - iPad Mini (744x1133 portrait, 1133x744 landscape)
 
 5. **Verify**:
    - Content is properly centered

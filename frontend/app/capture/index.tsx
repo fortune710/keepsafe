@@ -363,7 +363,7 @@ export default function CaptureScreen() {
             </View>
       
             {/* Top Mode Selector */}
-            <View style={styles.modeSelector}>
+            <View style={[styles.modeSelector, { minHeight: responsive.minTouchTarget }]}>
               <TouchableOpacity
                 style={[styles.modeTab, selectedMode === 'camera' && styles.activeModeTab]}
                 onPress={() => setSelectedMode('camera')}
@@ -385,7 +385,15 @@ export default function CaptureScreen() {
               </TouchableOpacity>
             </View>
       
-            <View style={styles.content}>
+            <View 
+              style={[
+                styles.content,
+                {
+                  paddingHorizontal: responsive.contentPadding,
+                  maxWidth: responsive.maxContentWidth,
+                },
+              ]}
+            >
               {/* Persistent Camera or Audio Visualizer */}
               <Animated.View 
                 style={[styles.mediaContainer, selectedMode === 'microphone' && styles.borderContainer]}
@@ -439,7 +447,13 @@ export default function CaptureScreen() {
               {/* Bottom Action Buttons */}
               <View style={styles.actionContainer}>
                 <TouchableOpacity 
-                  style={styles.uploadButton} 
+                  style={[
+                    styles.uploadButton,
+                    {
+                      minWidth: responsive.minTouchTarget,
+                      minHeight: responsive.minTouchTarget,
+                    },
+                  ]} 
                   onPress={handleUpload}
                   disabled={selectedMode !== 'camera'}
                 >
@@ -483,7 +497,13 @@ export default function CaptureScreen() {
                 </TouchableOpacity>
       
                 <TouchableOpacity 
-                  style={styles.flipButton} 
+                  style={[
+                    styles.flipButton,
+                    {
+                      minWidth: responsive.minTouchTarget,
+                      minHeight: responsive.minTouchTarget,
+                    },
+                  ]} 
                   onPress={selectedMode === 'camera' ? toggleCameraFacing : undefined}
                   disabled={selectedMode !== 'camera' || !isCameraReady}
                 >
@@ -578,8 +598,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
-    // Tablet: larger touch targets
-    minHeight: 44,
   },
   modeTab: {
     flex: 1,
@@ -605,9 +623,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    // Tablet: center content with max width constraint
-    maxWidth: 900,
     alignSelf: 'center',
     width: '100%',
   },
@@ -707,9 +722,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    // Ensure minimum touch target (iOS guideline: 44pt)
-    minWidth: 44,
-    minHeight: 44,
   },
   uploadHint: {
     fontSize: 10,
@@ -728,9 +740,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    // Ensure minimum touch target (iOS guideline: 44pt)
-    minWidth: 44,
-    minHeight: 44,
   },
   captureButton: {
     width: scale(85),
