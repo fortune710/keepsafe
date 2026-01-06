@@ -17,6 +17,7 @@ import { VaultHeader } from '@/components/vault/vault-header';
 import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
+import { useResponsive, useTabletLayout } from '@/hooks/use-responsive';
 
 const { height, width } = Dimensions.get('window');
 
@@ -25,6 +26,8 @@ const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 
 export default function VaultScreen() {
+  const responsive = useResponsive();
+  const tabletLayout = useTabletLayout();
   const { entries, entriesByDate, isLoading, error, refetch, retryEntry } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
 
@@ -134,7 +137,15 @@ export default function VaultScreen() {
       <EntryPage>
         <FlashList
           data={Object.keys(entriesByDate)}
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={{
+            ...styles.contentContainer,
+            ...(responsive.isTablet && {
+              paddingHorizontal: responsive.contentPadding,
+              maxWidth: responsive.maxContentWidth,
+              alignSelf: 'center' as const,
+              width: '100%',
+            }),
+          }}
           keyExtractor={(item) => item}
           onScroll={handleScroll}
           scrollEnabled={!isMusicPlayerVisible}
@@ -219,7 +230,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F9FF',
   },
   contentContainer: {
-    paddingVertical: verticalScale(30)
+    paddingVertical: verticalScale(30),
   },
   listHeader: {
     justifyContent: 'center',

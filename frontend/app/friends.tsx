@@ -13,9 +13,11 @@ import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useResponsive } from '@/hooks/use-responsive';
 
 
 export default function FriendsScreen() {
+  const responsive = useResponsive();
   const { profile } = useAuthContext();
   const { 
     friends, 
@@ -246,6 +248,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 40,
+    // Tablet: center content with max width constraint
+    maxWidth: 900,
+    alignSelf: 'center',
+    width: '100%',
   },
   loadingContainer: {
     flex: 1,
@@ -303,6 +309,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    // Ensure minimum touch target (iOS guideline: 44pt)
+    minHeight: 44,
   },
   searchPlaceholder: {
     fontSize: 16,
@@ -335,6 +343,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    // Ensure minimum touch target (iOS guideline: 44pt)
+    minHeight: 44,
   },
   shareButtonText: {
     color: '#8B5CF6',

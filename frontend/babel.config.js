@@ -1,14 +1,17 @@
 // babel.config.js
-module.exports = function(api) {
+module.exports = function (api) {
   api.cache(true);
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      ['module-resolver', {
-        alias: {
-          '@': './'
-        }
-      }],
+      [
+        'module-resolver',
+        {
+          alias: {
+            '@': './',
+          },
+        },
+      ],
       'react-native-worklets/plugin',
     ],
   };
