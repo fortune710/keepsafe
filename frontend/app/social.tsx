@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Image } from 'react-native';
 import { Plus, Users } from 'lucide-react-native';
+import { useResponsive } from '@/hooks/use-responsive';
 
 interface Friend {
   id: string;
@@ -41,6 +42,7 @@ const mockMemoryBoxes: MemoryBox[] = [
 ];
 
 export default function SocialScreen() {
+  const responsive = useResponsive();
   const friendsWithShares = mockFriends.filter(friend => friend.hasShared);
 
   return (
@@ -49,7 +51,16 @@ export default function SocialScreen() {
         <Text style={styles.title}>Social</Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={responsive.isTablet ? {
+          maxWidth: responsive.maxContentWidth,
+          alignSelf: 'center',
+          width: '100%',
+          paddingHorizontal: responsive.contentPadding,
+        } : undefined}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Shared Moments</Text>
           {friendsWithShares.length > 0 ? (
@@ -141,6 +152,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    // Ensure minimum touch target (iOS guideline: 44pt)
+    minHeight: 44,
   },
   createButtonText: {
     color: '#8B5CF6',

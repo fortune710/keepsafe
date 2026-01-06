@@ -27,10 +27,12 @@ import { DateContainer } from '@/components/date-container';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
 import AudioWaveVisualier from '@/components/audio/audio-wave-visualier';
+import { useResponsive } from '@/hooks/use-responsive';
 
 const { height } = Dimensions.get('window');
 
 export default function CaptureScreen() {
+  const responsive = useResponsive();
   const [selectedMode, setSelectedMode] = useState<'camera' | 'microphone'>('camera');
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
@@ -576,6 +578,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    // Tablet: larger touch targets
+    minHeight: 44,
   },
   modeTab: {
     flex: 1,
@@ -602,6 +606,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    // Tablet: center content with max width constraint
+    maxWidth: 900,
+    alignSelf: 'center',
+    width: '100%',
   },
   mediaContainer: {
     height: verticalScale(250),
@@ -699,6 +707,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    // Ensure minimum touch target (iOS guideline: 44pt)
+    minWidth: 44,
+    minHeight: 44,
   },
   uploadHint: {
     fontSize: 10,
@@ -717,6 +728,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    // Ensure minimum touch target (iOS guideline: 44pt)
+    minWidth: 44,
+    minHeight: 44,
   },
   captureButton: {
     width: scale(85),
@@ -730,6 +744,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    // Ensure minimum touch target for tablets (iOS guideline: 44pt)
+    minWidth: 85,
+    minHeight: 85,
   },
   recordingButton: {
     backgroundColor: '#EF4444',
