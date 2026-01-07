@@ -84,6 +84,7 @@ export class PlacesSearchService {
                             ? { proximity: `${options.coordinates.longitude},${options.coordinates.latitude}` }
                             : {}),
                     },
+                    timeout: 5000, // 5 second timeout to fail-fast
                 }
             );
 
@@ -102,7 +103,18 @@ export class PlacesSearchService {
 
             return results;
         } catch (error) {
-            console.error('Error fetching places from Mapbox Search API:', error);
+            if (axios.isAxiosError(error)) {
+                if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+                    logger.error('PlacesSearchService: request timeout', { query, error: error.message });
+                    console.error('Mapbox Search API request timed out after 5 seconds');
+                } else {
+                    logger.error('PlacesSearchService: request error', { query, error: error.message, status: error.response?.status });
+                    console.error('Error fetching places from Mapbox Search API:', error.message);
+                }
+            } else {
+                logger.error('PlacesSearchService: unexpected error', { query, error });
+                console.error('Unexpected error fetching places from Mapbox Search API:', error);
+            }
             return [];
         }
     }
