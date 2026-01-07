@@ -71,7 +71,7 @@ export class PlacesSearchService {
         }
 
         try {
-            logger.info('PlacesSearchService: starting search', { query });
+            logger.debug('PlacesSearchService: starting search', { query });
             const response = await axios.get<MapboxSearchResponse>(
                 `${this.BASE_URL}`,
                 {
@@ -88,7 +88,7 @@ export class PlacesSearchService {
                 }
             );
 
-            logger.info('PlacesSearchService: response', { response: response.data.features });
+            logger.debug('PlacesSearchService: response', { response: response.data.features });
 
             if (!response.data.features || response.data.features.length === 0) {
                 return [];
@@ -105,14 +105,14 @@ export class PlacesSearchService {
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-                    logger.error('PlacesSearchService: request timeout', { query, error: error.message });
+                    logger.error('PlacesSearchService: request timeout', { error: error.message });
                     console.error('Mapbox Search API request timed out after 5 seconds');
                 } else {
-                    logger.error('PlacesSearchService: request error', { query, error: error.message, status: error.response?.status });
+                    logger.error('PlacesSearchService: request error', { error: error.message, status: error.response?.status });
                     console.error('Error fetching places from Mapbox Search API:', error.message);
                 }
             } else {
-                logger.error('PlacesSearchService: unexpected error', { query, error });
+                logger.error('PlacesSearchService: unexpected error', { error });
                 console.error('Unexpected error fetching places from Mapbox Search API:', error);
             }
             return [];
