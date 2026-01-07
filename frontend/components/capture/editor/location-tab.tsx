@@ -19,6 +19,14 @@ interface LocationSearchResult {
     isCurrentLocation?: boolean;
 }
 
+/**
+ * Renders a location search interface that lists nearby places and search results and lets the user pick a location.
+ *
+ * Displays an input for typing a query, shows a combined list containing an optional "Current" location entry and place results, indicates loading/empty states, and invokes a callback when a location is selected.
+ *
+ * @param onSelectLocation - Callback invoked with the selected location string (address) when the user chooses a location
+ * @returns The LocationTab component UI for searching and selecting a location
+ */
 export default function LocationTab({ onSelectLocation }: LocationTabProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedQuery = useDebounce(searchQuery, 500);
@@ -280,4 +288,3 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
 });
-

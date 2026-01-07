@@ -28,6 +28,22 @@ const POPULAR_COLORS = [
     "#FF1493", "#00CED1", "#32CD32", "#FF4500", "#DA70D6",
 ];
 
+/**
+ * Renders a multi-tab text editor panel for editing text, text color, background color, and font.
+ *
+ * Provides an internal tab bar with: a multiline text input (auto-focused when active), a text color picker
+ * (preset palette plus optional custom ColorSlider), a background color picker (same behavior), and a font selector.
+ *
+ * @param textInput - Current text value shown in the editor
+ * @param onTextChange - Called with the new text when the user edits the text input
+ * @param selectedColor - Currently selected text color (hex string)
+ * @param onColorChange - Called with a hex color when the text color is changed
+ * @param selectedFont - Currently selected font name
+ * @param onFontChange - Called with the font name when a font is selected
+ * @param selectedBackgroundColor - Currently selected background color (hex string); defaults to `#000000`
+ * @param onBackgroundColorChange - Optional callback called with a hex color when the background color is changed
+ * @returns A React element containing the internal tab bar and the active tab's content
+ */
 export default function TextTab({ 
     textInput, 
     onTextChange, 
