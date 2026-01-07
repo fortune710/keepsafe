@@ -229,7 +229,7 @@ export default function DetailsScreen() {
         };
         updateTextItem(
           pendingTextItemId, 
-          currentItem.text || pendingTextValue, 
+          currentItem.text ?? pendingTextValue, 
           updatedStyle as { color: string; fontFamily?: string; backgroundColor?: string }
         );
       }
