@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { X, Sticker } from 'lucide-react-native';
+import { X, Sticker, UserPlus, UserPlus2 } from 'lucide-react-native';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useAuthContext } from '@/providers/auth-provider';
@@ -27,6 +27,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
 import AudioEntry from '@/components/audio/audio-entry';
 import EntryShareList from '@/components/friends/entry-share-list';
+import EntryAttachmentList from '@/components/capture/entry-attachment-list';
+import { MediaCanvasItemType } from '@/types/capture';
 
 interface Friend {
   id: string;
@@ -91,6 +93,11 @@ export default function DetailsScreen() {
   const { toast } = useToast();
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
+  const [showAttachmentList, setShowAttachmentList] = useState<boolean>(false);
+  const [editorDefaultTab, setEditorDefaultTab] = useState<MediaCanvasItemType | undefined>(undefined);
+  const [pendingTextItemId, setPendingTextItemId] = useState<number | null>(null);
+  const [pendingTextValue, setPendingTextValue] = useState<string>("");
+  const [attachmentListStateBeforeEditor, setAttachmentListStateBeforeEditor] = useState<boolean>(false);
   
 
 
@@ -139,7 +146,95 @@ export default function DetailsScreen() {
 
   
 
-  const { viewShotRef, items, addText, addSticker, saveImage, addMusic, addLocation, removeElement } = useMediaCanvas();
+  const { viewShotRef, items, addText, addSticker, addMusic, addLocation, removeElement, updateTextItem } = useMediaCanvas();
+  
+  // Custom addText handler that handles pending text items
+  const handleAddText = (text: string, style: { color: string; fontFamily?: string; backgroundColor?: string }) => {
+    // If there's a pending text item, remove it first
+    if (pendingTextItemId !== null) {
+      removeElement(pendingTextItemId);
+      setPendingTextItemId(null);
+      setPendingTextValue("");
+    }
+    // Add the new text item
+    addText(text, style);
+  };
+  
+  // Handle attachment type selection
+  const handleAttachmentSelect = (type: MediaCanvasItemType) => {
+    // Save the current attachment list state before opening editor
+    setAttachmentListStateBeforeEditor(showAttachmentList);
+    
+    if (type === "text") {
+      // Auto-add text with default value
+      const defaultText = "Enter text";
+      const defaultStyle = {
+        color: "#FFFFFF",
+        fontFamily: "Arial",
+        backgroundColor: "#000000",
+      };
+      const tempId = addText(defaultText, defaultStyle); // Returns the ID
+      setPendingTextItemId(tempId);
+      setPendingTextValue(defaultText);
+      // Open editor with text tab
+      setEditorDefaultTab("text");
+      setShowEditorPopover(true);
+    } else {
+      // For other types, just open the editor with the selected tab
+      setEditorDefaultTab(type);
+      setShowEditorPopover(true);
+    }
+    setShowAttachmentList(false);
+  };
+  
+  // Handle editor popover close
+  const handleEditorClose = (currentText?: string) => {
+    // If there's a pending text item and it hasn't been changed or is empty, remove it
+    const textValue = currentText !== undefined ? currentText : pendingTextValue;
+    if (pendingTextItemId !== null && (textValue === "Enter text" || !textValue.trim())) {
+      removeElement(pendingTextItemId);
+      setPendingTextItemId(null);
+      setPendingTextValue("");
+    }
+    setShowEditorPopover(false);
+    setEditorDefaultTab(undefined);
+    // Restore the attachment list state to what it was before opening the editor
+    setShowAttachmentList(attachmentListStateBeforeEditor);
+  };
+  
+  // Handle text changes in editor - update in real-time
+  const handleTextChange = (text: string) => {
+    if (pendingTextItemId !== null) {
+      setPendingTextValue(text);
+      // Find the current style from the item
+      const currentItem = items.find(item => item.id === pendingTextItemId);
+      if (currentItem && currentItem.type === "text") {
+        updateTextItem(pendingTextItemId, text, currentItem.style || {
+          color: "#FFFFFF",
+          fontFamily: "Arial",
+          backgroundColor: "#000000",
+        });
+      }
+    }
+  };
+  
+  // Handle style changes in real-time
+  const handleStyleChange = (styleUpdates: { color?: string; fontFamily?: string; backgroundColor?: string }) => {
+    if (pendingTextItemId !== null) {
+      const currentItem = items.find(item => item.id === pendingTextItemId);
+      if (currentItem && currentItem.type === "text") {
+        const updatedStyle = {
+          ...currentItem.style,
+          ...styleUpdates,
+        };
+        updateTextItem(
+          pendingTextItemId, 
+          currentItem.text || pendingTextValue, 
+          updatedStyle as { color: string; fontFamily?: string; backgroundColor?: string }
+        );
+      }
+    }
+  };
 
 
   
@@ -255,58 +350,65 @@ export default function DetailsScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={() => router.back()}
-          >
-            <X color="#64748B" size={24} />
-          </TouchableOpacity>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.cancelButton}
+          onPress={() => router.back()}
+        >
+          <X color="#64748B" size={24} />
+        </TouchableOpacity>
 
-          <Text style={styles.title}>Add Details</Text>
+        <Text style={styles.title}>Add Details</Text>
 
-          <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={() => setShowEditorPopover(true)}
-          >
-            <Sticker color="#64748B" size={24} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={styles.cancelButton}
+          onPress={() => setShowAttachmentList(!showAttachmentList)}
+        >
+          {
+            showAttachmentList ? (
+              <UserPlus2 color="#64748B" size={24} />
+            ) : (
+              <Sticker color="#64748B" size={24} />
+            )
+          }
+        </TouchableOpacity>
+      </View>
 
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <Animated.View 
-            style={[styles.mediaContainer, capture?.type === 'audio' && styles.borderContainer]}
-          >
-            {capture?.type === 'photo' && capture.uri ? (
-              <MediaCanvas 
-                uri={capture.uri}
-                type='photo'
-                ref={viewShotRef}
-                items={items}
-                transformsRef={transformsRef}
-                removeElement={removeElement}
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Animated.View 
+          style={[styles.mediaContainer, capture?.type === 'audio' && styles.borderContainer]}
+        >
+          {capture?.type === 'photo' && capture.uri ? (
+            <MediaCanvas 
+              uri={capture.uri}
+              type='photo'
+              ref={viewShotRef}
+              items={items}
+              transformsRef={transformsRef}
+              removeElement={removeElement}
+            />
+          ) : 
+          capture?.type === 'video' ? (
+            <Pressable onPress={() => videPlaying ? player.pause() : player.play()}>
+              <VideoView 
+                style={styles.mediaPreview} 
+                player={player} 
+                contentFit='cover'
               />
-            ) : 
-            capture?.type === 'video' ? (
-              <Pressable onPress={() => videPlaying ? player.pause() : player.play()}>
-                <VideoView 
-                  style={styles.mediaPreview} 
-                  player={player} 
-                  contentFit='cover'
-                />
-              </Pressable>
-            ) :
-            capture?.type === 'audio' ? (
-              <AudioEntry entry={capture}/>
-            ) : null}
-          </Animated.View>
+            </Pressable>
+          ) :
+          capture?.type === 'audio' ? (
+            <AudioEntry entry={capture}/>
+          ) : null}
+        </Animated.View>
 
-          <View style={styles.form}>            
+        <View style={styles.form}>
+          {showAttachmentList ? (
+            <EntryAttachmentList 
+              onSelectAttachment={handleAttachmentSelect}
+            />
+          ) : (
             <EntryShareList 
               isPrivate={isPrivate}
               isEveryone={isEveryone}
@@ -316,30 +418,34 @@ export default function DetailsScreen() {
               handleFriendToggle={handleFriendToggle}
               friends={realFriends}
             />
+          )}
 
-            <TouchableOpacity 
-              style={[
-                styles.saveButton, 
-                (isLoading || !hasSelectedSharing()) && styles.saveButtonDisabled
-              ]} 
-              onPress={handleSave}
-              disabled={isLoading || !hasSelectedSharing()}
-            >
-              <Text style={styles.saveButtonText}>{getSaveButtonText()}</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+          <TouchableOpacity 
+            style={[
+              styles.saveButton, 
+              (isLoading || !hasSelectedSharing()) && styles.saveButtonDisabled
+            ]} 
+            onPress={handleSave}
+            disabled={isLoading || !hasSelectedSharing()}
+          >
+            <Text style={styles.saveButtonText}>{getSaveButtonText()}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
-        <EditorPopover
-          isVisible={showEditorPopover}
-          onClose={() => setShowEditorPopover(false)}
-          addText={addText}
-          addSticker={addSticker}
-          addMusic={addMusic}
-          addLocation={addLocation}
-        />
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+      <EditorPopover
+        isVisible={showEditorPopover}
+        onClose={handleEditorClose}
+        addText={handleAddText}
+        addSticker={addSticker}
+        addMusic={addMusic}
+        addLocation={addLocation}
+        defaultTab={editorDefaultTab}
+        onTextChange={handleTextChange}
+        onStyleChange={handleStyleChange}
+        initialText={pendingTextItemId !== null ? pendingTextValue : undefined}
+      />
+    </SafeAreaView>
   );
 }
 
