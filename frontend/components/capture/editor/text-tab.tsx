@@ -44,13 +44,23 @@ export default function TextTab({
 
     // Auto-focus when text tab becomes active, but keep keyboard persistent when switching tabs
     useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        
         if (activeInternalTab === "text") {
             // Small delay to ensure the component is rendered
-            setTimeout(() => {
-                textInputRef.current?.focus();
+            timer = setTimeout(() => {
+                if (textInputRef.current) {
+                    textInputRef.current.focus();
+                }
             }, 100);
         }
-        // Don't blur when switching tabs - keep keyboard persistent
+        
+        // Cleanup function to clear timeout if activeInternalTab changes or component unmounts
+        return () => {
+            if (timer !== null) {
+                clearTimeout(timer);
+            }
+        };
     }, [activeInternalTab]);
 
 
