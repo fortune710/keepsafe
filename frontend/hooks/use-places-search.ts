@@ -1,10 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { PlacesSearchService } from '@/services/places-search-service';
-
-export type PlacesSearchCoordinates = {
-  latitude: number;
-  longitude: number;
-};
+import { PlacesSearchService, PlacesSearchCoordinates } from '@/services/places-search-service';
 
 export function usePlacesSearch(
   query: string,
