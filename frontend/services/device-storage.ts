@@ -1,4 +1,4 @@
-import { SuggestedFriend } from '@/types/friends';
+import { FriendWithProfile, SuggestedFriend } from '@/types/friends';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -113,7 +113,7 @@ class DeviceStorage {
     await this.setItem(`friends_${userId}`, friends, 60); // Cache for 1 hour
   }
 
-  async getFriends(userId: string): Promise<any[] | null> {
+  async getFriends(userId: string): Promise<FriendWithProfile[] | null> {
     return await this.getItem<any[]>(`friends_${userId}`);
   }
 
