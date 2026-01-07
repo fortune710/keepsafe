@@ -23,11 +23,6 @@ interface MusicPopoverProps {
 }
 
 export default function AudioPreviewPopover({ isVisible, onClose, music }: MusicPopoverProps) {
-  const popoverHeight = useSharedValue(height * 0.5);
-
-  const animatedPopoverStyle = useAnimatedStyle(() => ({
-    maxHeight: popoverHeight.value,
-  }));
 
   // Don't return null - let the exit animation play
   if (!isVisible && !music) return null;
@@ -45,7 +40,7 @@ export default function AudioPreviewPopover({ isVisible, onClose, music }: Music
 
       {isVisible && (
         <Animated.View 
-          style={[styles.popover, animatedPopoverStyle]}
+          style={[styles.popover]}
           entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
           exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
         >
@@ -130,7 +125,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(24),
     padding: scale(12),
     width: '90%',
-    marginBottom: verticalScale(16),
+    marginBottom: verticalScale(42),
   },
   closeButtonText: {
     fontSize: scale(16),
