@@ -110,8 +110,6 @@ export function useDeviceLocation(): UseDeviceLocationResult {
           postalCode: address.postalCode || '',
         };
 
-        console.log({ address });
-
         return locationData;
       } catch (err: any) {
         console.error('Location error:', err);
