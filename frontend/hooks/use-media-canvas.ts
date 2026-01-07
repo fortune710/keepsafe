@@ -25,7 +25,7 @@ export function useMediaCanvas() {
     }
 
     const removeElement = (id: number) => {
-        setItems(prevItems => prevItems.filter(item => item.id != id));
+        setItems(prevItems => prevItems.filter(item => item.id !== id));
     }
 
     const updateTextItem = (id: number, text: string, style: { color: string; fontFamily?: string; backgroundColor?: string }) => {
