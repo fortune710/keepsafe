@@ -2,6 +2,12 @@ import { useCallback } from 'react';
 import * as Location from 'expo-location';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+// In-memory cache for reverse geocoding results to avoid duplicate requests
+const reverseGeocodeCache = new Map<string, string>();
+
+// Utility function to sleep/delay
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
 interface LocationData {
   address: string;
   postalCode: string;
@@ -157,8 +163,24 @@ export function useDeviceLocation(): UseDeviceLocationResult {
           return [];
         }
 
-        // Reverse geocode each result to get formatted addresses
-        const placesPromises = geocodedLocations.slice(0, 20).map(async (location, index) => {
+        // Helper function to reverse geocode a single location with caching
+        const reverseGeocodeLocation = async (
+          location: Location.LocationGeocodedLocation,
+          index: number
+        ): Promise<PlaceResult> => {
+          const cacheKey = `${location.latitude},${location.longitude}`;
+          
+          // Check cache first
+          const cachedAddress = reverseGeocodeCache.get(cacheKey);
+          if (cachedAddress) {
+            return {
+              id: `place-${index}-${location.latitude}-${location.longitude}`,
+              formattedAddress: cachedAddress,
+              latitude: location.latitude,
+              longitude: location.longitude,
+            };
+          }
+
           try {
             const reverseGeocode = await Location.reverseGeocodeAsync({
               latitude: location.latitude,
@@ -192,6 +214,9 @@ export function useDeviceLocation(): UseDeviceLocationResult {
 
               const formattedAddress = parts.join(', ') || searchQuery;
               
+              // Cache the result
+              reverseGeocodeCache.set(cacheKey, formattedAddress);
+              
               return {
                 id: `place-${index}-${location.latitude}-${location.longitude}`,
                 formattedAddress,
@@ -200,9 +225,11 @@ export function useDeviceLocation(): UseDeviceLocationResult {
               };
             } else {
               // Fallback if reverse geocoding fails
+              const fallbackAddress = searchQuery;
+              reverseGeocodeCache.set(cacheKey, fallbackAddress);
               return {
                 id: `place-${index}-${location.latitude}-${location.longitude}`,
-                formattedAddress: searchQuery,
+                formattedAddress: fallbackAddress,
                 latitude: location.latitude,
                 longitude: location.longitude,
               };
@@ -210,16 +237,46 @@ export function useDeviceLocation(): UseDeviceLocationResult {
           } catch (error) {
             console.error('Reverse geocoding error for place:', error);
             // Fallback
+            const fallbackAddress = searchQuery;
+            reverseGeocodeCache.set(cacheKey, fallbackAddress);
             return {
               id: `place-${index}-${location.latitude}-${location.longitude}`,
-              formattedAddress: searchQuery,
+              formattedAddress: fallbackAddress,
               latitude: location.latitude,
               longitude: location.longitude,
             };
           }
-        });
+        };
 
-        const places = await Promise.all(placesPromises);
+        // Process locations in small batches with throttling
+        const BATCH_SIZE = 5;
+        const DELAY_BETWEEN_BATCHES = 200; // 200ms delay between batches
+        const locationsToProcess = geocodedLocations.slice(0, 20);
+        const places: PlaceResult[] = [];
+
+        for (let i = 0; i < locationsToProcess.length; i += BATCH_SIZE) {
+          const batch = locationsToProcess.slice(i, i + BATCH_SIZE);
+          
+          // Process batch with Promise.allSettled to handle individual failures
+          const batchResults = await Promise.allSettled(
+            batch.map((location, batchIndex) => 
+              reverseGeocodeLocation(location, i + batchIndex)
+            )
+          );
+
+          // Extract successful results
+          batchResults.forEach((result) => {
+            if (result.status === 'fulfilled') {
+              places.push(result.value);
+            }
+          });
+
+          // Add delay between batches (except for the last batch)
+          if (i + BATCH_SIZE < locationsToProcess.length) {
+            await sleep(DELAY_BETWEEN_BATCHES);
+          }
+        }
+
         return places;
       } catch (err: any) {
         console.error('Error getting places in state:', err);
