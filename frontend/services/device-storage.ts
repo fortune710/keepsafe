@@ -114,7 +114,7 @@ class DeviceStorage {
   }
 
   async getFriends(userId: string): Promise<FriendWithProfile[] | null> {
-    return await this.getItem<any[]>(`friends_${userId}`);
+    return await this.getItem<FriendWithProfile[]>(`friends_${userId}`);
   }
 
   async setEntries(userId: string, entries: any[]): Promise<void> {
