@@ -7,7 +7,9 @@ export function useMediaCanvas() {
     const [items, setItems] = useState<Array<MediaCanvasItem>>([]);
 
     const addText = (text: string, style: { color: string; fontFamily?: string }) => {
-        setItems([...items, { id: Date.now(), type: "text", text: text, style }]);
+        const id = Date.now();
+        setItems(prevItems => [...prevItems, { id, type: "text", text: text, style }]);
+        return id;
     };
     
     const addSticker = (sticker: any) => {
@@ -23,8 +25,15 @@ export function useMediaCanvas() {
     }
 
     const removeElement = (id: number) => {
-        const remainingElements = items.filter(item => item.id != id);
-        setItems(remainingElements);
+        setItems(prevItems => prevItems.filter(item => item.id != id));
+    }
+
+    const updateTextItem = (id: number, text: string, style: { color: string; fontFamily?: string; backgroundColor?: string }) => {
+        setItems(prevItems => prevItems.map(item => 
+            item.id === id && item.type === "text" 
+                ? { ...item, text, style }
+                : item
+        ));
     }
 
     const viewShotRef = useRef<ViewShot | null>(null);
@@ -79,6 +88,7 @@ export function useMediaCanvas() {
         saveImage,
         removeElement,
         addMusic,
-        addLocation
+        addLocation,
+        updateTextItem
     }
 }
