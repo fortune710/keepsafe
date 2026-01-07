@@ -34,7 +34,7 @@ export function MusicListItem({ music, onPress }: MusicListItemProps) {
                 </View>
             </View>
             <AudioPreview 
-                canvasRadius={13}
+                canvasRadius={15}
                 audioSource={music.preview}
             />
         </TouchableOpacity>
@@ -43,8 +43,8 @@ export function MusicListItem({ music, onPress }: MusicListItemProps) {
 
 const styles = StyleSheet.create({
     image: {
-        width: scale(35),
-        height: verticalScale(33),
+        width: scale(40),
+        height: verticalScale(37),
         borderRadius: 5
     },
     listItem: {
@@ -53,6 +53,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         marginBottom: 8,
+        paddingRight: scale(7),
     },
     listItemInner: {
         display: "flex",

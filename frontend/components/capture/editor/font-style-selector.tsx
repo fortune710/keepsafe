@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ViewStyle,
 } from "react-native";
+import { scale, verticalScale } from "react-native-size-matters";
 
 type FontStyleSelectorProps = {
   fonts: string[]; // List of font family names
@@ -21,7 +22,7 @@ const FontStyleSelector: React.FC<FontStyleSelectorProps> = ({
   fonts,
   onSelect,
   style,
-  previewChar = "A",
+  previewChar,
   initialFont,
 }) => {
   const [selected, setSelected] = useState<string>(
@@ -37,7 +38,7 @@ const FontStyleSelector: React.FC<FontStyleSelectorProps> = ({
     <View style={[styles.container, style]}>
       <FlatList
         data={fonts}
-        numColumns={4}
+        numColumns={2}
         keyExtractor={(item) => item}
         renderItem={({ item }) => {
           const isSelected = selected === item;
@@ -55,8 +56,11 @@ const FontStyleSelector: React.FC<FontStyleSelectorProps> = ({
                   { fontFamily: item },
                   isSelected && { color: "#007AFF" },
                 ]}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
               >
-                {previewChar}
+                {previewChar || item}
               </Text>
             </TouchableOpacity>
           );
@@ -64,6 +68,7 @@ const FontStyleSelector: React.FC<FontStyleSelectorProps> = ({
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
         style={styles.flatList}
+        keyboardShouldPersistTaps="handled"
       />
     </View>
   );
@@ -71,7 +76,7 @@ const FontStyleSelector: React.FC<FontStyleSelectorProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height: 400, // 👈 Fixed height instead of flex: 1
+    height: verticalScale(280), // 👈 Fixed height instead of flex: 1
     width: "100%",
   },
   flatList: {
@@ -84,8 +89,9 @@ const styles = StyleSheet.create({
   option: {
     flex: 1,
     margin: 8,
-    aspectRatio: 1,
+    minHeight: 60,
     borderRadius: 12,
+    padding: scale(10),
     borderWidth: 1,
     borderColor: "#ccc",
     justifyContent: "center",
@@ -97,8 +103,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#e6f0ff",
   },
   preview: {
-    fontSize: 28,
+    fontSize: scale(16),
     color: "#000",
+    textAlign: "center",
+    flexWrap: "wrap",
   },
 });
 
