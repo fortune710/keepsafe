@@ -37,6 +37,16 @@ interface Friend {
   username: string;
 }
 
+/**
+ * Render the details screen for reviewing a captured media item, editing attachments,
+ * configuring sharing options, and saving the entry.
+ *
+ * This component builds a MediaCapture from route params, manages attachment editing
+ * (including in-editor live text editing with pending item handling), sharing state
+ * (private, everyone, or selected friends), optimistic entry creation, and the save flow.
+ *
+ * @returns The Details screen UI for adding details to a capture, managing attachments and privacy, and submitting the entry.
+ */
 export default function DetailsScreen() {
   const params = useLocalSearchParams();
   const { captureId, type, uri, duration } = params;

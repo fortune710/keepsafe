@@ -38,6 +38,21 @@ interface EditorPopoverProps {
   initialText?: string;
 }
 
+/**
+ * Render an editor popover that lets users add text, stickers, music, or a location to a media canvas.
+ *
+ * @param isVisible - Whether the popover is currently visible
+ * @param onClose - Callback invoked when the popover is dismissed; receives the current text input (if any)
+ * @param addText - Adds a text item with style `{ color, fontFamily?, backgroundColor? }`
+ * @param addSticker - Adds a sticker given its URI
+ * @param addMusic - Adds a music tag
+ * @param addLocation - Adds a location string
+ * @param defaultTab - Optional initial active tab (`"text" | "sticker" | "music" | "location"`)
+ * @param onTextChange - Optional callback invoked as the text input changes
+ * @param onStyleChange - Optional callback invoked when text style (color, fontFamily, backgroundColor) changes
+ * @param initialText - Optional initial value for the text input
+ * @returns The popover UI element when visible, or `null` when hidden
+ */
 export default function EditorPopover({
   isVisible,
   onClose,

@@ -3,6 +3,20 @@ import { useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import ViewShot, { captureRef } from "react-native-view-shot";
 
+/**
+ * Manage a collection of media canvas items and provide utilities to capture the canvas as an image.
+ *
+ * @returns An object exposing:
+ * - `viewShotRef`: a ref to the ViewShot instance (or `null`) for capturing the rendered view.
+ * - `items`: the current array of `MediaCanvasItem`.
+ * - `addText(text, style)`: adds a text item and returns the generated numeric id.
+ * - `addSticker(sticker)`: adds a sticker item.
+ * - `addMusic(music)`: adds a music item (`MusicTag`).
+ * - `addLocation(location)`: adds a location item.
+ * - `removeElement(id)`: removes the item with the given id.
+ * - `updateTextItem(id, text, style)`: updates the text and style of an existing text item.
+ * - `saveImage()`: captures the view and returns the captured file URI prefixed with `file://` on success, or `null` on failure.
+ */
 export function useMediaCanvas() {
     const [items, setItems] = useState<Array<MediaCanvasItem>>([]);
 

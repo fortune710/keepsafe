@@ -13,6 +13,15 @@ const attachmentTypes: { type: MediaCanvasItemType; icon: React.ComponentType<an
     { type: "location", icon: MapPin, label: "Location" },
 ];
 
+/**
+ * Renders a labeled horizontal list of attachment options and invokes a callback when an option is selected.
+ *
+ * Each option displays an icon inside a circular avatar with a label underneath; tapping an option calls
+ * `onSelectAttachment` with that option's `MediaCanvasItemType`.
+ *
+ * @param onSelectAttachment - Callback invoked with the selected attachment `type` when an option is pressed
+ * @returns A React element that renders the attachment selector UI
+ */
 export default function EntryAttachmentList({ onSelectAttachment }: EntryAttachmentListProps) {
     return (
         <View>
@@ -86,4 +95,3 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 });
-

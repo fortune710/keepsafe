@@ -50,6 +50,11 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
     )
 }
 
+/**
+ * Renders the empty-state view shown when no music results are available.
+ *
+ * @returns The empty-state React element containing a music icon and the prompt "Start searching for music".
+ */
 function EmptyComponent() {
     return (
         <View style={styles.emptyContainer}>

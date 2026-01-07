@@ -35,6 +35,19 @@ interface UseDeviceLocationResult {
   clearLocation: () => void;
 }
 
+/**
+ * Exposes the device's current location and a list of representative places within the device's region.
+ *
+ * Provides current device location (when permissions are granted), a cached/throttled list of places derived from the device's region, loading states for both queries, any error message, and a function to clear the cached location and places.
+ *
+ * @returns An object with the following properties:
+ *  - `location` — The resolved `LocationData` for the device, or `null` if permissions were not granted or location is unavailable.
+ *  - `placesInState` — An array of `PlaceResult` representing places found within the device's region (may be empty).
+ *  - `isLoading` — `true` while the device location query is loading or fetching, otherwise `false`.
+ *  - `isLoadingPlaces` — `true` while the places-in-state query is loading, otherwise `false`.
+ *  - `error` — A user-facing error message string when the location query fails, or `null` if there is no error.
+ *  - `clearLocation` — A function that clears the cached device location and the cached places-in-state.
+ */
 export function useDeviceLocation(): UseDeviceLocationResult {
   const queryClient = useQueryClient();
 
