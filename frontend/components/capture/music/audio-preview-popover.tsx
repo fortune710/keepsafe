@@ -22,6 +22,16 @@ interface MusicPopoverProps {
   music: MusicTag;
 }
 
+/**
+ * Render a sliding "Now Playing" popover that previews a music item and its metadata.
+ *
+ * Renders an overlay with a backdrop and an animated popover containing an AudioPreview, cover image, title, artist, and a Close action. The popover mounts only when `isVisible` is true; the overlay remains while exit animation runs.
+ *
+ * @param isVisible - Whether the popover is currently visible
+ * @param onClose - Callback invoked when the backdrop or Close button is pressed
+ * @param music - The music item to preview (expects `MusicTag` shape with `preview`, `cover`, `title`, and `artist`)
+ * @returns The popover JSX element, or `null` when neither visible nor provided with a music item
+ */
 export default function AudioPreviewPopover({ isVisible, onClose, music }: MusicPopoverProps) {
 
   // Don't return null - let the exit animation play

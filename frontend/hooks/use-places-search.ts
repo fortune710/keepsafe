@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { PlacesSearchService, PlacesSearchCoordinates } from '@/services/places-search-service';
 
+/**
+ * Searches for places matching a search term, optionally biased by coordinates.
+ *
+ * @param query - The search term to look up.
+ * @param options - Optional settings for the search.
+ * @param options.coordinates - Latitude and longitude used to bias the search results.
+ * @returns An object containing `places` (search results; defaults to an empty array), `isLoading` (whether the query is in progress), and `error` (any error encountered).
+ */
 export function usePlacesSearch(
   query: string,
   options: { coordinates?: PlacesSearchCoordinates } = {}
@@ -23,4 +31,3 @@ export function usePlacesSearch(
     error,
   };
 }
-

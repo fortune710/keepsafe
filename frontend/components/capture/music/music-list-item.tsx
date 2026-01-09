@@ -10,6 +10,13 @@ interface MusicListItemProps {
     onPress?: (music: MusicTag) => void;
 }
 
+/**
+ * Render a touchable list item showing a music cover, title, artist, and an audio preview control.
+ *
+ * @param music - The music item to display (cover URI, title, artist, and preview source)
+ * @param onPress - Optional callback invoked with `music` when the item is pressed
+ * @returns The rendered list item element for the given `music`
+ */
 export function MusicListItem({ music, onPress }: MusicListItemProps) {
     const handleMusicSelection = () => {
         onPress && onPress(music);
