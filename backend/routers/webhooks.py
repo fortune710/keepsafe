@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from services.ingestion_service import IngestionService
 from services.notification_enqueue_service import NotificationEnqueueService
+from services.friend_service import FriendService
 from services.supabase_client import get_supabase_client
 import logging
 import hmac
@@ -14,9 +15,17 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 ingestion_service = IngestionService()
 notification_enqueue_service = NotificationEnqueueService()
+friend_service = FriendService()
 
 class EntryWebhookPayload(BaseModel):
     """Payload structure for entry webhook."""
+    type: str  # 'INSERT', 'UPDATE', 'DELETE'
+    table: str
+    record: Optional[Dict[str, Any]] = None
+    old_record: Optional[Dict[str, Any]] = None
+
+class FriendWebhookPayload(BaseModel):
+    """Payload structure for friend webhook."""
     type: str  # 'INSERT', 'UPDATE', 'DELETE'
     table: str
     record: Optional[Dict[str, Any]] = None
@@ -164,6 +173,133 @@ async def entry_webhook(
         raise
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post("/friends")
+async def friend_webhook(
+    payload: FriendWebhookPayload,
+    request: Request,
+    x_supabase_signature: Optional[str] = Header(None, alias="x-supabase-signature")
+):
+    """
+    Process friendship change webhooks for the "friendships" table.
+    
+    Handles INSERT events (new friend requests) and UPDATE events (friend request acceptance).
+    On INSERT with status="pending", sends a friend request notification to the recipient.
+    On UPDATE from "pending" to "accepted", sends an acceptance notification to the original requester.
+    
+    Parameters:
+        payload (FriendWebhookPayload): Webhook payload describing the change.
+        request (Request): The incoming HTTP request object.
+        x_supabase_signature (Optional[str]): Optional Supabase webhook signature header.
+    
+    Returns:
+        dict: Response object containing `status`, `message`, and `friendship_id`.
+    """
+    try:
+        if payload.table != "friendships":
+            logger.warning(f"Received webhook for unexpected table: {payload.table}")
+            return {"status": "ignored", "message": f"Table {payload.table} not handled"}
+        
+        friendship_id = None
+        
+        if payload.type == "INSERT":
+            if not payload.record:
+                raise HTTPException(status_code=400, detail="Record missing in INSERT payload")
+            
+            friendship_id = payload.record.get("id")
+            status = payload.record.get("status", "pending")
+            logger.info(f"Processing INSERT webhook for friendship {friendship_id} with status {status}")
+            
+            # Send friend request notification if status is pending
+            if status == "pending":
+                success = await friend_service.send_friend_request_notification(payload.record)
+                if success:
+                    return {
+                        "status": "success",
+                        "message": f"Friend request notification sent for friendship {friendship_id}",
+                        "friendship_id": friendship_id
+                    }
+                else:
+                    logger.warning(f"Failed to send friend request notification for friendship {friendship_id}")
+                    return {
+                        "status": "partial_success",
+                        "message": f"Friendship {friendship_id} processed but notification failed",
+                        "friendship_id": friendship_id
+                    }
+            else:
+                # Not a pending request, just acknowledge
+                return {
+                    "status": "success",
+                    "message": f"Friendship {friendship_id} inserted (status: {status})",
+                    "friendship_id": friendship_id
+                }
+        
+        elif payload.type == "UPDATE":
+            if not payload.record:
+                raise HTTPException(status_code=400, detail="Record missing in UPDATE payload")
+            
+            friendship_id = payload.record.get("id")
+            new_status = payload.record.get("status", "")
+            old_status = payload.old_record.get("status", "") if payload.old_record else ""
+            
+            logger.info(
+                f"Processing UPDATE webhook for friendship {friendship_id}: "
+                f"{old_status} -> {new_status}"
+            )
+            
+            # Send acceptance notification if status changed from pending to accepted
+            if old_status == "pending" and new_status == "accepted":
+                success = await friend_service.send_request_accept_notification(payload.record)
+                if success:
+                    return {
+                        "status": "success",
+                        "message": f"Friend accept notification sent for friendship {friendship_id}",
+                        "friendship_id": friendship_id
+                    }
+                else:
+                    logger.warning(f"Failed to send friend accept notification for friendship {friendship_id}")
+                    return {
+                        "status": "partial_success",
+                        "message": f"Friendship {friendship_id} updated but notification failed",
+                        "friendship_id": friendship_id
+                    }
+            else:
+                # Status change that doesn't require notification
+                return {
+                    "status": "success",
+                    "message": f"Friendship {friendship_id} updated (status: {old_status} -> {new_status})",
+                    "friendship_id": friendship_id
+                }
+        
+        elif payload.type == "DELETE":
+            if not payload.old_record:
+                raise HTTPException(status_code=400, detail="Old record missing in DELETE payload")
+            
+            friendship_id = payload.old_record.get("id")
+            logger.info(f"Processing DELETE webhook for friendship {friendship_id}")
+            
+            # No notification needed for deletion
+            return {
+                "status": "success",
+                "message": f"Friendship {friendship_id} deleted",
+                "friendship_id": friendship_id
+            }
+        
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported webhook type: {payload.type}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing friend webhook: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
