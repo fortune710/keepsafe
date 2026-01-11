@@ -323,6 +323,8 @@ export interface Database {
           user_id: string
           current_streak: number
           max_streak: number
+          last_entry_date: string | null
+          last_access_time: string | null
           created_at: string
           updated_at: string
         }
@@ -331,6 +333,8 @@ export interface Database {
           user_id: string
           current_streak?: number
           max_streak?: number
+          last_entry_date?: string | null
+          last_access_time?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -339,6 +343,8 @@ export interface Database {
           user_id?: string
           current_streak?: number
           max_streak?: number
+          last_entry_date?: string | null
+          last_access_time?: string | null
           created_at?: string
           updated_at?: string
         }

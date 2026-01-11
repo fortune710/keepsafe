@@ -41,15 +41,17 @@ export class StreakService {
       console.error('Failed to load streak data:', error);
     }
 
-    // Fallback to Supabase (single row per user) for cross-device sync of streak stats
+    // Fallback to Supabase (single row per user) for cross-device sync of streak data
     try {
       const { data, error } = await supabase
         .from('user_streaks')
-        .select('current_streak, max_streak')
+        .select('current_streak, max_streak, last_entry_date, last_access_time')
         .eq('user_id', userId)
         .maybeSingle<{
           current_streak: number | null;
           max_streak: number | null;
+          last_entry_date: string | null;
+          last_access_time: string | null;
         }>();
 
       if (error) {
@@ -58,10 +60,8 @@ export class StreakService {
         const fromRemote: StreakData = {
           currentStreak: data.current_streak ?? 0,
           maxStreak: data.max_streak ?? 0,
-          // These fields are still tracked locally for streak logic; the Supabase table
-          // intentionally stores only streak stats (current/max).
-          lastEntryDate: null,
-          lastAccessTime: null,
+          lastEntryDate: data.last_entry_date,
+          lastAccessTime: data.last_access_time,
         };
 
         // Cache remotely-loaded data locally (best-effort)
@@ -104,6 +104,8 @@ export class StreakService {
           user_id: userId,
           current_streak: data.currentStreak,
           max_streak: data.maxStreak,
+          last_entry_date: data.lastEntryDate,
+          last_access_time: data.lastAccessTime,
         } as never, { onConflict: 'user_id' } as never);
 
       if (error) {

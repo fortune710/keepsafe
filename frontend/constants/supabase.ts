@@ -127,6 +127,8 @@ export const SCHEMA = {
     user_id: 'uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE',
     current_streak: 'integer NOT NULL DEFAULT 0',
     max_streak: 'integer NOT NULL DEFAULT 0',
+    last_entry_date: 'date',
+    last_access_time: 'timestamptz',
     created_at: 'timestamptz DEFAULT now()',
     updated_at: 'timestamptz DEFAULT now()',
   }

@@ -7,6 +7,8 @@
       - `user_id` (uuid, references auth.users)
       - `current_streak` (integer)
       - `max_streak` (integer)
+      - `last_entry_date` (date, nullable)
+      - `last_access_time` (timestamptz, nullable)
       - `created_at` (timestamp)
       - `updated_at` (timestamp)
 
@@ -21,6 +23,8 @@ CREATE TABLE IF NOT EXISTS user_streaks (
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   current_streak integer NOT NULL DEFAULT 0,
   max_streak integer NOT NULL DEFAULT 0,
+  last_entry_date date,
+  last_access_time timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -58,7 +62,7 @@ CREATE POLICY "Users can update own streak"
   ON user_streaks
   FOR UPDATE
   TO authenticated
-  USING (auth.uid() = user_id);
+  USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own streak"
