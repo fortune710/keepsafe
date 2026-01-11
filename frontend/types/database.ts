@@ -317,6 +317,32 @@ export interface Database {
           updated_at?: string
         }
       }
+      streaks: {
+        Row: {
+          id: number
+          user_id: string
+          current_streak: number
+          max_streak: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          current_streak?: number
+          max_streak?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          current_streak?: number
+          max_streak?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

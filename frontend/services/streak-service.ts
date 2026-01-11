@@ -1,6 +1,7 @@
 import { format, differenceInDays, startOfDay } from 'date-fns';
 import { deviceStorage } from './device-storage';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Streak Service - Manages user daily entry streaks
@@ -40,6 +41,42 @@ export class StreakService {
       console.error('Failed to load streak data:', error);
     }
 
+    // Fallback to Supabase (single row per user) for cross-device sync of streak stats
+    try {
+      const { data, error } = await supabase
+        .from('streaks')
+        .select('current_streak, max_streak')
+        .eq('user_id', userId)
+        .maybeSingle<{
+          current_streak: number | null;
+          max_streak: number | null;
+        }>();
+
+      if (error) {
+        console.error('Error fetching streak data from Supabase:', error);
+      } else if (data) {
+        const fromRemote: StreakData = {
+          currentStreak: data.current_streak ?? 0,
+          maxStreak: data.max_streak ?? 0,
+          // These fields are still tracked locally for streak logic; the Supabase table
+          // intentionally stores only streak stats (current/max).
+          lastEntryDate: null,
+          lastAccessTime: null,
+        };
+
+        // Cache remotely-loaded data locally (best-effort)
+        try {
+          await deviceStorage.setItem(`streak_${userId}`, fromRemote);
+        } catch (cacheError) {
+          console.error('Failed to cache remote streak data locally:', cacheError);
+        }
+
+        return fromRemote;
+      }
+    } catch (error) {
+      console.error('Error in Supabase streak fallback:', error);
+    }
+
     // Return default streak data
     return {
       currentStreak: 0,
@@ -51,11 +88,29 @@ export class StreakService {
 
   // Save streak data to storage
   static async saveStreakData(userId: string, data: StreakData): Promise<void> {
+    // 1. Save to local storage (best-effort cache; don't throw)
     try {
       await deviceStorage.setItem(`streak_${userId}`, data);
       console.log('Saved streak data:', data);
     } catch (error) {
       console.error('Failed to save streak data:', error);
+    }
+
+    // 2. Sync streak stats to Supabase (best-effort; do not block core app flows)
+    try {
+      const { error } = await supabase
+        .from('streaks')
+        .upsert({
+          user_id: userId,
+          current_streak: data.currentStreak,
+          max_streak: data.maxStreak,
+        } as never, { onConflict: 'user_id' } as never);
+
+      if (error) {
+        console.error('Error saving streak data to Supabase:', error);
+      }
+    } catch (error) {
+      console.error('Error in saveStreakData Supabase sync:', error);
     }
   }
 
