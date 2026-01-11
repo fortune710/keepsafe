@@ -317,7 +317,7 @@ export interface Database {
           updated_at?: string
         }
       }
-      streaks: {
+      user_streaks: {
         Row: {
           id: number
           user_id: string

@@ -12,7 +12,7 @@ export const TABLES = {
   PUSH_TOKENS: 'push_tokens',
   NOTIFICATION_SETTINGS: 'notification_settings',
   PRIVACY_SETTINGS: 'privacy_settings',
-  STREAKS: 'streaks',
+  USER_STREAKS: 'user_streaks',
 } as const;
 
 // Storage Bucket Names
@@ -122,9 +122,9 @@ export const SCHEMA = {
     created_at: 'timestamptz DEFAULT now()',
     updated_at: 'timestamptz DEFAULT now()',
   },
-  STREAKS: {
+  USER_STREAKS: {
     id: 'bigserial PRIMARY KEY',
-    user_id: 'uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE',
+    user_id: 'uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE',
     current_streak: 'integer NOT NULL DEFAULT 0',
     max_streak: 'integer NOT NULL DEFAULT 0',
     created_at: 'timestamptz DEFAULT now()',

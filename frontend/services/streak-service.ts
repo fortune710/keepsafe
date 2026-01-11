@@ -44,7 +44,7 @@ export class StreakService {
     // Fallback to Supabase (single row per user) for cross-device sync of streak stats
     try {
       const { data, error } = await supabase
-        .from('streaks')
+        .from('user_streaks')
         .select('current_streak, max_streak')
         .eq('user_id', userId)
         .maybeSingle<{
@@ -99,7 +99,7 @@ export class StreakService {
     // 2. Sync streak stats to Supabase (best-effort; do not block core app flows)
     try {
       const { error } = await supabase
-        .from('streaks')
+        .from('user_streaks')
         .upsert({
           user_id: userId,
           current_streak: data.currentStreak,

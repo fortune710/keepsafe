@@ -1,10 +1,10 @@
 /*
-  # Streaks Table
+  # User Streaks Table
 
   1. New Table
-    - `streaks` - Per-user streak stats (1 row per user)
+    - `user_streaks` - Per-user streak stats (1 row per user)
       - `id` (bigint, primary key)
-      - `user_id` (uuid, references profiles)
+      - `user_id` (uuid, references auth.users)
       - `current_streak` (integer)
       - `max_streak` (integer)
       - `created_at` (timestamp)
@@ -15,66 +15,65 @@
     - Policies so users can manage only their own streak record
 */
 
--- Create streaks table
-CREATE TABLE IF NOT EXISTS streaks (
+-- Create user_streaks table
+CREATE TABLE IF NOT EXISTS user_streaks (
   id bigserial PRIMARY KEY,
-  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   current_streak integer NOT NULL DEFAULT 0,
   max_streak integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(user_id)
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Backfill and enforce NOT NULL constraints for existing rows (if any)
-UPDATE streaks
+UPDATE user_streaks
 SET created_at = now()
 WHERE created_at IS NULL;
 
-UPDATE streaks
+UPDATE user_streaks
 SET updated_at = now()
 WHERE updated_at IS NULL;
 
-ALTER TABLE streaks
+ALTER TABLE user_streaks
   ALTER COLUMN created_at SET NOT NULL,
   ALTER COLUMN updated_at SET NOT NULL;
 
 -- Enable Row Level Security
-ALTER TABLE streaks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_streaks ENABLE ROW LEVEL SECURITY;
 
 -- Policies: users can manage their own streak record
 CREATE POLICY "Users can read own streak"
-  ON streaks
+  ON user_streaks
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert own streak"
-  ON streaks
+  ON user_streaks
   FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own streak"
-  ON streaks
+  ON user_streaks
   FOR UPDATE
   TO authenticated
   USING (auth.uid() = user_id);
   WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own streak"
-  ON streaks
+  ON user_streaks
   FOR DELETE
   TO authenticated
   USING (auth.uid() = user_id);
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_streaks_user_id
-  ON streaks(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_streaks_user_id
+  ON user_streaks(user_id);
 
 -- updated_at trigger
-CREATE TRIGGER update_streaks_updated_at
-  BEFORE UPDATE ON streaks
+CREATE TRIGGER update_user_streaks_updated_at
+  BEFORE UPDATE ON user_streaks
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
