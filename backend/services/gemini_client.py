@@ -13,7 +13,7 @@ Docs: https://ai.google.dev/gemini-api/docs
 
 _client: Optional[genai.Client] = None
 
-GEMINI_FLASH_MODEL = "gemini-2.0-flash"          # Fast multimodal model
+GEMINI_FLASH_MODEL = "gemini-2.5-flash"          # Fast multimodal model
 GEMINI_EMBED_MODEL = "text-embedding-004"       # Latest embedding model
 
 
