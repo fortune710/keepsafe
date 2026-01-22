@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { 
   SlideInUp,
@@ -11,13 +11,14 @@ import EntryReactionsPopup from '@/components/entry-reactions-popup';
 import EntryCommentsPopup from '@/components/entry-comments-popup';
 import VaultEntryCard from '@/components/entries/vault-entry-card';
 import { EntryPage } from '@/components/entries/entry-page';
-import { verticalScale } from 'react-native-size-matters';
+import { scale, verticalScale } from 'react-native-size-matters';
 import { FlashList } from '@shopify/flash-list';
-import { VaultHeader } from '@/components/vault/vault-header';
 import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
 import { useResponsive, useTabletLayout } from '@/hooks/use-responsive';
+import { ChevronLeft } from 'lucide-react-native';
+import { Colors } from '@/lib/constants';
 
 const { height, width } = Dimensions.get('window');
 
@@ -135,6 +136,9 @@ export default function VaultScreen() {
 
     return (
       <EntryPage>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <ChevronLeft color="#64748B" size={24} />
+        </Pressable>
         <FlashList
           data={Object.keys(entriesByDate)}
           contentContainerStyle={{
@@ -185,7 +189,6 @@ export default function VaultScreen() {
       style={styles.container}
     >
       <>
-        <VaultHeader isVisible={isHeaderVisible}/>
 
         <View style={styles.content}>
           {renderContent()}
@@ -238,6 +241,17 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'row',
     marginVertical: verticalScale(24)
+  },
+  backButton: {
+    padding: scale(10),
+    position: 'absolute',
+    top: verticalScale(50),
+    left: scale(20),
+    backgroundColor: Colors.white,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: 100,
+    zIndex: 9999,
   },
   content: {
     flex: 1,
