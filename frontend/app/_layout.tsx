@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryProvider } from '@/providers/query-provider';
@@ -11,6 +12,9 @@ import { Host } from 'react-native-portalize';
 import { useEffect } from 'react';
 import { initializeBackgroundTasks } from '@/lib/background-task-init';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useAppFonts } from '@/hooks/useFonts';
+
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -22,6 +26,19 @@ export default function RootLayout() {
   useEffect(() => {
     initializeBackgroundTasks();
   }, []);
+
+  // Load fonts
+  const { fontsLoaded, fontError } = useAppFonts();
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <Host>

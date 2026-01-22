@@ -66,7 +66,7 @@ export async function generateInviteCode(): Promise<string> {
 }
 
 export const generateDeepLinkUrl = () => {
-    const PROD_URL = "https://keepsafe.app";
+    const PROD_URL = "https://keepsafe.fortunealebiosu.dev";
     const DEV_URL = "exp://192.168.12.175:8081/--";
 
     console.log({ env: process.env.EXPO_PUBLIC_NODE_ENV })
@@ -114,7 +114,7 @@ export const getRelativeDate = (dateString: string) => {
       return date.toLocaleDateString('en-US', { 
         month: 'short', 
         day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+        //year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
       });
     }
 };

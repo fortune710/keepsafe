@@ -10,7 +10,7 @@ export default function AboutScreen() {
   const buildNumber = '2025.01.15';
 
   const handleContactSupport = () => {
-    Linking.openURL('mailto:support@keepsafe.app?subject=Keepsafe Support');
+    Linking.openURL('mailto:contact@fortunealebiosu.dev?subject=Keepsafe Support');
   };
 
   return (

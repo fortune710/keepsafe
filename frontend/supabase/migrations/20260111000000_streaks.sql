@@ -75,6 +75,15 @@ CREATE POLICY "Users can delete own streak"
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_streaks_user_id
   ON user_streaks(user_id);
 
+-- Ensure the update_updated_at_column function exists (it should from the first migration)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
 -- updated_at trigger
 CREATE TRIGGER update_user_streaks_updated_at
   BEFORE UPDATE ON user_streaks
