@@ -99,52 +99,24 @@ export function useMediaCapture(): UseCaptureResult {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
       });
 
       // Small delay to ensure mode reset completes
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Set to recording mode
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
       });
 
-      // Custom recording options for higher volume and quality
-      const recordingOptions = {
-        android: {
-          extension: '.m4a',
-          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-          audioEncoder: Audio.AndroidAudioEncoder.AAC,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 256000, // Higher bit rate for better quality
-          maxFileSize: 10 * 1024 * 1024, // 10MB max file size
-        },
-        ios: {
-          extension: '.m4a',
-          audioQuality: Audio.IOSAudioQuality.MAX, // Maximum quality
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 256000, // Higher bit rate for better quality
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
-        },
-        web: {
-          mimeType: 'audio/webm',
-          bitsPerSecond: 256000,
-        },
-      };
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        recordingOptions
-      );
+      const { recording: newRecording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       
       setRecording(newRecording);
       
@@ -175,20 +147,14 @@ export function useMediaCapture(): UseCaptureResult {
       }
       
       await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
       const uri = recording.getURI();
       
       if (!uri) {
         throw new Error('No recording URI available');
       }
-
-      // Reset audio mode back to normal playback mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
-      });
 
       const audioCapture: MediaCapture = {
         id: generateId(),
