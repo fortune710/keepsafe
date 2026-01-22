@@ -82,7 +82,7 @@ export default function LegalScreen() {
 
             <Text style={styles.sectionTitle}>9. Contact Information</Text>
             <Text style={styles.sectionText}>
-              If you have questions about these Terms of Service, please contact us at support@keepsafe.app.
+              If you have questions about these Terms of Service, please contact us at contact@fortunealebiosu.dev.
             </Text>
           </View>
         );
@@ -188,7 +188,7 @@ export default function LegalScreen() {
 
             <Text style={styles.sectionTitle}>10. Contact Us</Text>
             <Text style={styles.sectionText}>
-              If you have questions about this Privacy Policy, please contact us at support@keepsafe.app or through the app's support feature.
+              If you have questions about this Privacy Policy, please contact us at contact@fortunealebiosu.dev or through the app's support feature.
             </Text>
           </View>
         );
