@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     flex: 1,
   },
@@ -203,6 +203,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+    fontFamily: 'Outfit-Regular',
     color: '#64748B',
     marginTop: 12,
   },
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   },
   monthTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
   },
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#64748B',
   },
   daysGrid: {
@@ -271,8 +272,8 @@ const styles = StyleSheet.create({
   },
   dayNumber: {
     fontSize: 16,
+    fontFamily: 'Jost-Medium',
     color: '#1E293B',
-    fontWeight: '500',
   },
   entryIndicatorContainer: {
     position: 'absolute',
@@ -292,8 +293,8 @@ const styles = StyleSheet.create({
   },
   entryCount: {
     fontSize: 10,
+    fontFamily: 'Jost-SemiBold',
     color: '#8B5CF6',
-    fontWeight: '600',
     marginTop: 1,
   },
 

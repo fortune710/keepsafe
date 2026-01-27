@@ -241,6 +241,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
   },
@@ -260,6 +261,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+    fontFamily: 'Outfit-Regular',
     color: '#64748B',
     marginTop: 16,
   },
@@ -271,6 +273,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 20,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
     marginTop: 16,
@@ -279,6 +282,7 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
@@ -293,6 +297,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
     fontSize: 16,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
   },
   searchBox: {
@@ -314,6 +319,7 @@ const styles = StyleSheet.create({
   },
   searchPlaceholder: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#94A3B8',
     marginLeft: 12,
   },
@@ -327,6 +333,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#64748B',
     marginLeft: 8,
@@ -349,6 +356,7 @@ const styles = StyleSheet.create({
   shareButtonText: {
     color: '#8B5CF6',
     fontSize: 16,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     marginLeft: 8,
   },

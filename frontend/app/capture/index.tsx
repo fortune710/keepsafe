@@ -1,16 +1,10 @@
-// ================================
-// FIXED CAMERA CAPTURE IMPLEMENTATION
-// ================================
-
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ScrollView, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
-  withRepeat, 
-  withTiming, 
   withSpring, 
   interpolate,
   Extrapolate,
@@ -28,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
 import AudioWaveVisualier from '@/components/audio/audio-wave-visualier';
 import { useResponsive } from '@/hooks/use-responsive';
+import { logger } from '@/lib/logger';
 
 const { height } = Dimensions.get('window');
 
@@ -141,7 +136,7 @@ export default function CaptureScreen() {
   // FIXED: Proper photo capture
   const takePicture = async () => {
     try {
-      console.log('Taking picture...');
+      logger.debug('Taking picture...');
       
       if (!cameraRef.current) {
         throw new Error('Camera ref not available');
@@ -159,7 +154,7 @@ export default function CaptureScreen() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      console.log('Camera ready, taking picture...');
+      logger.debug('Camera ready, taking picture...');
 
       // Process the photo using your MediaService
       const capture = await MediaService.capturePhoto(cameraRef);
@@ -177,7 +172,7 @@ export default function CaptureScreen() {
 
 
     } catch (error: any) {
-      console.error('Photo capture failed:', error);
+      logger.error('Photo capture failed:', error);
       Alert.alert('Error', `Failed to take picture: ${error.message}`);
     }
   };
@@ -187,20 +182,9 @@ export default function CaptureScreen() {
     if (!cameraRef.current || isCapturing || (isVideoRecording && !pendingVideoStartRef.current)) return;
     
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:startVideo',message:'startVideo called',data:{selectedMode,isCapturing,isVideoRecording,isCameraReady,cameraMode,hasCameraRef:!!cameraRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V1'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] startVideo called', { selectedMode, isCapturing, isVideoRecording, isCameraReady, cameraMode, hasCameraRef: !!cameraRef.current });
-      console.log('Starting video recording...');
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:startVideo',message:'mic permission status',data:{micStatus:micPermission?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'video2',hypothesisId:'V_MIC'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] mic permission status', { micStatus: micPermission?.status });
-
       // On iOS, video recording typically needs microphone permission (unless muted).
       if (micPermission?.status !== 'granted') {
         const res = await requestMicPermission();
-        console.log('[VideoDebug] mic permission request result', { micStatus: res?.status });
         if (res?.status !== 'granted') {
           Alert.alert('Microphone Permission Required', 'Please enable microphone permission to record videos with audio.');
           return;
@@ -214,10 +198,6 @@ export default function CaptureScreen() {
 
       // Switch to video mode
       if (cameraMode !== 'video') {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:startVideo',message:'switching cameraMode -> video',data:{cameraModeBefore:cameraMode},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V2'})}).catch(()=>{});
-        // #endregion
-        console.log('[VideoDebug] switching cameraMode -> video');
         // We intentionally wait for `onCameraReady` to fire in video mode before calling `recordAsync`.
         pendingVideoStartRef.current = true;
         pendingVideoStopRef.current = false;
@@ -240,22 +220,13 @@ export default function CaptureScreen() {
         setVideoDuration(Math.floor((Date.now() - startTime) / 1000));
       }, 1000);
 
-      console.log('Starting recording...');
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:startVideo',message:'calling cameraRef.recordAsync',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V3'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] calling cameraRef.current.recordAsync (about to await)');
+      logger.debug('Starting recording...');
       const videoResult = await cameraRef.current.recordAsync({
         maxDuration: 60,
         //quality: '720p',
         // NOTE: if mic permission is flaky on some devices, try setting mute: true as a fallback.
       });
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:startVideo',message:'recordAsync resolved',data:{hasUri:!!videoResult?.uri},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V3'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] recordAsync resolved', { hasUri: !!videoResult?.uri });
-      console.log('Video recorded:', videoResult);
+      logger.debug('Video recorded:', videoResult);
 
       if (videoResult && videoResult.uri) {
         const capture = await MediaService.createVideoCapture(videoResult.uri);
@@ -272,10 +243,7 @@ export default function CaptureScreen() {
         }
       }
     } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:startVideo',message:'recordAsync threw',data:{name:error?.name,message:error?.message,code:error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V3'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] recordAsync threw', { name: error?.name, message: error?.message, code: error?.code });
+      logger.debug('recordAsync threw', { name: error?.name, message: error?.message, code: error?.code });
       videoStateRef.current = 'failed';
       // Cleanup timer/state so we don't call stopRecording after a failed start.
       if (videoTimerRef.current) {
@@ -285,7 +253,7 @@ export default function CaptureScreen() {
       setVideoDuration(0);
       // Force a remount of the camera to recover from blank/unresponsive native state.
       setCameraInstance((v) => v + 1);
-      console.error('Error starting video recording:', error);
+      logger.error('Error starting video recording:', error);
       Alert.alert('Error', `Failed to start video recording: ${error.message}`);
     }
   };
@@ -294,11 +262,8 @@ export default function CaptureScreen() {
     if (!cameraRef.current) return;
     
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:stopVideo',message:'stopVideo called',data:{isVideoRecording,hasCameraRef:!!cameraRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V4'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] stopVideo called', { isVideoRecording, hasCameraRef: !!cameraRef.current });
-      console.log('Stopping video recording...');
+      logger.debug('stopVideo called', { isVideoRecording, hasCameraRef: !!cameraRef.current });
+      logger.debug('Stopping video recording...');
       // If we're waiting to start (mode switch -> onCameraReady), just mark pending stop.
       if (pendingVideoStartRef.current) {
         pendingVideoStopRef.current = true;
@@ -306,16 +271,16 @@ export default function CaptureScreen() {
         videoStateRef.current = 'idle';
         setIsVideoRecording(false);
         setVideoDuration(0);
-        console.log('[VideoDebug] stopVideo: cancelled pending start before recordAsync');
+        logger.debug('stopVideo: cancelled pending start before recordAsync');
         return;
       }
       // If recordAsync already failed, do NOT call stopRecording (it can wedge the native session).
       if (videoStateRef.current === 'failed') {
-        console.log('[VideoDebug] stopVideo: skipping stopRecording because videoState=failed');
+        logger.debug('stopVideo: skipping stopRecording because videoState=failed');
         return;
       }
       if (!isVideoRecording) {
-        console.log('[VideoDebug] stopVideo: not recording; nothing to stop');
+        logger.debug('stopVideo: not recording; nothing to stop');
         return;
       }
       
@@ -328,17 +293,11 @@ export default function CaptureScreen() {
       setVideoDuration(0);
       
       // Stop recording
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:stopVideo',message:'calling cameraRef.stopRecording',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V4'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] calling cameraRef.current.stopRecording()');
+      logger.debug('calling cameraRef.current.stopRecording()');
       cameraRef.current.stopRecording();
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:stopVideo',message:'stopRecording threw',data:{name:(error as any)?.name,message:(error as any)?.message,code:(error as any)?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'video1',hypothesisId:'V4'})}).catch(()=>{});
-      // #endregion
-      console.log('[VideoDebug] stopRecording threw', { name: (error as any)?.name, message: (error as any)?.message, code: (error as any)?.code });
-      console.error('Error stopping video recording:', error);
+      logger.debug('stopRecording threw', { name: (error as any)?.name, message: (error as any)?.message, code: (error as any)?.code });
+      logger.error('Error stopping video recording:', error);
       Alert.alert('Error', 'Failed to stop video recording');
     }
   };
@@ -373,7 +332,7 @@ export default function CaptureScreen() {
           setIsVideoRecording(false);
           setVideoDuration(0);
         } catch (error) {
-          console.error('Error stopping video before audio recording:', error);
+          logger.error('Error stopping video before audio recording:', error);
         }
       }
       
@@ -389,7 +348,7 @@ export default function CaptureScreen() {
     const mediaType = selectedMode === 'camera' ? 'photo' : 'audio';
     const capture = await uploadMedia(mediaType);
 
-    console.log('Capture', capture);
+    logger.debug('Capture', capture);
     
     if (capture) {
       router.push({
@@ -413,11 +372,8 @@ export default function CaptureScreen() {
 
   // Camera ready handler
   const onCameraReady = () => {
-    console.log('Camera is ready');
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/24da142c-9860-4354-b5fa-425c6ebc46ce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'capture/index.tsx:onCameraReady',message:'onCameraReady fired',data:{cameraMode,selectedMode,pendingVideoStart:pendingVideoStartRef.current,pendingVideoStop:pendingVideoStopRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'video2',hypothesisId:'V_READY'})}).catch(()=>{});
-    // #endregion
-    console.log('[VideoDebug] onCameraReady', { cameraMode, selectedMode, pendingVideoStart: pendingVideoStartRef.current, pendingVideoStop: pendingVideoStopRef.current });
+    logger.debug('Camera is ready');
+    logger.debug('onCameraReady', { cameraMode, selectedMode, pendingVideoStart: pendingVideoStartRef.current, pendingVideoStop: pendingVideoStopRef.current });
     setIsCameraReady(true);
 
     // If we switched to video mode and were waiting to start recording, do it now.
@@ -427,10 +383,10 @@ export default function CaptureScreen() {
         pendingVideoStopRef.current = false;
         videoStateRef.current = 'idle';
         setIsVideoRecording(false);
-        console.log('[VideoDebug] pending stop was set; skipping video start');
+        logger.debug('pending stop was set; skipping video start');
         return;
       }
-      console.log('[VideoDebug] starting pending video now that camera is ready in video mode');
+      logger.debug('starting pending video now that camera is ready in video mode');
       // Fire and forget; `startVideo` will proceed because pendingVideoStartRef is now false and cameraMode is video.
       startVideo();
     }
