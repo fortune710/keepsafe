@@ -265,7 +265,7 @@ export class PushNotificationService {
   static async initializeNotificationSettingsFromPermission(
     userId: string,
     permissionGranted: boolean,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       // Check remote row existence directly (local cache may exist without remote in older versions)
       const { data, error } = await supabase
@@ -276,18 +276,20 @@ export class PushNotificationService {
 
       if (error) {
         console.error('Error checking notification settings row existence:', error);
-        return;
+        return false;
       }
 
       if (data?.user_id) {
-        return;
+        return false;
       }
 
       const defaults = permissionGranted ? ALL_NOTIFICATIONS_ON : ALL_NOTIFICATIONS_OFF;
       await PushNotificationService.saveNotificationSettings(userId, defaults);
+      return true;
     } catch (error) {
       // Best-effort: never break permission flow due to settings persistence
       console.error('Error initializing notification settings from permission:', error);
+      return false;
     }
   }
 }

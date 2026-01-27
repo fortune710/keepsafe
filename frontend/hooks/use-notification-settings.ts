@@ -116,7 +116,7 @@ export function useNotificationSettings(): UseNotificationSettingsResult {
         }
 
         // Persist initial preferences row if missing (grant => all true, deny => all false).
-        void PushNotificationService.initializeNotificationSettingsFromPermission(
+        const created = await PushNotificationService.initializeNotificationSettingsFromPermission(
           user.id,
           finalStatus === 'granted',
         );
@@ -132,7 +132,17 @@ export function useNotificationSettings(): UseNotificationSettingsResult {
           return;
         }
 
-        // Granted: enable push toggle, keep other prefs as-is.
+        // Granted: if this is the first time, default everything to true; otherwise keep other prefs as-is.
+        if (created) {
+          saveSettings({
+            [NotificationSettings.PUSH_NOTIFICATIONS]: true,
+            [NotificationSettings.FRIEND_ACTIVITY]: true,
+            [NotificationSettings.ENTRY_REMINDER]: true,
+            [NotificationSettings.FRIEND_REQUESTS]: true,
+          });
+          return;
+        }
+
         saveSettings({
           ...currentSettings,
           [NotificationSettings.PUSH_NOTIFICATIONS]: true,
