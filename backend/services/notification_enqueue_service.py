@@ -118,11 +118,11 @@ class NotificationEnqueueService:
             if shared_with_everyone:
                 # Get all friends of the owner
                 friends = self._get_user_friends(owner_id)
-                recipient_user_ids = [friend["friend_id"] for friend in friends]
+                recipient_user_ids = [friend["friend_id"] for friend in friends if friend["friend_id"] != owner_id]
             elif shared_with:
                 # Use the shared_with list
-                recipient_user_ids = shared_with if isinstance(shared_with, list) else []
-            
+                recipient_user_ids = [user_id for user_id in shared_with if user_id != owner_id] if isinstance(shared_with, list) else []
+
             if not recipient_user_ids:
                 logger.info(f"No recipients found for entry {entry_id}")
                 return True  # Not an error, just no one to notify
