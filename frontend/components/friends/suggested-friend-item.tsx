@@ -10,8 +10,7 @@ import { scale, verticalScale } from 'react-native-size-matters';
 import { useInviteAcceptance } from '@/hooks/use-invite-acceptance';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
-
-
+import { useSuggestedFriends } from '@/hooks/use-suggested-friends';
 
 interface FriendItemProps {
   friend: SuggestedFriend;
@@ -22,6 +21,7 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
   const { profile } = useAuthContext();
   const { acceptInvite: sendFriendRequest, isProcessing } = useInviteAcceptance();
   const { toast: showToast } = useToast();
+  const { removeContactFromList } = useSuggestedFriends();
 
   const handleAccept = async () => {
     if (!profile?.id) {
@@ -29,6 +29,8 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
     }
     const result = await sendFriendRequest(friend.id, profile.id);
     if (result.success) {
+      // Remove contact from list optimistically
+      removeContactFromList(friend.id);
       return showToast('Friend request sent', 'success');
     } else {
       return showToast(result.message || 'Failed to send friend request', 'error');
