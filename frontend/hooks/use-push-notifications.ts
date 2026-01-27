@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { PushNotificationService } from '@/services/push-notification-service';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -24,11 +25,13 @@ interface UsePushNotificationsResult {
   sendTestNotification: () => Promise<void>;
 }
 
-export function usePushNotifications(): UsePushNotificationsResult {
+export function usePushNotifications(userId?: string): UsePushNotificationsResult {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<Notifications.Notification | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [permissionStatus, setPermissionStatus] =
+    useState<Notifications.PermissionStatus | null>(null);
   
   const notificationListener = useRef<Notifications.Subscription>(null);
   const responseListener = useRef<Notifications.Subscription>(null);
@@ -54,10 +57,20 @@ export function usePushNotifications(): UsePushNotificationsResult {
         notificationListener.current.remove();
       }
       if (responseListener.current) {
-        notificationListener.current?.remove();
+        responseListener.current?.remove();
       }
     };
   }, []);
+
+  useEffect(() => {
+    // If we learned permission status before the userId was available, persist
+    // the initial notification settings row once we have the userId.
+    if (!userId || !permissionStatus) return;
+    void PushNotificationService.initializeNotificationSettingsFromPermission(
+      userId,
+      permissionStatus === 'granted',
+    );
+  }, [userId, permissionStatus]);
 
   const registerForPushNotifications = async (): Promise<string | null> => {
     setIsLoading(true);
@@ -84,6 +97,14 @@ export function usePushNotifications(): UsePushNotificationsResult {
       if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
+      }
+
+      setPermissionStatus(finalStatus);
+      if (userId) {
+        void PushNotificationService.initializeNotificationSettingsFromPermission(
+          userId,
+          finalStatus === 'granted',
+        );
       }
 
       if (finalStatus !== 'granted') {

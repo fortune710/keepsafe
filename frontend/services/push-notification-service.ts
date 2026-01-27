@@ -9,6 +9,20 @@ import { NotificationSettings } from '@/types/notifications';
 
 export type NotificationSettingsMap = Record<NotificationSettings, boolean>;
 
+const ALL_NOTIFICATIONS_ON: NotificationSettingsMap = {
+  [NotificationSettings.PUSH_NOTIFICATIONS]: true,
+  [NotificationSettings.FRIEND_ACTIVITY]: true,
+  [NotificationSettings.ENTRY_REMINDER]: true,
+  [NotificationSettings.FRIEND_REQUESTS]: true,
+};
+
+const ALL_NOTIFICATIONS_OFF: NotificationSettingsMap = {
+  [NotificationSettings.PUSH_NOTIFICATIONS]: false,
+  [NotificationSettings.FRIEND_ACTIVITY]: false,
+  [NotificationSettings.ENTRY_REMINDER]: false,
+  [NotificationSettings.FRIEND_REQUESTS]: false,
+};
+
 const NOTIFICATION_SETTINGS_STORAGE_KEY = (userId: string) =>
   `notification_settings_${userId}`;
 
@@ -226,6 +240,56 @@ export class PushNotificationService {
     if (error) {
       console.error('Error saving notification settings to Supabase:', error);
       throw new Error(error.message || 'Failed to save notification settings');
+    }
+  }
+
+  /**
+   * Backwards-compatible alias (matches older naming used in docs/issues).
+   */
+  static async saveNotificationsSettings(
+    userId: string,
+    settings: NotificationSettingsMap,
+  ): Promise<void> {
+    return await PushNotificationService.saveNotificationSettings(userId, settings);
+  }
+
+  /**
+   * Create an initial `notification_settings` row the first time we learn the
+   * device-level notification permission outcome for a user.
+   *
+   * - If granted: default all options to true
+   * - If denied: default all options to false
+   *
+   * This is intentionally "create-if-missing" to avoid clobbering user prefs.
+   */
+  static async initializeNotificationSettingsFromPermission(
+    userId: string,
+    permissionGranted: boolean,
+  ): Promise<boolean> {
+    try {
+      // Check remote row existence directly (local cache may exist without remote in older versions)
+      const { data, error } = await supabase
+        .from('notification_settings')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle<{ user_id: string }>();
+
+      if (error) {
+        console.error('Error checking notification settings row existence:', error);
+        return false;
+      }
+
+      if (data?.user_id) {
+        return false;
+      }
+
+      const defaults = permissionGranted ? ALL_NOTIFICATIONS_ON : ALL_NOTIFICATIONS_OFF;
+      await PushNotificationService.saveNotificationSettings(userId, defaults);
+      return true;
+    } catch (error) {
+      // Best-effort: never break permission flow due to settings persistence
+      console.error('Error initializing notification settings from permission:', error);
+      return false;
     }
   }
 }
