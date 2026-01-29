@@ -9,6 +9,7 @@ import { NotificationSettings } from '@/types/notifications';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import { LocalNotificationService } from '@/services/local-notification-service';
 
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettingsMap = {
   [NotificationSettings.PUSH_NOTIFICATIONS]: true,
@@ -61,6 +62,11 @@ export function useNotificationSettings(): UseNotificationSettingsResult {
 
       queryClient.setQueryData<NotificationSettingsMap>(queryKey, next);
 
+      //If user disbaled notifications, cancel all scheduled notifications
+      if (!next[NotificationSettings.PUSH_NOTIFICATIONS]) {
+        await LocalNotificationService.cancelAllScheduledNotifications();
+      }
+      
       return { previous };
     },
     onError: (_err, _next, context) => {
