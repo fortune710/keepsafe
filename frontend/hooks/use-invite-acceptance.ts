@@ -50,7 +50,10 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
         .single();
 
       if (existingFriendship) {
-        throw new Error('You are already connected with this user');
+        return {
+          friendshipId: (existingFriendship as any).id,
+          message: 'You are already connected with this user',
+        };
       }
 
 

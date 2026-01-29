@@ -6,11 +6,12 @@ import { FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { Colors } from '@/lib/constants';
 import { SuggestedFriend } from '@/types/friends';
 import { getDefaultAvatarUrl } from '@/lib/utils';
-import { scale, verticalScale } from 'react-native-size-matters';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { useInviteAcceptance } from '@/hooks/use-invite-acceptance';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { useSuggestedFriends } from '@/hooks/use-suggested-friends';
+import { useFriends } from '@/hooks/use-friends';
 
 interface FriendItemProps {
   friend: SuggestedFriend;
@@ -22,6 +23,9 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
   const { acceptInvite: sendFriendRequest, isProcessing } = useInviteAcceptance();
   const { toast: showToast } = useToast();
   const { removeContactFromList } = useSuggestedFriends();
+  const { checkFriendStatus } = useFriends();
+
+  const friendStatus = checkFriendStatus(friend.id);
 
   const handleAccept = async () => {
     if (!profile?.id) {
@@ -55,15 +59,37 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
           <Text style={styles.friendEmail}>{friend.username}</Text>
         </View>
 
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={handleAccept}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          disabled={isProcessing}
-        >
-          <Plus color="#fff" size={20} />
-          <Text style={styles.addButtonText}>Add</Text>
-        </TouchableOpacity>
+        {
+          !friendStatus ? (
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={handleAccept}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              disabled={isProcessing}
+            >
+              <Plus color={Colors.white} strokeWidth={3} size={20} />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          ) : 
+          friendStatus === FRIENDSHIP_STATUS.PENDING || friendStatus === FRIENDSHIP_STATUS.ACCEPTED ? (
+            <TouchableOpacity 
+              style={styles.pendingButton}
+              disabled={true}
+            >
+              <Plus color={Colors.white} strokeWidth={3} size={20} />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={styles.blockedButton}
+              disabled={true}
+            >
+              <X color={Colors.white} strokeWidth={3} size={20} />
+              <Text style={styles.addButtonText}>Blocked</Text>
+            </TouchableOpacity>
+          )
+        }
+
       </View>
     </Animated.View>
   );
@@ -71,17 +97,13 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
+    //backgroundColor: 'white',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    paddingHorizontal: verticalScale(7),
+    marginBottom: verticalScale(10),
+    //marginBottom: verticalScale(0),
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   avatarContainer: {
     position: 'relative',
@@ -117,13 +139,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   friendName: {
-    fontSize: 16,
+    fontSize: moderateScale(14),
     fontWeight: '600',
+    fontFamily: 'Outfit-Bold',
     color: '#1E293B',
     marginBottom: 2,
   },
   friendEmail: {
-    fontSize: 14,
+    fontSize: moderateScale(12),
+    fontFamily: 'Jost-SemiBold',
     color: '#64748B',
   },
   statusText: {
@@ -134,18 +158,43 @@ const styles = StyleSheet.create({
   addButton: {
     paddingVertical: verticalScale(6),
     paddingHorizontal: scale(12),
-    borderRadius: 15, // medium border radius
+    borderRadius: scale(99), // medium border radius
     backgroundColor: Colors.primary,
-    minWidth: 40,
+    minWidth: scale(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+    display: "flex",
+    flexDirection: "row"
+  },
+  pendingButton: {
+    paddingVertical: verticalScale(6),
+    paddingHorizontal: scale(12),
+    borderRadius: scale(99), // medium border radius
+    backgroundColor: Colors.text,
+    opacity: 0.5,
+    minWidth: scale(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+    display: "flex",
+    flexDirection: "row"
+  },
+  blockedButton: {
+    paddingVertical: verticalScale(6),
+    paddingHorizontal: scale(12),
+    borderRadius: scale(99), // medium border radius
+    backgroundColor: Colors.danger,
+    opacity: 0.5,
+    minWidth: scale(40),
     alignItems: 'center',
     justifyContent: 'center',
     display: "flex",
     flexDirection: "row"
   },
   addButtonText: {
-    fontSize: scale(10),
-    color: 'white',
+    fontSize: moderateScale(12),
+    color: Colors.white,
     fontWeight: '600',
-    marginLeft: scale(6)
+    fontFamily: 'Outfit-Bold',
+    marginLeft: scale(6),
   },
 });

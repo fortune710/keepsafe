@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
-import { Search, Share, ChevronRight, UserPlus, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Search, ChevronRight, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import InvitePopover from '@/components/invite-popover';
 import FriendSearchBar from '@/components/friend-search-bar';
@@ -10,6 +10,7 @@ import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { useSuggestedFriends } from '@/hooks/use-suggested-friends';
 import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
+import AddFriendsSection from '@/components/friends/add-friends-section';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -152,23 +153,9 @@ export default function FriendsScreen() {
                     onPress={handleSearchToggle}
                     activeOpacity={0.7}
                   >
-                    <Search color="#94A3B8" size={20} />
-                    <Text style={styles.searchPlaceholder}>Search friends...</Text>
+                    <Search color="#94A3B8" strokeWidth={3} size={20} />
+                    <Text style={styles.searchPlaceholder}>Search friends</Text>
                   </TouchableOpacity>
-
-                  <View style={styles.addFriendsSection}>
-                    <View style={styles.sectionHeader}>
-                      <UserPlus color="#8B5CF6" size={16} />
-                      <Text style={styles.sectionTitle}>Add Friends</Text>
-                    </View>
-                    
-                    <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
-                      <Share color="#8B5CF6" size={20} />
-                      <Text style={styles.shareButtonText}>Share Your Link</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <SuggestedFriendsList friends={suggestedFriends}/>
 
                   <FriendsSection
                     friends={allFriends}
@@ -179,6 +166,11 @@ export default function FriendsScreen() {
                     isLoading={false}
                     searchQuery=""
                   />
+
+                  <SuggestedFriendsList friends={suggestedFriends}/>
+
+                  <AddFriendsSection showModal={handleShareLink} />
+
                 </>
               ) : (
                 <>
@@ -307,57 +299,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginTop: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    // Ensure minimum touch target (iOS guideline: 44pt)
-    minHeight: 44,
+    marginTop: verticalScale(8),
+    marginBottom: verticalScale(16),
   },
   searchPlaceholder: {
-    fontSize: 16,
-    fontFamily: 'Jost-Regular',
+    fontSize: scale(14),
+    fontFamily: 'Jost-SemiBold',
+    fontWeight: '600',
     color: '#94A3B8',
-    marginLeft: 12,
-  },
-  addFriendsSection: {
-    marginBottom: 8,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
-    fontWeight: '600',
-    color: '#64748B',
-    marginLeft: 8,
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    // Ensure minimum touch target (iOS guideline: 44pt)
-    minHeight: 44,
-  },
-  shareButtonText: {
-    color: '#8B5CF6',
-    fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
-    fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: scale(12),
   },
 });
