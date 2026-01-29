@@ -2,6 +2,9 @@ import { format, differenceInDays, startOfDay } from 'date-fns';
 import { deviceStorage } from './device-storage';
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
+import { TABLES } from '@/constants/supabase';
+import { LocalNotificationService } from './local-notification-service';
+import * as Notifications from 'expo-notifications';
 
 /**
  * Streak Service - Manages user daily entry streaks
@@ -44,7 +47,7 @@ export class StreakService {
     // Fallback to Supabase (single row per user) for cross-device sync of streak data
     try {
       const { data, error } = await supabase
-        .from('user_streaks')
+        .from(TABLES.USER_STREAKS)
         .select('current_streak, max_streak, last_entry_date, last_access_time')
         .eq('user_id', userId)
         .maybeSingle<{
@@ -99,7 +102,7 @@ export class StreakService {
     // 2. Sync streak stats to Supabase (best-effort; do not block core app flows)
     try {
       const { error } = await supabase
-        .from('user_streaks')
+        .from(TABLES.USER_STREAKS)
         .upsert({
           user_id: userId,
           current_streak: data.currentStreak,
@@ -160,6 +163,7 @@ export class StreakService {
         // (Multiple entries per day don't increase the streak)
         newStreakData.lastAccessTime = now.toISOString();
         console.log('Same day entry - no streak change');
+
       } else if (daysDiff === 1) {
         // Next consecutive day - increment streak!
         // IMPORTANT: We update lastEntryDate here, so tomorrow will also be daysDiff = 1
@@ -169,6 +173,7 @@ export class StreakService {
         newStreakData.lastEntryDate = todayStr; // ← Critical: update the date for next time
         newStreakData.lastAccessTime = now.toISOString();
         console.log('Consecutive day - streak increased to', newStreakData.currentStreak);
+      
       } else {
         // Gap in streak (missed a day or more) - reset to 1
         newStreakData.currentStreak = 1;
@@ -176,7 +181,48 @@ export class StreakService {
         newStreakData.lastEntryDate = todayStr;
         newStreakData.lastAccessTime = now.toISOString();
         console.log('Gap detected - streak reset to 1');
+
       }
+    }
+    
+    // Always schedule a notification, content depends on streak status
+    // Cancel any existing notifications first to avoid duplicates
+    await LocalNotificationService.cancelAllScheduledNotifications();
+    
+    if (newStreakData.currentStreak >= 1) {
+      // Active streak - remind about keeping streak alive
+      await LocalNotificationService.scheduleNotification({
+        content: {
+          title: 'How are you doing today?',
+          body: `Capture your day to keep your ${newStreakData.currentStreak} day streak alive!`,
+          data: {
+            page: '/capture'
+          }
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 12,
+          minute: 0,
+        },
+        identifier: `streak_${userId}`,
+      });
+    } else {
+      // No active streak - general app reminder
+      await LocalNotificationService.scheduleNotification({
+        content: {
+          title: 'Come back to Keepsafe',
+          body: 'Capture a moment from your day and start building your streak!',
+          data: {
+            page: '/capture'
+          }
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 12,
+          minute: 0,
+        },
+        identifier: `streak_${userId}`,
+      });
     }
 
     // Save the updated streak data
@@ -208,6 +254,28 @@ export class StreakService {
         lastAccessTime: now.toISOString(),
       };
       await this.saveStreakData(userId, updatedData);
+      
+      // Schedule general reminder for users with no entries
+      if (updatedData.currentStreak < 1) {
+        // Cancel any existing notifications first to avoid duplicates
+        await LocalNotificationService.cancelAllScheduledNotifications();
+        await LocalNotificationService.scheduleNotification({
+          content: {
+            title: 'Come back to Keepsafe',
+            body: 'Capture a moment from your day and start building your streak!',
+            data: {
+              page: '/capture'
+            }
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY,
+            hour: 12,
+            minute: 0,
+          },
+          identifier: `streak_${userId}`,
+        });
+      }
+      
       return updatedData;
     }
 
@@ -224,6 +292,26 @@ export class StreakService {
       };
       await this.saveStreakData(userId, resetData);
       logger.info(`Streak reset - no entry for ${daysSinceLastEntry} days`);
+      
+      // Update notification to general reminder since streak is now 0
+      // Cancel any existing notifications first to avoid duplicates
+      await LocalNotificationService.cancelAllScheduledNotifications();
+      await LocalNotificationService.scheduleNotification({
+        content: {
+          title: 'Come back to Keepsafe',
+          body: 'Capture a moment from your day and start building your streak!',
+          data: {
+            page: '/capture'
+          }
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 12,
+          minute: 0,
+        },
+        identifier: `streak_${userId}`,
+      });
+      
       return resetData;
     }
 
@@ -246,6 +334,26 @@ export class StreakService {
     };
     
     await this.saveStreakData(userId, resetData);
+    
+    // Update notification to general reminder since streak is reset
+    // Cancel any existing notifications first to avoid duplicates
+    await LocalNotificationService.cancelAllScheduledNotifications();
+    await LocalNotificationService.scheduleNotification({
+      content: {
+        title: 'Come back to Keepsafe',
+        body: 'Capture a moment from your day and start building your streak!',
+        data: {
+          page: '/capture'
+        }
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: 12,
+        minute: 0,
+      },
+      identifier: `streak_${userId}`,
+    });
+    
     return resetData;
   }
 }

@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { SearchService } from '@/services/search-service';
 import { useAuthContext } from '@/providers/auth-provider';
+import { posthog } from '@/constants/posthog';
+import { Platform } from 'react-native';
 
 export type SearchRole = 'user' | 'assistant' | 'system';
 
@@ -84,6 +86,10 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
       setInput('');
 
       try {
+        posthog.capture('ai_search', {
+          query: userMessage.content,
+          platform: Platform.OS
+        })
         await SearchService.streamSearch({
           userId: user.id,
           query,

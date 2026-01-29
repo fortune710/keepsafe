@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -406,18 +406,19 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 4,
   },
   profileUsername: {
     fontSize: 14,
+    fontFamily: 'Outfit-Medium',
     color: '#8B5CF6',
-    fontWeight: '500',
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 13,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
   settingsSection: {
@@ -453,12 +454,13 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   itemSubtitle: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
 });

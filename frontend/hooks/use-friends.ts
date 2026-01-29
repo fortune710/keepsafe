@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
@@ -8,6 +8,7 @@ import { FriendService } from '@/services/friend-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { posthog } from '@/constants/posthog';
 import { FriendWithProfile } from '@/types/friends';
+import { logger } from '@/lib/logger';
 
 
 
@@ -19,6 +20,7 @@ interface UseFriendsResult {
   blockedFriends: FriendWithProfile[];
   isLoading: boolean;
   error: Error | null;
+  checkFriendStatus: (friendId: string) => typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.PENDING | typeof FRIENDSHIP_STATUS.BLOCKED | null;
   sendFriendRequest: (friendId: string) => Promise<{ success: boolean; error?: string }>;
   acceptFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   declineFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
@@ -54,6 +56,20 @@ export function useFriends(userId?: string): UseFriendsResult {
     f.status === FRIENDSHIP_STATUS.BLOCKED && f.blocked_by === userId
   );
 
+  const checkFriendStatus = (
+    friendId: string
+  ): typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.PENDING | typeof FRIENDSHIP_STATUS.BLOCKED | null => {
+    if (friends.find(f => f.id === friendId)) {
+      return FRIENDSHIP_STATUS.ACCEPTED;
+    } else if (pendingRequests.find(f => f.id === friendId)) {
+      return FRIENDSHIP_STATUS.PENDING;
+    } else if (blockedFriends.find(f => f.id === friendId)) {
+      return FRIENDSHIP_STATUS.BLOCKED;
+    } else {
+      return null;
+    }
+  };
+
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (friendId: string) => {
       return await FriendService.sendFriendRequest(userId!, friendId);
@@ -69,7 +85,7 @@ export function useFriends(userId?: string): UseFriendsResult {
 
   const updateFriendshipMutation = useMutation({
     mutationFn: async ({ id, status, blocked_by }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED | typeof FRIENDSHIP_STATUS.BLOCKED; blocked_by?: string | null }) => {
-      if (__DEV__) console.log('Updating friendship:', { id, status, blocked_by });
+      logger.debug('Updating friendship:', { id, status, blocked_by });
 
       const updateData: any = { status };
       if (blocked_by !== undefined) {
@@ -82,11 +98,11 @@ export function useFriends(userId?: string): UseFriendsResult {
         .eq('id', id);
         
       if (error) {
-        if (__DEV__) console.error('Error updating friendship:', error);
+        logger.error('Error updating friendship:', error);
         throw new Error(error.message);
       }
 
-      if (__DEV__) console.log('Updated friendship status successfully');
+      logger.debug('Updated friendship status successfully');
       return { id, status };
     },
     onSuccess: async () => {
@@ -166,7 +182,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         // Omitting friendship_id for privacy compliance
         posthog.capture('friend_blocked', {});
       } catch (error) {
-        if (__DEV__) console.warn('Analytics capture failed:', error);
+        logger.warn('Analytics capture failed:', error);
       }
       return { success: true };
     } catch (error) {
@@ -211,7 +227,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         queryKey: ["suggested-friends"],
         queryFn: async () => {
           const contacts = await FriendService.getSuggestedFriendsFromContacts();
-          console.log({ contacts });
+          logger.debug('Prefetched suggested friends:', { contacts });
           return contacts.filter(contact => contact.id !== profile?.id);
         }
       })
@@ -234,6 +250,7 @@ export function useFriends(userId?: string): UseFriendsResult {
     blockedFriends,
     isLoading,
     error,
+    checkFriendStatus,
     sendFriendRequest,
     acceptFriendRequest,
     declineFriendRequest,

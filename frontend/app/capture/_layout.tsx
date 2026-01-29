@@ -7,8 +7,8 @@ import { useAuthContext } from '@/providers/auth-provider';
 
 export default function CaptureLayout() {
   // Initialize push notifications
-  const { expoPushToken, error } = usePushNotifications();
   const { profile } = useAuthContext();
+  const { expoPushToken, error } = usePushNotifications(profile?.id);
 
   
   useEffect(() => {

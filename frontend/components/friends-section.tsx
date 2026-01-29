@@ -4,6 +4,7 @@ import { Users } from 'lucide-react-native';
 import FriendItem, { Friend } from './friend-item';
 import { FRIENDSHIP_STATUS } from '@/constants/supabase';
 import Badge from './ui/badge';
+import { verticalScale } from 'react-native-size-matters';
 
 interface FriendsSectionProps {
   friends: Friend[];
@@ -64,39 +65,13 @@ export default function FriendsSection({
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {connectedFriends.length > 0 && (
-        <>
-          <View style={styles.sectionHeader}>
-            <Users color="#10B981" size={16} />
-            <Text style={styles.sectionTitle}>
-              Connected
-            </Text>
-            <Badge style={styles.connectedBadge} text={connectedFriends.length} />
-          </View>
-          
-          {connectedFriends.map((friend, index) => (
-            <FriendItem
-              key={friend.id}
-              friend={friend}
-              onRemove={onRemoveFriend}
-              onPress={onFriendPress}
-              onAccept={onAcceptRequest}
-              onDecline={onDeclineRequest}
-              onBlock={onBlockFriend}
-              index={index}
-            />
-          ))}
-        </>
-      )}
-
       {pendingFriends.length > 0 && (
         <>
           <View style={styles.sectionHeader}>
             <Users color="#F59E0B" size={16} />
             <Text style={styles.sectionTitle}>
-              Pending
+              Pending Requests
             </Text>
-            <Badge style={styles.pendingBadge} text={pendingFriends.length} />
           </View>
           
           {pendingFriends.map((friend, index) => (
@@ -109,6 +84,30 @@ export default function FriendsSection({
               onDecline={onDeclineRequest}
               onBlock={onBlockFriend}
               index={connectedFriends.length + index}
+            />
+          ))}
+        </>
+      )}
+
+      {connectedFriends.length > 0 && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Users color="#10B981" size={16} />
+            <Text style={styles.sectionTitle}>
+              Your Friends
+            </Text>
+          </View>
+          
+          {connectedFriends.map((friend, index) => (
+            <FriendItem
+              key={friend.id}
+              friend={friend}
+              onRemove={onRemoveFriend}
+              onPress={onFriendPress}
+              onAccept={onAcceptRequest}
+              onDecline={onDeclineRequest}
+              onBlock={onBlockFriend}
+              index={index}
             />
           ))}
         </>
@@ -126,14 +125,14 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 24,
+    marginBottom: verticalScale(10),
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#64748B',
     marginLeft: 8,
+    fontFamily: 'Outfit-SemiBold',
   },
   loadingContainer: {
     flex: 1,
