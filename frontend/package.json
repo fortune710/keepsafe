@@ -1,7 +1,7 @@
 {
   "name": "keepsafe",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "0.9.5",
   "private": true,
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start --clear",
