@@ -165,11 +165,16 @@ export function useUserEntries(): UseUserEntriesResult {
     }
   }, [user]);
   // Combine real entries with optimistic entries
-  const allEntries = [...optimisticEntries, ...entries];
+  const allEntries = [...optimisticEntries, ...(entries || [])];
+
+  // Ensure entriesByDate is always an object, never undefined
+  const entriesByDate = allEntries.length > 0 
+    ? groupBy(allEntries, "created_at")
+    : {};
 
   return {
     entries: allEntries,
-    entriesByDate: groupBy(allEntries, "created_at"),
+    entriesByDate,
     isLoading,
     error,
     refetch,

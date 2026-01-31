@@ -40,6 +40,8 @@ export default function VaultScreen() {
   const musicPlayerCleanupTimeoutRef = useRef<number | null>(null);
 
   const handleScroll = (event: any) => {
+    if (!event?.nativeEvent?.contentOffset) return;
+    
     const currentOffset = event.nativeEvent.contentOffset.y;
 
     if (currentOffset > prevOffset.current && isHeaderVisible) {
@@ -119,7 +121,7 @@ export default function VaultScreen() {
       );
     }
 
-    if (entries.length === 0) {
+    if (!entries || entries.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No entries yet</Text>
@@ -140,7 +142,7 @@ export default function VaultScreen() {
           <ChevronLeft color="#64748B" size={24} />
         </Pressable>
         <FlashList
-          data={Object.keys(entriesByDate)}
+          data={entriesByDate ? Object.keys(entriesByDate) : []}
           contentContainerStyle={{
             ...styles.contentContainer,
             ...(responsive.isTablet && {
@@ -154,27 +156,39 @@ export default function VaultScreen() {
           onScroll={handleScroll}
           scrollEnabled={!isMusicPlayerVisible}
           renderItem={({ item }) => {
-            const entries = entriesByDate[item];
+            const entries = entriesByDate?.[item];
+            if (!entries || entries.length === 0) {
+              return null;
+            }
+            
             const entriesDate = new Date(item);
+            if (isNaN(entriesDate.getTime())) {
+              return null;
+            }
+            
             return (
               <View>
                 <View style={styles.listHeader}>
                   <DateContainer date={entriesDate}/>
                 </View>
                 {
-                  entries.map((entry) => (
-                    <VaultEntryCard
-                      entry={entry as any}
-                      key={entry.id}
-                      onReactions={handleEntryReactions}
-                      onComments={handleEntryComments}
-                      onRetry={retryEntry}
-                      onMusicPress={handleMusicPress}
-                    />
-                  ))
+                  entries.map((entry) => {
+                    if (!entry?.id) {
+                      return null;
+                    }
+                    return (
+                      <VaultEntryCard
+                        entry={entry as any}
+                        key={entry.id}
+                        onReactions={handleEntryReactions}
+                        onComments={handleEntryComments}
+                        onRetry={retryEntry}
+                        onMusicPress={handleMusicPress}
+                      />
+                    );
+                  })
                 }
               </View>
-
             )
           }}
         />

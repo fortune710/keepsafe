@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryProvider } from '@/providers/query-provider';
 import { AuthProvider } from '@/providers/auth-provider';
 import { ToastProvider } from '@/providers/toast-provider';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 import { useDeepLinking } from '@/hooks/use-deep-linking';
 import { Host } from 'react-native-portalize';
@@ -41,33 +42,35 @@ export default function RootLayout() {
   }
 
   return (
-    <Host>
-      <SafeAreaProvider>
-        <QueryProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="onboarding" />
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="capture" />
-                  <Stack.Screen name="invite/[id]" />
-                <Stack.Screen name="vault" />
-                  <Stack.Screen name="calendar" />
-                  <Stack.Screen name="calendar/day" />
-                  <Stack.Screen name="social" />
-                  <Stack.Screen name="friends" />
-                  <Stack.Screen name="dreamscape" />
-                  <Stack.Screen name="search" />
-                  <Stack.Screen name="capture/details" />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
-                <StatusBar style="dark" />
-              </GestureHandlerRootView>
-            </ToastProvider>
-          </AuthProvider>
-        </QueryProvider>
-      </SafeAreaProvider>
-    </Host>
+    <ErrorBoundary>
+      <Host>
+        <SafeAreaProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <ToastProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="onboarding" />
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="capture" />
+                    <Stack.Screen name="invite/[id]" />
+                  <Stack.Screen name="vault" />
+                    <Stack.Screen name="calendar" />
+                    <Stack.Screen name="calendar/day" />
+                    <Stack.Screen name="social" />
+                    <Stack.Screen name="friends" />
+                    <Stack.Screen name="dreamscape" />
+                    <Stack.Screen name="search" />
+                    <Stack.Screen name="capture/details" />
+                    <Stack.Screen name="+not-found" />
+                  </Stack>
+                  <StatusBar style="dark" />
+                </GestureHandlerRootView>
+              </ToastProvider>
+            </AuthProvider>
+          </QueryProvider>
+        </SafeAreaProvider>
+      </Host>
+    </ErrorBoundary>
   );
 }
