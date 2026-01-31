@@ -106,6 +106,16 @@ class NotificationService:
                 f"Notification enqueued: title='{title}', "
                 f"recipients={len(recipients)}, priority={priority}"
             )
+            
+            # Capture PostHog event for notification enqueued
+            self._capture_notification_enqueued_event(
+                metadata=metadata,
+                recipients=recipients,
+                title=title,
+                body=body,
+                priority=priority
+            )
+            
             return True
             
         except Exception as e:
@@ -235,6 +245,15 @@ class NotificationService:
                 await self._delete_message(msg_id)
                 stats["succeeded"] += 1
                 logger.info(f"Successfully processed notification: msg_id={msg_id}")
+                
+                # Capture PostHog event for notification sent
+                self._capture_notification_sent_event(
+                    metadata=metadata,
+                    recipients=recipients,
+                    title=title,
+                    body=body,
+                    priority=priority
+                )
             else:
                 # Handle failure
                 await self._handle_failure(
@@ -612,6 +631,174 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Error deleting message {msg_id}: {str(e)}", exc_info=True)
             raise
+    
+    def _get_user_info_from_tokens(self, tokens: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Get user_id and email for each push token.
+        
+        Args:
+            tokens: List of Expo push tokens
+            
+        Returns:
+            Dict mapping token to user info with keys: user_id, email
+        """
+        if not tokens or not self.posthog_client:
+            return {}
+        
+        try:
+            # Query push_tokens table to get user_ids for tokens
+            response = self.supabase.table("push_tokens").select("token, user_id").in_("token", tokens).execute()
+            
+            token_to_user: Dict[str, str] = {}
+            if response.data:
+                for row in response.data:
+                    token = row.get("token")
+                    user_id = row.get("user_id")
+                    if token and user_id:
+                        token_to_user[token] = user_id
+            
+            if not token_to_user:
+                return {}
+            
+            # Get emails for user_ids
+            user_ids = list(set(token_to_user.values()))
+            profile_response = self.supabase.table("profiles").select("id, email").in_("id", user_ids).execute()
+            
+            user_id_to_email: Dict[str, Optional[str]] = {}
+            if profile_response.data:
+                for profile in profile_response.data:
+                    user_id = profile.get("id")
+                    email = profile.get("email")
+                    if user_id:
+                        user_id_to_email[user_id] = email
+            
+            # Build result mapping token -> {user_id, email}
+            result: Dict[str, Dict[str, Optional[str]]] = {}
+            for token, user_id in token_to_user.items():
+                result[token] = {
+                    "user_id": user_id,
+                    "email": user_id_to_email.get(user_id)
+                }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error getting user info from tokens: {str(e)}")
+            return {}
+    
+    def _capture_notification_enqueued_event(
+        self,
+        metadata: Optional[Dict[str, Any]],
+        recipients: List[str],
+        title: str,
+        body: str,
+        priority: str
+    ) -> None:
+        """Capture PostHog event when notification is enqueued."""
+        if not self.posthog_client:
+            return
+        
+        try:
+            notification_type = metadata.get("notification_type", "unknown") if metadata else "unknown"
+            
+            # Get user info from tokens
+            token_user_info = self._get_user_info_from_tokens(recipients)
+            
+            # Capture event for each recipient
+            for token in recipients:
+                user_info = token_user_info.get(token, {})
+                user_id = user_info.get("user_id")
+                email = user_info.get("email")
+                
+                properties: Dict[str, Any] = {
+                    "notification_type": notification_type,
+                    "title": title,
+                    "body": body,
+                    "priority": priority,
+                    "recipient_count": len(recipients),
+                }
+                
+                if user_id:
+                    properties["user_id"] = user_id
+                if email:
+                    properties["email"] = email
+                
+                # Add any additional metadata
+                if metadata:
+                    for key, value in metadata.items():
+                        if key not in properties and key != "notification_type":
+                            properties[f"metadata_{key}"] = value
+                
+                # Use user_id as distinct_id if available, otherwise use token
+                distinct_id = user_id if user_id else f"token_{token[:8]}"
+                
+                self.posthog_client.capture(
+                    distinct_id=distinct_id,
+                    event="notification_enqueued",
+                    properties=properties
+                )
+            
+            self.posthog_client.flush()
+            
+        except Exception as e:
+            logger.error(f"Error capturing notification_enqueued event to PostHog: {str(e)}")
+    
+    def _capture_notification_sent_event(
+        self,
+        metadata: Optional[Dict[str, Any]],
+        recipients: List[str],
+        title: str,
+        body: str,
+        priority: str
+    ) -> None:
+        """Capture PostHog event when notification is successfully sent."""
+        if not self.posthog_client:
+            return
+        
+        try:
+            notification_type = metadata.get("notification_type", "unknown") if metadata else "unknown"
+            
+            # Get user info from tokens
+            token_user_info = self._get_user_info_from_tokens(recipients)
+            
+            # Capture event for each recipient
+            for token in recipients:
+                user_info = token_user_info.get(token, {})
+                user_id = user_info.get("user_id")
+                email = user_info.get("email")
+                
+                properties: Dict[str, Any] = {
+                    "notification_type": notification_type,
+                    "title": title,
+                    "body": body,
+                    "priority": priority,
+                    "recipient_count": len(recipients),
+                }
+                
+                if user_id:
+                    properties["user_id"] = user_id
+                if email:
+                    properties["email"] = email
+                
+                # Add any additional metadata
+                if metadata:
+                    for key, value in metadata.items():
+                        if key not in properties and key != "notification_type":
+                            properties[f"metadata_{key}"] = value
+                
+                # Use user_id as distinct_id if available, otherwise use token
+                distinct_id = user_id if user_id else f"token_{token[:8]}"
+                
+                self.posthog_client.capture(
+                    distinct_id=distinct_id,
+                    event="notification_sent",
+                    properties=properties
+                )
+            
+            self.posthog_client.flush()
+            
+        except Exception as e:
+            logger.error(f"Error capturing notification_sent event to PostHog: {str(e)}")
     
     def _log_error_to_posthog(self, error: Exception, context: Dict[str, Any]) -> None:
         """
