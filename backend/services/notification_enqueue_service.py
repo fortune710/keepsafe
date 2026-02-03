@@ -141,7 +141,7 @@ class NotificationEnqueueService:
             # Create notification message
             entry_type_display = f"a {entry_type.capitalize()}" if entry_type != "audio" else "an audio recording"
             title = "New Entry Shared"
-            body = f"{owner_name} shared a {entry_type_display} with you"
+            body = f"{owner_name} shared {entry_type_display} with you"
             
             # Enqueue the notification
             success = self.notification_service.enqueue_notification(

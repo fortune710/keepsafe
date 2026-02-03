@@ -720,8 +720,6 @@ class NotificationService:
                 
                 if user_id:
                     properties["user_id"] = user_id
-                if email:
-                    properties["email"] = email
                 
                 # Add any additional metadata
                 if metadata:

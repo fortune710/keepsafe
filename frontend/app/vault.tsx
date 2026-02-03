@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { 
@@ -107,7 +107,7 @@ export default function VaultScreen() {
   }).current;
 
   // Handler for when viewable items change
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
     const visibleEntryIds: string[] = [];
     
     viewableItems.forEach(item => {
@@ -123,7 +123,7 @@ export default function VaultScreen() {
     if (visibleEntryIds.length > 0) {
       markEntriesAsSeen(visibleEntryIds);
     }
-  }).current;
+  }, [entriesByDate, unseenEntryIds, markEntriesAsSeen]);
 
   // Scroll to top handler
   const scrollToTop = () => {
