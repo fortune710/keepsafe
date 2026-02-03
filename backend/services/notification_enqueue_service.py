@@ -163,7 +163,7 @@ class NotificationEnqueueService:
                     "notification_type": "entry_share"
                 },
                 data={
-                    "page_url": "/vault",
+                    "page_url": "/vault?refresh=true",
                 }
             )
             
