@@ -12,13 +12,14 @@ import EntryCommentsPopup from '@/components/entry-comments-popup';
 import VaultEntryCard from '@/components/entries/vault-entry-card';
 import { EntryPage } from '@/components/entries/entry-page';
 import { scale, verticalScale } from 'react-native-size-matters';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
 import { useResponsive, useTabletLayout } from '@/hooks/use-responsive';
 import { ChevronLeft } from 'lucide-react-native';
 import { Colors } from '@/lib/constants';
+import NewEntriesIndicator from '@/components/new-entries-indicator';
 
 const { height, width } = Dimensions.get('window');
 
@@ -29,7 +30,7 @@ const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 export default function VaultScreen() {
   const responsive = useResponsive();
   const tabletLayout = useTabletLayout();
-  const { entries, entriesByDate, isLoading, error, refetch, retryEntry } = useUserEntries();
+  const { entries, entriesByDate, isLoading, error, refetch, retryEntry, unseenEntryIds, markEntriesAsSeen } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(false);
@@ -38,6 +39,7 @@ export default function VaultScreen() {
 
   const prevOffset = useRef(0);
   const musicPlayerCleanupTimeoutRef = useRef<number | null>(null);
+  const flashListRef = useRef<FlashListRef<string>>(null);
 
   const handleScroll = (event: any) => {
     if (!event?.nativeEvent?.contentOffset) return;
@@ -98,6 +100,36 @@ export default function VaultScreen() {
     };
   }, []);
 
+  // Viewability config for tracking when entries appear in viewport
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50, // 50% visible
+    minimumViewTime: 500, // 500ms
+  }).current;
+
+  // Handler for when viewable items change
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    const visibleEntryIds: string[] = [];
+    
+    viewableItems.forEach(item => {
+      const dateKey = item.item;
+      const dateEntries = entriesByDate?.[dateKey] || [];
+      dateEntries.forEach((entry: any) => {
+        if (unseenEntryIds.has(entry.id)) {
+          visibleEntryIds.push(entry.id);
+        }
+      });
+    });
+    
+    if (visibleEntryIds.length > 0) {
+      markEntriesAsSeen(visibleEntryIds);
+    }
+  }).current;
+
+  // Scroll to top handler
+  const scrollToTop = () => {
+    flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
 
   const renderContent = () => {
     if (error) {
@@ -142,6 +174,7 @@ export default function VaultScreen() {
           <ChevronLeft color="#64748B" size={24} />
         </Pressable>
         <FlashList
+          ref={flashListRef}
           data={entriesByDate ? Object.keys(entriesByDate) : []}
           contentContainerStyle={{
             ...styles.contentContainer,
@@ -155,6 +188,8 @@ export default function VaultScreen() {
           keyExtractor={(item) => item}
           onScroll={handleScroll}
           scrollEnabled={!isMusicPlayerVisible}
+          viewabilityConfig={viewabilityConfig}
+          onViewableItemsChanged={onViewableItemsChanged}
           renderItem={({ item }) => {
             const entries = entriesByDate?.[item];
             if (!entries || entries.length === 0) {
@@ -207,6 +242,15 @@ export default function VaultScreen() {
         <View style={styles.content}>
           {renderContent()}
         </View>
+
+        {/* New Entries Indicator */}
+        {unseenEntryIds.size > 0 && (
+          <NewEntriesIndicator
+            count={unseenEntryIds.size}
+            onPress={scrollToTop}
+            visible={unseenEntryIds.size > 0}
+          />
+        )}
 
         {/* Popups at screen level */}
         {isPopupVisible && selectedEntryId && (
