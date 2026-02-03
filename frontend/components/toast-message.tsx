@@ -20,27 +20,36 @@ export default function ToastMessage({ message, type, visible, onHide }: ToastMe
           runOnJS(onHide)();
         }
       })}
-      style={[
-        styles.container,
-        type === 'success' ? styles.successContainer : styles.errorContainer
-      ]}
+      style={styles.outerContainer}
     >
-      <Text style={[
-        styles.message,
-        type === 'success' ? styles.successText : styles.errorText
+      <View style={[
+        styles.toastContainer,
+        type === 'success' ? styles.successContainer : styles.errorContainer
       ]}>
-        {message}
-      </Text>
+        <Text style={[
+          styles.message,
+          type === 'success' ? styles.successText : styles.errorText
+        ]}>
+          {message}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: {
     position: 'absolute',
     top: 60,
-    left: 20,
-    right: 20,
+    left: 0,
+    right: 0,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    paddingHorizontal: 20,
+  },
+  toastContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderRadius: 20,
@@ -49,9 +58,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 8,
-    zIndex: 1000,
     maxWidth: 320,
-    alignSelf: 'center',
   },
   successContainer: {
     backgroundColor: '#10B981',
