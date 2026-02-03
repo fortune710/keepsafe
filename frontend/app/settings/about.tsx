@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -110,12 +110,13 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 32,
-    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
     color: '#1E293B',
     marginBottom: 8,
   },
   appTagline: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     textAlign: 'center',
     marginBottom: 24,
@@ -126,12 +127,13 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#8B5CF6',
     marginBottom: 4,
   },
   buildText: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#94A3B8',
   },
   linksSection: {
@@ -164,7 +166,7 @@ const styles = StyleSheet.create({
   linkText: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
     color: '#1E293B',
   },
   creditsSection: {
@@ -173,6 +175,7 @@ const styles = StyleSheet.create({
   },
   creditsTitle: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#94A3B8',
     marginBottom: 8,
   },
@@ -182,6 +185,7 @@ const styles = StyleSheet.create({
   },
   creditsText: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     marginLeft: 6,
   },

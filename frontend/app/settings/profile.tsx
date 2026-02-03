@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -216,6 +216,7 @@ const styles = StyleSheet.create({
   },
   avatarHint: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
   optionsContainer: {
@@ -250,12 +251,13 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   optionValue: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
   placeholderValue: {
@@ -268,6 +270,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     lineHeight: 20,
     textAlign: 'center',

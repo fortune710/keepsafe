@@ -10,6 +10,8 @@ import { BACKEND_URL } from '@/lib/constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { logger } from '@/lib/logger';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import { verticalScale } from 'react-native-size-matters';
 
 interface SettingsItem {
   id: string;
@@ -267,11 +269,10 @@ export default function SettingsScreen() {
               <Text style={styles.profileUsername}>
                 @{profile?.username || 'username'}
               </Text>
-              <Text style={styles.profileEmail}>{profile?.email}</Text>
             </View>
             <Image 
               source={{ 
-                uri: profile?.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=200' 
+                uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || 'Unknown User')
               }}
               style={styles.profileImage}
             />
@@ -387,7 +388,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     margin: 20,
     borderRadius: 20,
-    paddingVertical: 24,
+    paddingVertical: verticalScale(12),
     paddingHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
