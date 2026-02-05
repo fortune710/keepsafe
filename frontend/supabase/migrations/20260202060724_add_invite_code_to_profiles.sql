@@ -36,6 +36,46 @@ CREATE TRIGGER set_profile_invite_code_trigger
   EXECUTE FUNCTION set_profile_invite_code();
 
 -- Backfill invite_code for existing profiles that don't have one
-UPDATE public.profiles
-SET invite_code = generate_invite_code()
-WHERE invite_code IS NULL;
+-- Process each profile individually with retry logic to handle unique constraint violations
+DO $$
+DECLARE
+  profile_record RECORD;
+  new_invite_code text;
+  max_attempts int := 10;
+  attempt_count int;
+  success boolean;
+BEGIN
+  -- Iterate over each profile that needs an invite code
+  FOR profile_record IN 
+    SELECT id FROM public.profiles WHERE invite_code IS NULL
+  LOOP
+    success := false;
+    attempt_count := 0;
+    
+    -- Retry loop to handle potential duplicate invite codes
+    WHILE NOT success AND attempt_count < max_attempts LOOP
+      attempt_count := attempt_count + 1;
+      
+      BEGIN
+        -- Generate a new invite code
+        new_invite_code := generate_invite_code();
+        
+        -- Attempt to update the profile with the new invite code
+        UPDATE public.profiles
+        SET invite_code = new_invite_code
+        WHERE id = profile_record.id;
+        
+        success := true;
+        
+      EXCEPTION
+        WHEN unique_violation THEN
+          -- If we hit a duplicate, retry with a new code
+          IF attempt_count >= max_attempts THEN
+            RAISE EXCEPTION 'Failed to generate unique invite_code for profile % after % attempts', 
+              profile_record.id, max_attempts;
+          END IF;
+          -- Continue to next iteration to retry
+      END;
+    END LOOP;
+  END LOOP;
+END $$;
