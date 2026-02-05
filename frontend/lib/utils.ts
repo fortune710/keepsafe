@@ -79,15 +79,32 @@ export const generateDeepLinkUrl = () => {
 }
 
 export function groupBy<T, K extends keyof T>(arr: T[], key: K): Record<string, T[]> {
+    if (!arr || !Array.isArray(arr)) {
+      return {};
+    }
+    
     return arr.reduce((acc, item) => {
+      if (!item) return acc;
+      
       let groupKey: string;
       if ((key === 'updated_at' || key === 'created_at') && typeof item[key] === 'string') {
-        // Group by day (YYYY-MM-DD) if key is 'updated_at'
+        // Group by day (YYYY-MM-DD) in local timezone if key is 'updated_at' or 'created_at'
         const date = new Date(item[key] as string);
-        groupKey = date.toISOString().slice(0, 10);
+        if (!isNaN(date.getTime())) {
+          // Use local date components to match DateContainer display
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          groupKey = `${year}-${month}-${day}`;
+        } else {
+          // Invalid date - group under 'invalid-date' or skip
+          groupKey = 'invalid-date';
+        }
       } else {
-        groupKey = String(item[key]);
+        const value = item[key];
+        groupKey = value != null ? String(value) : 'null';
       }
+      
       if (!acc[groupKey]) {
         acc[groupKey] = [];
       }

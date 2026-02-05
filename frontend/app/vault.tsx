@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { 
@@ -12,13 +12,14 @@ import EntryCommentsPopup from '@/components/entry-comments-popup';
 import VaultEntryCard from '@/components/entries/vault-entry-card';
 import { EntryPage } from '@/components/entries/entry-page';
 import { scale, verticalScale } from 'react-native-size-matters';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
 import { useResponsive, useTabletLayout } from '@/hooks/use-responsive';
 import { ChevronLeft } from 'lucide-react-native';
 import { Colors } from '@/lib/constants';
+import NewEntriesIndicator from '@/components/new-entries-indicator';
 
 const { height, width } = Dimensions.get('window');
 
@@ -29,7 +30,7 @@ const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 export default function VaultScreen() {
   const responsive = useResponsive();
   const tabletLayout = useTabletLayout();
-  const { entries, entriesByDate, isLoading, error, refetch, retryEntry } = useUserEntries();
+  const { entries, entriesByDate, isLoading, error, refetch, retryEntry, unseenEntryIds, markEntriesAsSeen } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(false);
@@ -38,8 +39,11 @@ export default function VaultScreen() {
 
   const prevOffset = useRef(0);
   const musicPlayerCleanupTimeoutRef = useRef<number | null>(null);
+  const flashListRef = useRef<FlashListRef<string>>(null);
 
   const handleScroll = (event: any) => {
+    if (!event?.nativeEvent?.contentOffset) return;
+    
     const currentOffset = event.nativeEvent.contentOffset.y;
 
     if (currentOffset > prevOffset.current && isHeaderVisible) {
@@ -96,6 +100,36 @@ export default function VaultScreen() {
     };
   }, []);
 
+  // Viewability config for tracking when entries appear in viewport
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50, // 50% visible
+    minimumViewTime: 500, // 500ms
+  }).current;
+
+  // Handler for when viewable items change
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
+    const visibleEntryIds: string[] = [];
+    
+    viewableItems.forEach(item => {
+      const dateKey = item.item;
+      const dateEntries = entriesByDate?.[dateKey] || [];
+      dateEntries.forEach((entry: any) => {
+        if (unseenEntryIds.has(entry.id)) {
+          visibleEntryIds.push(entry.id);
+        }
+      });
+    });
+    
+    if (visibleEntryIds.length > 0) {
+      markEntriesAsSeen(visibleEntryIds);
+    }
+  }, [entriesByDate, unseenEntryIds, markEntriesAsSeen]);
+
+  // Scroll to top handler
+  const scrollToTop = () => {
+    flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
 
   const renderContent = () => {
     if (error) {
@@ -119,7 +153,7 @@ export default function VaultScreen() {
       );
     }
 
-    if (entries.length === 0) {
+    if (!entries || entries.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No entries yet</Text>
@@ -140,7 +174,8 @@ export default function VaultScreen() {
           <ChevronLeft color="#64748B" size={24} />
         </Pressable>
         <FlashList
-          data={Object.keys(entriesByDate)}
+          ref={flashListRef}
+          data={entriesByDate ? Object.keys(entriesByDate) : []}
           contentContainerStyle={{
             ...styles.contentContainer,
             ...(responsive.isTablet && {
@@ -153,28 +188,42 @@ export default function VaultScreen() {
           keyExtractor={(item) => item}
           onScroll={handleScroll}
           scrollEnabled={!isMusicPlayerVisible}
+          viewabilityConfig={viewabilityConfig}
+          onViewableItemsChanged={onViewableItemsChanged}
           renderItem={({ item }) => {
-            const entries = entriesByDate[item];
+            const entries = entriesByDate?.[item];
+            if (!entries || entries.length === 0) {
+              return null;
+            }
+            
             const entriesDate = new Date(item);
+            if (isNaN(entriesDate.getTime())) {
+              return null;
+            }
+            
             return (
               <View>
                 <View style={styles.listHeader}>
                   <DateContainer date={entriesDate}/>
                 </View>
                 {
-                  entries.map((entry) => (
-                    <VaultEntryCard
-                      entry={entry as any}
-                      key={entry.id}
-                      onReactions={handleEntryReactions}
-                      onComments={handleEntryComments}
-                      onRetry={retryEntry}
-                      onMusicPress={handleMusicPress}
-                    />
-                  ))
+                  entries.map((entry) => {
+                    if (!entry?.id) {
+                      return null;
+                    }
+                    return (
+                      <VaultEntryCard
+                        entry={entry as any}
+                        key={entry.id}
+                        onReactions={handleEntryReactions}
+                        onComments={handleEntryComments}
+                        onRetry={retryEntry}
+                        onMusicPress={handleMusicPress}
+                      />
+                    );
+                  })
                 }
               </View>
-
             )
           }}
         />
@@ -193,6 +242,15 @@ export default function VaultScreen() {
         <View style={styles.content}>
           {renderContent()}
         </View>
+
+        {/* New Entries Indicator */}
+        {unseenEntryIds.size > 0 && (
+          <NewEntriesIndicator
+            count={unseenEntryIds.size}
+            onPress={scrollToTop}
+            visible={unseenEntryIds.size > 0}
+          />
+        )}
 
         {/* Popups at screen level */}
         {isPopupVisible && selectedEntryId && (

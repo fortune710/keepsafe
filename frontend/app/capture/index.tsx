@@ -636,12 +636,12 @@ const styles = StyleSheet.create({
     //marginTop: verticalScale(24)
   },
   profileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 20,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(20),
     borderWidth: 2,
     borderColor: '#8B5CF6',
-    padding: 2,
+    padding: scale(2),
   },
   profileImage: {
     width: '100%',
@@ -650,9 +650,9 @@ const styles = StyleSheet.create({
   },
   
   friendsButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',

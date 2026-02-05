@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 16,
   },
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   },
   usageText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginLeft: 12,
   },
@@ -245,17 +245,18 @@ const styles = StyleSheet.create({
   },
   breakdownTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   breakdownCount: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
   breakdownSize: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   actionsSection: {
@@ -282,12 +283,13 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   actionDescription: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
 });

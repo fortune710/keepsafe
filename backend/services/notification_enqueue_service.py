@@ -112,16 +112,9 @@ class NotificationEnqueueService:
             
             owner_name = owner_profile.get("username") or owner_profile.get("full_name") or "Someone"
             
-            # Determine recipients based on sharing settings
-            recipient_user_ids: List[str] = []
+            # Remove owner from the list of recipients
+            recipient_user_ids: List[str] = [user_id for user_id in shared_with if user_id != owner_id] if isinstance(shared_with, list) else []
             
-            if shared_with_everyone:
-                # Get all friends of the owner
-                friends = self._get_user_friends(owner_id)
-                recipient_user_ids = [friend["friend_id"] for friend in friends if friend["friend_id"] != owner_id]
-            elif shared_with:
-                # Use the shared_with list
-                recipient_user_ids = [user_id for user_id in shared_with if user_id != owner_id] if isinstance(shared_with, list) else []
 
             if not recipient_user_ids:
                 logger.info(f"No recipients found for entry {entry_id}")
@@ -146,9 +139,9 @@ class NotificationEnqueueService:
                 return True  # Not an error, just no tokens available
             
             # Create notification message
-            entry_type_display = entry_type.capitalize()
+            entry_type_display = f"a {entry_type.capitalize()}" if entry_type != "audio" else "an audio recording"
             title = "New Entry Shared"
-            body = f"{owner_name} shared a {entry_type_display} with you"
+            body = f"{owner_name} shared {entry_type_display} with you"
             
             # Enqueue the notification
             success = self.notification_service.enqueue_notification(
@@ -163,7 +156,7 @@ class NotificationEnqueueService:
                     "notification_type": "entry_share"
                 },
                 data={
-                    "page_url": "/vault",
+                    "page_url": "/vault?refresh=true",
                 }
             )
             
@@ -194,35 +187,7 @@ class NotificationEnqueueService:
         except Exception as e:
             logger.error(f"Error fetching user profile {user_id}: {str(e)}")
             return None
-    
-    def _get_user_friends(self, user_id: str) -> List[FriendDict]:
-        """
-        Return the list of accepted friends for the given user.
         
-        Each item in the returned list is a dict containing the key `friend_id` for a friend of the specified user. If an error occurs while fetching friends, an empty list is returned.
-        
-        Parameters:
-            user_id (str): The ID of the user whose accepted friends should be retrieved.
-        
-        Returns:
-            List[FriendDict]: A list of friend records with `friend_id` fields.
-        """
-        try:
-            # Get friends where user_id is the requester and status is accepted
-            response1 = self.supabase.table("friendships").select("friend_id").eq("user_id", user_id).eq("status", "accepted").execute()
-            
-            # Get friends where friend_id is the user and status is accepted
-            response2 = self.supabase.table("friendships").select("user_id").eq("friend_id", user_id).eq("status", "accepted").execute()
-            
-            friends1 = response1.data if response1.data else []
-            # Map user_id to friend_id for consistency
-            friends2 = [{"friend_id": friend["user_id"]} for friend in (response2.data if response2.data else [])]
-            
-            return friends1 + friends2
-        except Exception as e:
-            logger.error(f"Error fetching friends for user {user_id}: {str(e)}")
-            return []
-    
     def _filter_recipients_by_notification_settings(
         self,
         user_ids: List[str],
@@ -246,12 +211,14 @@ class NotificationEnqueueService:
             settings_dict = self.cache_service.get_notification_settings_batch(user_ids)
             
             # Filter users who have the notification type enabled
-            # Default to True if no settings found (opt-in by default)
+            # Edge case: If a user doesn't have a notification_settings record, 
+            # default to enabled (opt-in by default)
             enabled_user_ids = []
             for user_id in user_ids:
                 setting = settings_dict.get(user_id)
                 if setting is None:
-                    # No settings found - default to enabled
+                    # No settings found - default to enabled (edge case handled)
+                    logger.debug(f"No notification_settings record found for user {user_id}, defaulting to enabled")
                     enabled_user_ids.append(user_id)
                 elif setting.get(notification_type, True):
                     # Settings found and notification type is enabled
@@ -281,10 +248,13 @@ class NotificationEnqueueService:
             # Get push tokens from cache (batch operation)
             tokens_dict = self.cache_service.get_push_tokens_batch(user_ids)
             
-            # Flatten all tokens into a single list
+            # Edge case: Users can have multiple push tokens (multiple devices)
+            # Flatten all tokens into a single list - send to all devices
             all_tokens: List[str] = []
             for user_id in user_ids:
                 tokens = tokens_dict.get(user_id, [])
+                if len(tokens) > 1:
+                    logger.debug(f"User {user_id} has {len(tokens)} push tokens, sending to all devices")
                 all_tokens.extend(tokens)
             
             return all_tokens

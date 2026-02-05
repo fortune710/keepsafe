@@ -285,12 +285,14 @@ class FriendService:
             settings_dict = self.cache_service.get_notification_settings_batch(user_ids)
             
             # Filter users who have the notification type enabled
-            # Default to True if no settings found (opt-in by default)
+            # Edge case: If a user doesn't have a notification_settings record, 
+            # default to enabled (opt-in by default)
             enabled_user_ids = []
             for user_id in user_ids:
                 setting = settings_dict.get(user_id)
                 if setting is None:
-                    # No settings found - default to enabled
+                    # No settings found - default to enabled (edge case handled)
+                    logger.debug(f"No notification_settings record found for user {user_id}, defaulting to enabled")
                     enabled_user_ids.append(user_id)
                 elif setting.get(notification_type, True):
                     # Settings found and notification type is enabled
@@ -320,10 +322,13 @@ class FriendService:
             # Get push tokens from cache (batch operation)
             tokens_dict = self.cache_service.get_push_tokens_batch(user_ids)
             
-            # Flatten all tokens into a single list
+            # Edge case: Users can have multiple push tokens (multiple devices)
+            # Flatten all tokens into a single list - send to all devices
             all_tokens: list[str] = []
             for user_id in user_ids:
                 tokens = tokens_dict.get(user_id, [])
+                if len(tokens) > 1:
+                    logger.debug(f"User {user_id} has {len(tokens)} push tokens, sending to all devices")
                 all_tokens.extend(tokens)
             
             return all_tokens
