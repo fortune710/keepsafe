@@ -349,6 +349,29 @@ export interface Database {
           updated_at?: string
         }
       }
+      phone_number_updates: {
+        Row: {
+          id: string
+          user_id: string
+          phone_number: string
+          otp_hash: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          phone_number: string
+          otp_hash: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          phone_number?: string
+          otp_hash?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
