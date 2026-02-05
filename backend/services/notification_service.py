@@ -246,8 +246,9 @@ class NotificationService:
                 stats["succeeded"] += 1
                 logger.info(f"Successfully processed notification: msg_id={msg_id}")
                 
-                # Capture PostHog event for notification sent
-                self._capture_notification_sent_event(
+                # Capture PostHog event for notification sent (offload blocking I/O to thread)
+                await asyncio.to_thread(
+                    self._capture_notification_sent_event,
                     metadata=metadata,
                     recipients=recipients,
                     title=title,

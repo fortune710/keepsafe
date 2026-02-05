@@ -109,8 +109,8 @@ export default function FriendsScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // Refresh both friends and suggested friends in parallel
-      refreshFriends();
+      // Refresh both friends and suggested friends and await completion
+      await refreshFriends();
     } catch (error) {
       logger.warn('Error refreshing friends data:', error);
     } finally {

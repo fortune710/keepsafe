@@ -29,7 +29,7 @@ interface UseFriendsResult {
   unblockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   refetch: () => void;
   prefetchSuggestedFriends: () => Promise<{ success: boolean; error: string | null }>;
-  refreshFriends: () => void;
+  refreshFriends: () => Promise<void>;
 }
 
 export function useFriends(userId?: string): UseFriendsResult {
@@ -265,10 +265,12 @@ export function useFriends(userId?: string): UseFriendsResult {
     }
   }, [queryClient, profile?.id])
 
-  const refreshFriends = useCallback(() => {
-    // Invalidate both suggested friends and friendships queries
-    queryClient.invalidateQueries({ queryKey: ['suggested-friends'] });
-    queryClient.invalidateQueries({ queryKey: ['friendships', userId] });
+  const refreshFriends = useCallback(async () => {
+    // Refetch both suggested friends and friendships queries and await completion
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['suggested-friends'] }),
+      queryClient.refetchQueries({ queryKey: ['friendships', userId] }),
+    ]);
   }, [queryClient, userId]);
 
   return {
