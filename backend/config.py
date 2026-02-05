@@ -63,4 +63,9 @@ class Settings:
     REDIS_DB: int = _get_int_env("REDIS_DB", 0)
     REDIS_CACHE_TTL: int = _get_int_env("REDIS_CACHE_TTL", 3600)
 
+    # Twilio (SMS OTP)
+    TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "")
+
 settings = Settings()
