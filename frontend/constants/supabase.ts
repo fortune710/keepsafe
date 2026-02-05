@@ -13,6 +13,7 @@ export const TABLES = {
   NOTIFICATION_SETTINGS: 'notification_settings',
   PRIVACY_SETTINGS: 'privacy_settings',
   USER_STREAKS: 'user_streaks',
+  PHONE_NUMBER_UPDATES: 'phone_number_updates',
 } as const;
 
 // Storage Bucket Names

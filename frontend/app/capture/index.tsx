@@ -23,6 +23,9 @@ import { Colors } from '@/lib/constants';
 import AudioWaveVisualier from '@/components/audio/audio-wave-visualier';
 import { useResponsive } from '@/hooks/use-responsive';
 import { logger } from '@/lib/logger';
+import PhoneNumberBottomSheet from '@/components/phone-number-bottom-sheet';
+import { supabase } from '@/lib/supabase';
+import { getPhonePromptState } from '@/services/phone-number-prompt-service';
 
 const { height } = Dimensions.get('window');
 
@@ -46,7 +49,8 @@ export default function CaptureScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
-  const { profile } = useAuthContext();
+  const { profile, user } = useAuthContext();
+  const [showPhoneSheet, setShowPhoneSheet] = useState(false);
 
   const { 
     isCapturing, 
@@ -121,6 +125,43 @@ export default function CaptureScreen() {
       }
     };
   }, []);
+
+  // Show the phone-number prompt bottom sheet when entering `/capture` if needed.
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkShouldShowPhonePrompt = async () => {
+      if (!user?.id) return;
+      if (profile?.phone_number) {
+        if (!cancelled) setShowPhoneSheet(false);
+        return;
+      }
+
+      // If the user already has a pending OTP record, always show the sheet.
+      const { data: pendingRecord } = await supabase
+        .from('phone_number_updates')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (pendingRecord?.id) {
+        if (!cancelled) setShowPhoneSheet(true);
+        return;
+      }
+
+      const state = await getPhonePromptState(user.id);
+      const now = Date.now();
+      const shouldShow =
+        !state.dontAskAgain && (!state.nextPromptAtMs || now >= state.nextPromptAtMs);
+
+      if (!cancelled) setShowPhoneSheet(shouldShow);
+    };
+
+    checkShouldShowPhonePrompt().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.phone_number, user?.id]);
 
   // Cleanup audio recording when component unmounts (navigating away)
   useEffect(() => {
@@ -614,6 +655,11 @@ export default function CaptureScreen() {
           </ScrollView>
         </GestureDetector>
       </SafeAreaView>
+
+      <PhoneNumberBottomSheet
+        isVisible={showPhoneSheet}
+        onClose={() => setShowPhoneSheet(false)}
+      />
     </Animated.View>
   );
 }

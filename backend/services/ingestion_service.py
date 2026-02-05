@@ -12,7 +12,25 @@ class IngestionService:
     """Service for ingesting entries into the vector database."""
     
     def __init__(self):
-        self.pinecone_index = get_pinecone_index()
+        """
+        Initialize the ingestion service.
+
+        Note:
+            Pinecone initialization is deferred until first use so unit tests and
+            environments without Pinecone credentials can still construct this service.
+        """
+        self._pinecone_index = None
+
+    def _get_index(self):
+        """
+        Lazily initialize and return the Pinecone index.
+
+        Returns:
+            Any: Pinecone index instance.
+        """
+        if self._pinecone_index is None:
+            self._pinecone_index = get_pinecone_index()
+        return self._pinecone_index
     
     async def ingest_entry(self, entry: Dict[str, Any]) -> bool:
         """
@@ -99,7 +117,7 @@ class IngestionService:
             logger.debug("Metadata: %s", metadata)
             # Upsert to Pinecone
             logger.info(f"Upserting entry {entry_id} to Pinecone")
-            self.pinecone_index.upsert(
+            self._get_index().upsert(
                 vectors=[{
                     "id": entry_id,
                     "values": embedding,
@@ -137,7 +155,7 @@ class IngestionService:
             True if successful, False otherwise
         """
         try:
-            self.pinecone_index.delete(ids=[entry_id])
+            self._get_index().delete(ids=[entry_id])
             logger.info(f"Successfully deleted entry {entry_id} from Pinecone")
             return True
         except Exception as e:

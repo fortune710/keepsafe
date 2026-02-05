@@ -648,7 +648,12 @@ class NotificationService:
         
         try:
             # Query push_tokens table to get user_ids for tokens
-            response = self.supabase.schema("public").table("push_tokens").select("token, user_id").in_("token", tokens).execute()
+            response = (
+                self.supabase.table("push_tokens")
+                .select("token, user_id")
+                .in_("token", tokens)
+                .execute()
+            )
             
             token_to_user: Dict[str, str] = {}
             if response.data:

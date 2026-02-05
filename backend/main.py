@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import webhooks
 from routers import search
 from routers import user
+from routers import phone_number
 from config import settings
 from services.notification_scheduler import NotificationScheduler
 import logging
@@ -37,6 +38,7 @@ app.add_middleware(
 app.include_router(webhooks.router)
 app.include_router(search.router)
 app.include_router(user.router)
+app.include_router(phone_number.router)
 
 @app.get("/")
 async def root():
