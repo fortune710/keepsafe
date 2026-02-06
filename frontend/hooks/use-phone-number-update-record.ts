@@ -5,7 +5,6 @@ export interface PhoneNumberUpdateRecord {
   id: string;
   user_id: string;
   phone_number: string;
-  otp_hash: string;
   created_at: string;
 }
 
@@ -37,7 +36,7 @@ export function usePhoneNumberUpdateRecord(userId?: string): UsePhoneNumberUpdat
     try {
       const { data, error } = await supabase
         .from('phone_number_updates')
-        .select('id,user_id,phone_number,otp_hash,created_at')
+        .select('id,user_id,phone_number,created_at')
         .eq('user_id', userId)
         .maybeSingle();
 

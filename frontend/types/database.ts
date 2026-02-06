@@ -377,7 +377,14 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      rpc_verify_and_update_phone: {
+        Args: {
+          p_user_id: string;
+          p_phone_number: string;
+          p_raw_otp: string;
+        };
+        Returns: Json;
+      };
     }
     Enums: {
       [_ in never]: never

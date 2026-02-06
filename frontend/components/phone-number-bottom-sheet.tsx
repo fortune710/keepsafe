@@ -8,8 +8,6 @@ import { verticalScale } from 'react-native-size-matters';
 import { BACKEND_URL } from '@/lib/constants';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
-import { useOtpHash } from '@/hooks/use-otp-hash';
-import { useProfileOperations } from '@/hooks/use-profile-operations';
 import { usePhoneNumberUpdateRecord } from '@/hooks/use-phone-number-update-record';
 import { PhoneNumberInput } from '@/components/profile/phone-number-input';
 import { OtpInput } from '@/components/ui/otp-input';
@@ -38,8 +36,6 @@ type Step = 'phone' | 'otp';
 export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumberBottomSheetProps) {
   const { user, session } = useAuthContext();
   const { toast } = useToast();
-  const { matchesHash } = useOtpHash();
-  const { updateProfile, isLoading: isProfileUpdating } = useProfileOperations();
 
   const { record, loading: recordLoading, refresh } = usePhoneNumberUpdateRecord(user?.id);
 
@@ -215,30 +211,30 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
 
     setIsVerifyingOtp(true);
     try {
-      const isCorrect = matchesHash(cleaned, record.otp_hash);
-      if (!isCorrect) {
-        toast('Incorrect code. Please try again.', 'error');
-        return;
-      }
-
-      const result = await updateProfile({ phone_number: record.phone_number });
-      if (!result.success) {
-        toast(result.message || 'Failed to update phone number', 'error');
-        return;
-      }
-
-      // Cleanup the pending verification record.
-      const { error } = await supabase
-        .from('phone_number_updates')
-        .delete()
-        .eq('user_id', user.id);
+      // Call server-side RPC to verify OTP and update phone number in a single transaction
+      const { data, error } = await (supabase.rpc as any)('rpc_verify_and_update_phone', {
+        p_user_id: user.id,
+        p_phone_number: record.phone_number,
+        p_raw_otp: cleaned,
+      });
 
       if (error) {
-        // Non-blocking; phone number was updated, but cleanup failed.
-        toast('Phone number saved, but cleanup failed. Please try again later.', 'error');
-      } else {
-        toast('Phone number verified', 'success');
+        toast(error.message || 'Failed to verify OTP', 'error');
+        return;
       }
+
+      // Check RPC result (data is Json type from jsonb return)
+      const result = data as { success?: boolean; message?: string } | null;
+      if (!result || !result.success) {
+        const errorMessage = result?.message || 'Failed to verify OTP';
+        toast(errorMessage, 'error');
+        return;
+      }
+
+      toast('Phone number verified', 'success');
+
+      // Refresh the record to clear it (it should be deleted by the RPC)
+      await refresh();
 
       await clearPhonePromptState(user.id);
       onClose();
@@ -320,11 +316,11 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
                 <OtpInput value={otp} onChange={setOtp} />
 
                 <TouchableOpacity
-                  style={[styles.primaryButton, (!canVerify || isVerifyingOtp || isProfileUpdating) && styles.buttonDisabled]}
+                  style={[styles.primaryButton, (!canVerify || isVerifyingOtp) && styles.buttonDisabled]}
                   onPress={verifyOtp}
-                  disabled={!canVerify || isVerifyingOtp || isProfileUpdating}
+                  disabled={!canVerify || isVerifyingOtp}
                 >
-                  {isVerifyingOtp || isProfileUpdating ? (
+                  {isVerifyingOtp ? (
                     <ActivityIndicator color="white" />
                   ) : (
                     <Text style={styles.primaryButtonText}>Confirm Code</Text>
