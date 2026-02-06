@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional
 import json
 import logging
+import asyncio
 
 from services.gemini_client import generate_description_from_media, generate_embedding
 from services.pinecone_client import get_pinecone_index
@@ -20,16 +21,24 @@ class IngestionService:
             environments without Pinecone credentials can still construct this service.
         """
         self._pinecone_index = None
+        self._index_lock = asyncio.Lock()
 
-    def _get_index(self):
+    async def _get_index(self):
         """
         Lazily initialize and return the Pinecone index.
+        
+        Uses an asyncio.Lock to serialize concurrent initialization attempts,
+        preventing race conditions and multiple initializations.
 
         Returns:
             Any: Pinecone index instance.
         """
         if self._pinecone_index is None:
-            self._pinecone_index = get_pinecone_index()
+            async with self._index_lock:
+                # Double-check pattern: another coroutine may have initialized while waiting
+                if self._pinecone_index is None:
+                    # Offload blocking network I/O to a thread pool
+                    self._pinecone_index = await asyncio.to_thread(get_pinecone_index)
         return self._pinecone_index
     
     async def ingest_entry(self, entry: Dict[str, Any]) -> bool:
@@ -117,7 +126,8 @@ class IngestionService:
             logger.debug("Metadata: %s", metadata)
             # Upsert to Pinecone
             logger.info(f"Upserting entry {entry_id} to Pinecone")
-            self._get_index().upsert(
+            index = await self._get_index()
+            index.upsert(
                 vectors=[{
                     "id": entry_id,
                     "values": embedding,
@@ -155,7 +165,8 @@ class IngestionService:
             True if successful, False otherwise
         """
         try:
-            self._get_index().delete(ids=[entry_id])
+            index = await self._get_index()
+            index.delete(ids=[entry_id])
             logger.info(f"Successfully deleted entry {entry_id} from Pinecone")
             return True
         except Exception as e:
