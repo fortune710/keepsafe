@@ -43,7 +43,12 @@ export function PhoneNumberInput({
   const [value, setValue] = useState('');
 
   useEffect(() => {
-    if (!initialValue) return;
+    if (!initialValue) {
+      setCountryCode('');
+      setCountryIso('');
+      setValue('');
+      return;
+    }
 
     // Find all matching countries and sort by code length descending (longest match first).
     const matchingCountries = countries.filter(c => initialValue.startsWith(c.code));
@@ -57,8 +62,15 @@ export function PhoneNumberInput({
       return;
     }
 
-    // Fallback: attempt to show last 10 digits formatted.
-    setValue(formatPhoneNumber(extractPhoneNumber(initialValue)));
+    // Fallback: preserve all digits except for US (+1) numbers
+    let digitsOnly = initialValue.replace(/\D/g, '');
+    if (initialValue.startsWith('+1') && digitsOnly.startsWith('1')) {
+      // US number: remove leading '1' and format remaining digits
+      setValue(formatPhoneNumber(digitsOnly.slice(1)));
+    } else {
+      // Non-US number: preserve all digits unformatted
+      setValue(digitsOnly);
+    }
   }, [initialValue]);
 
   const phoneRegex = /^\d+$/;
