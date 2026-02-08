@@ -16,7 +16,8 @@ import { useMediaCapture } from '@/hooks/use-media-capture';
 import { MediaService } from '@/services/media-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
-import { getDefaultAvatarUrl, getTimefromTimezone } from '@/lib/utils';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import { useTimezone } from '@/hooks/use-timezone';
 import { DateContainer } from '@/components/date-container';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
@@ -31,6 +32,7 @@ const { height } = Dimensions.get('window');
 
 export default function CaptureScreen() {
   const responsive = useResponsive();
+  const { convertToLocalTimezone } = useTimezone();
   const [selectedMode, setSelectedMode] = useState<'camera' | 'microphone'>('camera');
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
@@ -471,7 +473,7 @@ export default function CaptureScreen() {
                 />
               </TouchableOpacity>
               
-              <DateContainer date={getTimefromTimezone()} />
+              <DateContainer date={convertToLocalTimezone(new Date())} />
               
               <TouchableOpacity
                 style={styles.friendsButton}

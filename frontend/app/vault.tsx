@@ -20,6 +20,7 @@ import { useResponsive, useTabletLayout } from '@/hooks/use-responsive';
 import { ChevronLeft } from 'lucide-react-native';
 import { Colors } from '@/lib/constants';
 import NewEntriesIndicator from '@/components/new-entries-indicator';
+import { useTimezone } from '@/hooks/use-timezone';
 
 const { height, width } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ export default function VaultScreen() {
   const tabletLayout = useTabletLayout();
   const { entries, entriesByDate, isLoading, error, refetch, retryEntry, unseenEntryIds, markEntriesAsSeen } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
+  const { convertToLocalTimezone } = useTimezone();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
@@ -196,7 +198,13 @@ export default function VaultScreen() {
               return null;
             }
             
-            const entriesDate = new Date(item);
+            // Convert date string to Date object, handling UTC conversion if needed
+            // item is a date string in YYYY-MM-DD format from groupBy
+            // We need to create a Date object for that date in local timezone
+            const dateString = item; // YYYY-MM-DD format
+            const [year, month, day] = dateString.split('-').map(Number);
+            const entriesDate = new Date(year, month - 1, day); // month is 0-indexed
+            
             if (isNaN(entriesDate.getTime())) {
               return null;
             }
