@@ -91,7 +91,6 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
           platform: Platform.OS
         })
         await SearchService.streamSearch({
-          userId: user.id,
           query,
           signal: controller.signal,
           onMessage: (chunk) => {
