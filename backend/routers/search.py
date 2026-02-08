@@ -50,7 +50,6 @@ async def search_stream(
     Streaming endpoint that runs the search agent and sends user-friendly
     status updates and the final summary over Server-Sent Events (SSE).
     """
-    print(current_user)
     user_id = current_user.user.id
     event_source = _sse_event_stream(user_id=user_id, query=payload.query)
     return StreamingResponse(event_source, media_type="text/event-stream")
