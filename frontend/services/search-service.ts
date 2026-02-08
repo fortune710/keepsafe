@@ -79,6 +79,11 @@ export class SearchService {
 
       if (!response.ok) {
         const error = new Error(`Search request failed with status ${response.status}`);
+        logger.error('SearchService: non-OK response', {
+          status: response.status,
+          statusText: response.statusText,
+          
+        });
         onError?.(error);
         try {
           const errorText = await response.text();

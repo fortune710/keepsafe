@@ -10,20 +10,22 @@ import { DateContainer } from '@/components/date-container';
 import { EntryPage } from '@/components/entries/entry-page';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getEntriesForDate, getTimefromTimezone } from '@/lib/utils';
+import { getEntriesForDate } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
+import { useTimezone } from '@/hooks/use-timezone';
 
 export default function CalendarDayScreen() {
   const { date } = useLocalSearchParams();
   const { entries, isLoading, error } = useUserEntries();
+  const { getLocalDateString, isUTC } = useTimezone();
 
   const selectedDate = date as string;
   console.log(selectedDate);
 
   // Filter entries for the selected date
   const dayEntries = React.useMemo(() => {
-    return getEntriesForDate(selectedDate, entries);
-  }, [entries, selectedDate]);
+    return getEntriesForDate(selectedDate, entries, { getLocalDateString, isUTC });
+  }, [entries, selectedDate, getLocalDateString, isUTC]);
 
   // Swipe right gesture to go back
   const swipeRightGesture = Gesture.Pan()

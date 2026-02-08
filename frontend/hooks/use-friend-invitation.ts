@@ -47,11 +47,7 @@ export function useFriendInvitation(): UseFriendInvitationResult {
     };
 
     try {
-      const result = await Share.share({
-        title: shareOptions.title,
-        message: `${shareOptions.message}\n\n${shareOptions.url}`,
-        url: shareOptions.url,
-      });
+      const result = await Share.share(shareOptions);
 
       return result.action !== Share.dismissedAction;
     } catch (error) {

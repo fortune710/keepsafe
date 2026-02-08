@@ -22,6 +22,16 @@ export interface ScheduleNotificationOptions {
  * and canceling scheduled notifications.
  */
 export class LocalNotificationService {
+  private static _sanitizeBadge(badge: unknown): number | undefined {
+    // Expo native expects badge to be an integer when provided.
+    // Passing null/undefined (or non-integers) can crash on some platforms,
+    // so we omit the field unless it's a valid integer.
+    if (typeof badge !== 'number' || !Number.isFinite(badge) || !Number.isInteger(badge)) {
+      return undefined;
+    }
+    return badge;
+  }
+
   /**
    * Configure notification behavior when app is in foreground.
    * Should be called during app initialization.
@@ -121,14 +131,19 @@ export class LocalNotificationService {
         await this.configureAndroidChannel();
       }
 
+      const contentInput: Notifications.NotificationContentInput = {
+        title: content.title,
+        body: content.body,
+        data: content.data || {},
+        sound: content.sound !== false,
+      };
+      const badge = this._sanitizeBadge(content.badge);
+      if (badge !== undefined) {
+        contentInput.badge = badge;
+      }
+
       const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: content.title,
-          body: content.body,
-          data: content.data || {},
-          sound: content.sound !== false,
-          badge: content.badge,
-        },
+        content: contentInput,
         trigger: null, // null trigger = immediate notification
         identifier,
       });
@@ -163,14 +178,19 @@ export class LocalNotificationService {
         await this.configureAndroidChannel();
       }
 
+      const contentInput: Notifications.NotificationContentInput = {
+        title: options.content.title,
+        body: options.content.body,
+        data: options.content.data || {},
+        sound: options.content.sound !== false,
+      };
+      const badge = this._sanitizeBadge(options.content.badge);
+      if (badge !== undefined) {
+        contentInput.badge = badge;
+      }
+
       const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: options.content.title,
-          body: options.content.body,
-          data: options.content.data || {},
-          sound: options.content.sound !== false,
-          badge: options.content.badge,
-        },
+        content: contentInput,
         trigger: options.trigger,
         identifier: options.identifier,
       });

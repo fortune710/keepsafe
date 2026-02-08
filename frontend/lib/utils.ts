@@ -78,16 +78,44 @@ export const generateDeepLinkUrl = () => {
     return PROD_URL;
 }
 
-export function groupBy<T, K extends keyof T>(arr: T[], key: K): Record<string, T[]> {
+export function groupBy<T, K extends keyof T>(
+  arr: T[], 
+  key: K,
+  timezoneUtils?: { getLocalDateString: (timestamp: string | Date) => string; isUTC: (timestamp: string) => boolean }
+): Record<string, T[]> {
+    if (!arr || !Array.isArray(arr)) {
+      return {};
+    }
+    
     return arr.reduce((acc, item) => {
+      if (!item) return acc;
+      
       let groupKey: string;
       if ((key === 'updated_at' || key === 'created_at') && typeof item[key] === 'string') {
-        // Group by day (YYYY-MM-DD) if key is 'updated_at'
-        const date = new Date(item[key] as string);
-        groupKey = date.toISOString().slice(0, 10);
+        const timestamp = item[key] as string;
+        
+        if (timezoneUtils) {
+          // Use timezone utilities to convert UTC timestamps to local timezone
+          groupKey = timezoneUtils.getLocalDateString(timestamp);
+        } else {
+          // Fallback: Group by day (YYYY-MM-DD) in local timezone
+          const date = new Date(timestamp);
+          if (!isNaN(date.getTime())) {
+            // Use local date components to match DateContainer display
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            groupKey = `${year}-${month}-${day}`;
+          } else {
+            // Invalid date - group under 'invalid-date' or skip
+            groupKey = 'invalid-date';
+          }
+        }
       } else {
-        groupKey = String(item[key]);
+        const value = item[key];
+        groupKey = value != null ? String(value) : 'null';
       }
+      
       if (!acc[groupKey]) {
         acc[groupKey] = [];
       }
@@ -185,9 +213,20 @@ export const getEntryCount = (day: number, monthDate: Date, entriesData: Record<
 export const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /* Entry utils */
-export const getEntriesForDate = (date: string, entries: EntryWithProfile[]) => { 
+export const getEntriesForDate = (
+  date: string, 
+  entries: EntryWithProfile[],
+  timezoneUtils?: { getLocalDateString: (timestamp: string | Date) => string; isUTC: (timestamp: string) => boolean }
+) => { 
   return entries.filter(entry => {
-    const entryDate = getTimefromTimezone(new Date(entry.created_at)).toISOString().split('T')[0];
+    let entryDate: string;
+    if (timezoneUtils) {
+      // Use timezone utilities to convert UTC timestamps to local timezone
+      entryDate = timezoneUtils.getLocalDateString(entry.created_at);
+    } else {
+      // Fallback: Use existing timezone conversion
+      entryDate = getTimefromTimezone(new Date(entry.created_at)).toISOString().split('T')[0];
+    }
     return entryDate === date;
   }).map(entry => ({
     id: entry.id,

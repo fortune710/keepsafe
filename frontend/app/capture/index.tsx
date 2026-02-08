@@ -16,18 +16,23 @@ import { useMediaCapture } from '@/hooks/use-media-capture';
 import { MediaService } from '@/services/media-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
-import { getDefaultAvatarUrl, getTimefromTimezone } from '@/lib/utils';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import { useTimezone } from '@/hooks/use-timezone';
 import { DateContainer } from '@/components/date-container';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
 import AudioWaveVisualier from '@/components/audio/audio-wave-visualier';
 import { useResponsive } from '@/hooks/use-responsive';
 import { logger } from '@/lib/logger';
+import PhoneNumberBottomSheet from '@/components/phone-number-bottom-sheet';
+import { supabase } from '@/lib/supabase';
+import { getPhonePromptState } from '@/services/phone-number-prompt-service';
 
 const { height } = Dimensions.get('window');
 
 export default function CaptureScreen() {
   const responsive = useResponsive();
+  const { convertToLocalTimezone } = useTimezone();
   const [selectedMode, setSelectedMode] = useState<'camera' | 'microphone'>('camera');
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
@@ -46,7 +51,8 @@ export default function CaptureScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
-  const { profile } = useAuthContext();
+  const { profile, user } = useAuthContext();
+  const [showPhoneSheet, setShowPhoneSheet] = useState(false);
 
   const { 
     isCapturing, 
@@ -121,6 +127,43 @@ export default function CaptureScreen() {
       }
     };
   }, []);
+
+  // Show the phone-number prompt bottom sheet when entering `/capture` if needed.
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkShouldShowPhonePrompt = async () => {
+      if (!user?.id) return;
+      if (profile?.phone_number) {
+        if (!cancelled) setShowPhoneSheet(false);
+        return;
+      }
+
+      // If the user already has a pending OTP record, always show the sheet.
+      const { data: pendingRecord } = await supabase
+        .from('phone_number_updates')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (pendingRecord?.id) {
+        if (!cancelled) setShowPhoneSheet(true);
+        return;
+      }
+
+      const state = await getPhonePromptState(user.id);
+      const now = Date.now();
+      const shouldShow =
+        !state.dontAskAgain && (!state.nextPromptAtMs || now >= state.nextPromptAtMs);
+
+      if (!cancelled) setShowPhoneSheet(shouldShow);
+    };
+
+    checkShouldShowPhonePrompt().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.phone_number, user?.id]);
 
   // Cleanup audio recording when component unmounts (navigating away)
   useEffect(() => {
@@ -430,7 +473,7 @@ export default function CaptureScreen() {
                 />
               </TouchableOpacity>
               
-              <DateContainer date={getTimefromTimezone()} />
+              <DateContainer date={convertToLocalTimezone(new Date())} />
               
               <TouchableOpacity
                 style={styles.friendsButton}
@@ -614,6 +657,11 @@ export default function CaptureScreen() {
           </ScrollView>
         </GestureDetector>
       </SafeAreaView>
+
+      <PhoneNumberBottomSheet
+        isVisible={showPhoneSheet}
+        onClose={() => setShowPhoneSheet(false)}
+      />
     </Animated.View>
   );
 }
@@ -636,12 +684,12 @@ const styles = StyleSheet.create({
     //marginTop: verticalScale(24)
   },
   profileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 20,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(20),
     borderWidth: 2,
     borderColor: '#8B5CF6',
-    padding: 2,
+    padding: scale(2),
   },
   profileImage: {
     width: '100%',
@@ -650,9 +698,9 @@ const styles = StyleSheet.create({
   },
   
   friendsButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',

@@ -8,27 +8,29 @@ import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { verticalScale } from 'react-native-size-matters';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
-import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames, getTimefromTimezone } from '@/lib/utils';
+import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames } from '@/lib/utils';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import StreakElement from '@/components/streaks/streak-element';
+import { useTimezone } from '@/hooks/use-timezone';
 
 export default function CalendarScreen() {
   const { user } = useAuthContext();
   const { entries, isLoading } = useEntries(user?.id);
   const { currentStreak, maxStreak, isLoading: streakLoading, checkAndUpdateStreak } = useStreakTracking(user?.id);
   const scrollViewRef = useRef<FlashListRef<Date>>(null);
+  const { getLocalDateString } = useTimezone();
 
   // Process entries data for calendar display
   const entriesData = React.useMemo(() => {
     const data: { [key: string]: number } = {};
     
     entries.forEach(entry => {
-      const dateKey = getTimefromTimezone(new Date(entry.created_at)).toISOString().split('T')[0];
+      const dateKey = getLocalDateString(entry.created_at);
       data[dateKey] = (data[dateKey] || 0) + 1;
     });
     
     return data;
-  }, [entries]);
+  }, [entries, getLocalDateString]);
 
   
 

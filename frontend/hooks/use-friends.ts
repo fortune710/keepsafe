@@ -26,9 +26,10 @@ interface UseFriendsResult {
   declineFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   removeFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   blockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
-   unblockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
+  unblockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   refetch: () => void;
   prefetchSuggestedFriends: () => Promise<{ success: boolean; error: string | null }>;
+  refreshFriends: () => Promise<void>;
 }
 
 export function useFriends(userId?: string): UseFriendsResult {
@@ -222,15 +223,34 @@ export function useFriends(userId?: string): UseFriendsResult {
   }, [deleteFriendshipMutation]);
 
   const prefetchSuggestedFriends = useCallback(async () => {
+    if (!profile?.id) {
+      return {
+        success: false,
+        error: 'Profile ID is required'
+      };
+    }
+
     try {
       await queryClient.prefetchQuery({
         queryKey: ["suggested-friends"],
         queryFn: async () => {
+          // Always fetch fresh data from API
           const contacts = await FriendService.getSuggestedFriendsFromContacts();
-          logger.debug('Prefetched suggested friends:', { contacts });
-          return contacts.filter(contact => contact.id !== profile?.id);
-        }
-      })
+          const filteredContacts = contacts.filter(contact => contact.id !== profile.id);
+          
+          // Sync device storage after successful fetch (consistent with useSuggestedFriends)
+          try {
+            await deviceStorage.setSuggestedFriends(filteredContacts);
+          } catch (storageError) {
+            logger.warn('Failed to sync suggested friends to device storage during prefetch:', storageError);
+            // Don't throw - storage sync failure shouldn't break the prefetch
+          }
+          
+          logger.debug('Prefetched suggested friends:', { contacts: filteredContacts });
+          return filteredContacts;
+        },
+        staleTime: 0, // Match the hook's configuration
+      });
 
       return {
         success: true,
@@ -244,6 +264,15 @@ export function useFriends(userId?: string): UseFriendsResult {
       }
     }
   }, [queryClient, profile?.id])
+
+  const refreshFriends = useCallback(async () => {
+    // Refetch both suggested friends and friendships queries and await completion
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['suggested-friends'] }),
+      queryClient.refetchQueries({ queryKey: ['friendships', userId] }),
+    ]);
+  }, [queryClient, userId]);
+
   return {
     friends,
     pendingRequests,
@@ -258,6 +287,7 @@ export function useFriends(userId?: string): UseFriendsResult {
     blockFriend,
     unblockFriend,
     refetch,
-    prefetchSuggestedFriends
+    prefetchSuggestedFriends,
+    refreshFriends
   };
 }

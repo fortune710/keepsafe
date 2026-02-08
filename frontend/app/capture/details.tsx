@@ -24,6 +24,7 @@ import EditorPopover from '@/components/capture/editor-popover';
 import { RenderedMediaCanvasItem } from '@/types/capture';
 import { useToast } from '@/hooks/use-toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LocalNotificationService } from '@/services/local-notification-service';
 import { Colors } from '@/lib/constants';
 import AudioEntry from '@/components/audio/audio-entry';
 import EntryShareList from '@/components/friends/entry-share-list';
@@ -331,7 +332,25 @@ export default function DetailsScreen() {
         } catch (error) {
           if (__DEV__) console.warn('Analytics capture failed:', error);
         }
-        toast(result.message, 'success');
+        
+        // Create notification message based on sharing options
+        let notificationBody = '';
+        if (isPrivate) {
+          notificationBody = 'Entry saved privately';
+        } else if (isEveryone) {
+          notificationBody = 'Entry shared with everyone';
+        } else if (selectedFriends.length > 0) {
+          notificationBody = `Entry shared with ${selectedFriends.length} friend${selectedFriends.length > 1 ? 's' : ''}`;
+        } else {
+          notificationBody = 'Entry saved successfully';
+        }
+        
+        await LocalNotificationService.sendNotification({
+          title: 'New Diary Entry Created',
+          body: notificationBody,
+          sound: true,
+        });
+        
         setTimeout(() => {
           router.push('/capture');
         }, 200);

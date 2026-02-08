@@ -8,7 +8,7 @@ import { useAuthContext } from '@/providers/auth-provider';
 
 export default function AcceptInviteScreen() {
   const { id } = useLocalSearchParams();
-  const inviteId = Array.isArray(id) ? id[0] : id;
+  const inviteCode = Array.isArray(id) ? id[0] : id;
   const { profile } = useAuthContext();
 
   const {
@@ -18,11 +18,11 @@ export default function AcceptInviteScreen() {
     isProcessing,
     acceptInvite,
     declineInvite,
-  } = useInviteAcceptance(inviteId);
+  } = useInviteAcceptance(inviteCode);
 
 
   const handleAccept = async () => {
-    if (!inviteId) return;
+    if (!inviteCode) return;
 
     try {
       const result = await acceptInvite(inviteData?.id ?? "", profile?.id ?? "");
@@ -47,7 +47,7 @@ export default function AcceptInviteScreen() {
   };
 
   const handleDecline = async () => {
-    if (!inviteId) return;
+    if (!inviteCode) return;
 
     Alert.alert(
       'Decline Invitation',
@@ -59,7 +59,7 @@ export default function AcceptInviteScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const result = await declineInvite(inviteId);
+              const result = await declineInvite(inviteCode);
               
               if (result.success) {
                 Alert.alert(
@@ -215,6 +215,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     marginTop: 16,
   },
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
     color: '#1E293B',
     marginTop: 24,
     marginBottom: 8,
@@ -234,6 +235,7 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
   },
   content: {
     flex: 1,
@@ -262,13 +264,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
     color: '#1E293B',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 18,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     textAlign: 'center',
   },
@@ -309,13 +312,14 @@ const styles = StyleSheet.create({
   },
   inviterName: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
     color: '#1E293B',
     marginBottom: 4,
     textAlign: 'center',
   },
   inviterEmail: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     marginBottom: 16,
     textAlign: 'center',
@@ -329,6 +333,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#475569',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -362,18 +367,19 @@ const styles = StyleSheet.create({
   acceptButtonText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
   },
   declineButtonText: {
     color: '#64748B',
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
   },
   footer: {
     alignItems: 'center',
   },
   footerText: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 20,

@@ -75,6 +75,20 @@
 CREATE TYPE entry_type AS ENUM ('photo', 'video', 'audio');
 CREATE TYPE friendship_status AS ENUM ('pending', 'accepted', 'declined', 'blocked');
 
+-- Create function to generate invite code
+CREATE OR REPLACE FUNCTION generate_invite_code()
+RETURNS text AS $$
+BEGIN
+  RETURN array_to_string(
+    ARRAY(
+      SELECT substring('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' 
+      FROM (ceil(random()*62))::int FOR 1)
+      FROM generate_series(1, 8)
+    ), ''
+  );
+END;
+$$ LANGUAGE plpgsql VOLATILE;
+
 -- Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -83,6 +97,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   username text UNIQUE,
   avatar_url text,
   bio text,
+  invite_code text UNIQUE,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -322,6 +337,18 @@ CREATE INDEX IF NOT EXISTS idx_invites_expires_at ON invites(expires_at);
 CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_push_tokens_token ON push_tokens(token);
 
+-- Create function to set invite code on profile creation
+CREATE OR REPLACE FUNCTION set_profile_invite_code()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Only set invite_code if it's not already provided
+  IF NEW.invite_code IS NULL THEN
+    NEW.invite_code := generate_invite_code();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -330,6 +357,12 @@ BEGIN
   RETURN NEW;
 END;
 $$ language 'plpgsql';
+
+-- Create trigger to set invite_code on profile creation
+CREATE TRIGGER set_profile_invite_code_trigger
+  BEFORE INSERT ON profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION set_profile_invite_code();
 
 -- Create triggers for updated_at
 CREATE TRIGGER update_profiles_updated_at
