@@ -349,12 +349,42 @@ export interface Database {
           updated_at?: string
         }
       }
+      phone_number_updates: {
+        Row: {
+          id: string
+          user_id: string
+          phone_number: string
+          otp_hash: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          phone_number: string
+          otp_hash: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          phone_number?: string
+          otp_hash?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      rpc_verify_and_update_phone: {
+        Args: {
+          p_user_id: string;
+          p_phone_number: string;
+          p_raw_otp: string;
+        };
+        Returns: Json;
+      };
     }
     Enums: {
       [_ in never]: never

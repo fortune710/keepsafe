@@ -8,6 +8,7 @@ import { deviceStorage } from '@/services/device-storage';
 import { groupBy } from '@/lib/utils';
 import { retryEntryProcessing } from '@/services/background-task-manager';
 import { EntryWithProfile } from '@/types/entries';
+import { useTimezone } from '@/hooks/use-timezone';
 
 
 
@@ -338,12 +339,16 @@ export function useUserEntries(): UseUserEntriesResult {
       console.error('Failed to retry entry:', error);
     }
   }, [user]);
+  
+  // Get timezone utilities for date grouping
+  const { getLocalDateString, isUTC } = useTimezone();
+  
   // Combine real entries with optimistic entries
   const allEntries = [...optimisticEntries, ...(entries || [])];
 
   // Ensure entriesByDate is always an object, never undefined
   const entriesByDate = allEntries.length > 0 
-    ? groupBy(allEntries, "created_at")
+    ? groupBy(allEntries, "created_at", { getLocalDateString, isUTC })
     : {};
 
   return {

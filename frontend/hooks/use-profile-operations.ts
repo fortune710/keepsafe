@@ -13,7 +13,7 @@ interface ProfileUpdateData {
   bio?: string;
   avatar_url?: string;
   birthday?: string;
-  phone?: string;
+  phone_number?: string;
 }
 
 interface UseProfileOperationsResult {
