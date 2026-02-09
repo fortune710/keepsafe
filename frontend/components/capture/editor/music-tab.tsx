@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
+        fontFamily: "Jost-Regular",
         color: "#64748B",
     },
     listHeader: { marginBottom: 10 },
