@@ -9,6 +9,7 @@ import { groupBy } from '@/lib/utils';
 import { retryEntryProcessing } from '@/services/background-task-manager';
 import { EntryWithProfile } from '@/types/entries';
 import { useTimezone } from '@/hooks/use-timezone';
+import { logger } from '@/lib/logger';
 
 
 
@@ -27,6 +28,63 @@ interface UseUserEntriesResult {
 }
 
 const MIN_ENTRIES_TO_CACHE = 10;
+
+/**
+ * Gets the profile of an entry owner.
+ * First checks device storage (friends) for the profile, then falls back to Supabase.
+ * @param ownerUserId - The user ID of the entry owner
+ * @param currentUserId - The current logged-in user's ID
+ * @returns The profile object with only id, full_name, username, and avatar_url
+ */
+async function getEntryOwnerProfile(
+  ownerUserId: string,
+  currentUserId: string
+): Promise<{ id: string; full_name: string | null; username: string | null; avatar_url: string | null } | null> {
+  try {
+    // Helper function to fetch profile from Supabase
+    const fetchFromSupabase = async () => {
+      const { data: profile, error } = await supabase
+        .from(TABLES.PROFILES)
+        .select('id, full_name, username, avatar_url')
+        .eq('id', ownerUserId)
+        .single();
+
+      if (error || !profile) {
+        console.error('Error fetching profile from Supabase:', error);
+        return null;
+      }
+
+      return profile;
+    };
+
+    // First, try to get from device storage (friends)
+    const friends = await deviceStorage.getFriends(currentUserId);
+    if (!friends) {
+      return await fetchFromSupabase();
+    }
+
+    // Find the friendship where the owner is either user_id or friend_id
+    const friendship = friends.find(
+      (f) => f.user_id === ownerUserId || f.friend_id === ownerUserId
+    );
+    
+    if (!friendship?.friend_profile || friendship.friend_profile.id !== ownerUserId) {
+      return await fetchFromSupabase();
+    }
+
+    // Return only the required fields from friend profile
+    const profileData = friendship.friend_profile;
+    return {
+      id: profileData.id,
+      full_name: profileData.full_name,
+      username: profileData.username,
+      avatar_url: profileData.avatar_url,
+    };
+  } catch (error) {
+    console.error('Error getting entry owner profile:', error);
+    return null;
+  }
+}
 
 export function useUserEntries(): UseUserEntriesResult {
   const { user } = useAuthContext();
@@ -63,7 +121,7 @@ export function useUserEntries(): UseUserEntriesResult {
         `)
         .contains('shared_with', [user.id])
         .order('created_at', { ascending: false })
-        .limit(20);
+        //.limit(20);
 
       if (userEntriesError || !entries) {
         throw new Error(userEntriesError.message);
@@ -107,7 +165,7 @@ export function useUserEntries(): UseUserEntriesResult {
 
     // Subscribe to entries table changes
     // Note: Supabase realtime doesn't support array contains filters directly,
-    // so we listen to all INSERTs and filter in the callback
+    // so we listen to all INSERTs and filter in the callback to check if user.id is in shared_with array
     const channel = supabase
       .channel(`shared-entries-${user.id}`)
       .on(
@@ -115,7 +173,8 @@ export function useUserEntries(): UseUserEntriesResult {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'entries',
+          table: TABLES.ENTRIES,
+          // No filter here - we filter in the callback to check if user.id is in shared_with array
         },
         async (payload) => {
           try {
@@ -133,25 +192,24 @@ export function useUserEntries(): UseUserEntriesResult {
               return;
             }
 
-            // Fetch full entry with profile data
-            const { data: newEntry, error: fetchError } = await supabase
-              .from(TABLES.ENTRIES)
-              .select(`*, profile:${TABLES.PROFILES}(*)`)
-              .eq('id', newEntryData.id)
-              .single();
-
-            if (fetchError || !newEntry) {
-              console.error('Error fetching new entry:', fetchError);
+            // Get the entry owner's profile using our helper function
+            const ownerProfile = await getEntryOwnerProfile(newEntryData.user_id, user.id);
+            
+            if (!ownerProfile) {
+              logger.error('Could not fetch entry owner profile');
               return;
             }
 
-            // Type assertion for newEntry
-            const typedNewEntry = newEntry as EntryWithProfile;
+            // Combine entry with profile
+            const typedNewEntry: EntryWithProfile = {
+              ...(newEntryData as any),
+              profile: ownerProfile,
+            };
 
             // Deduplicate: Check if entry already exists in React Query cache
             const currentEntries: EntryWithProfile[] = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', user.id]) || [];
             if (currentEntries.some(e => e.id === typedNewEntry.id)) {
-              console.log('Entry already exists in cache, skipping:', typedNewEntry.id);
+              logger.info('Entry already exists in cache, skipping:', typedNewEntry.id);
               return;
             }
 
@@ -165,7 +223,7 @@ export function useUserEntries(): UseUserEntriesResult {
             try {
               await deviceStorage.addEntry(user.id, typedNewEntry);
             } catch (storageError) {
-              console.error('Error saving entry to device storage:', storageError);
+              logger.error('Error saving entry to device storage:', storageError);
               // Don't block - continue even if storage fails
             }
 
