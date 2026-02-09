@@ -144,7 +144,7 @@ export default function CaptureScreen() {
         .from('phone_number_updates')
         .select('id')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .maybeSingle() as { data: { id: string } | null };
 
       if (pendingRecord?.id) {
         if (!cancelled) setShowPhoneSheet(true);
@@ -153,8 +153,7 @@ export default function CaptureScreen() {
 
       const state = await getPhonePromptState(user.id);
       const now = Date.now();
-      const shouldShow =
-        !state.dontAskAgain && (!state.nextPromptAtMs || now >= state.nextPromptAtMs);
+      const shouldShow = !state.dontAskAgain && (!state.nextPromptAtMs || now >= state.nextPromptAtMs);
 
       if (!cancelled) setShowPhoneSheet(shouldShow);
     };
