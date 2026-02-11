@@ -1,6 +1,7 @@
 import json
 import logging
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -23,8 +24,46 @@ logger = logging.getLogger(__name__)
 EXPORT_BASE_DIR = Path(tempfile.gettempdir()) / "keepsafe_exports"
 EXPORT_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
+EXPORT_JOB_TTL_SECONDS = 60 * 60  # 1 hour
+MAX_PENDING_EXPORT_JOBS_PER_USER = 3
+
 ExportJobState = Dict[str, Any]
 export_jobs: Dict[str, ExportJobState] = {}
+
+
+def _prune_export_jobs() -> None:
+    """Remove expired export jobs and delete their files from disk."""
+    now = datetime.now(timezone.utc)
+    expired_job_ids = []
+
+    for job_id, job in list(export_jobs.items()):
+        created_at_str = job.get("created_at")
+        completed_at_str = job.get("completed_at")
+        reference_time_str = completed_at_str or created_at_str
+
+        if not reference_time_str:
+            continue
+
+        try:
+            reference_time = datetime.fromisoformat(reference_time_str)
+        except Exception:  # noqa: BLE001
+            continue
+
+        if (now - reference_time).total_seconds() > EXPORT_JOB_TTL_SECONDS:
+            expired_job_ids.append(job_id)
+
+    for job_id in expired_job_ids:
+        job = export_jobs.get(job_id) or {}
+        file_path_str = job.get("file_path")
+        if file_path_str:
+            file_path = Path(file_path_str)
+            try:
+                if file_path.is_file():
+                    file_path.unlink()
+            except Exception:  # noqa: BLE001
+                logger.exception("Failed to delete expired export file for job %s", job_id)
+
+        export_jobs.pop(job_id, None)
 
 @router.delete("/{user_id}")
 async def delete_user(
@@ -92,10 +131,38 @@ def _fetch_user_export_data(user_id: str) -> Dict[str, Any]:
     profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
     profile_data = profile_response.data[0] if profile_response.data else None
 
-    # 2. Fetch Entries
+    # 2. Fetch Entries with pagination to avoid Supabase default row cap
     logger.info(f"Fetching entries for user_id: {user_id}")
-    entries_response = supabase.table("entries").select("*").eq("user_id", user_id).execute()
-    entries_data = entries_response.data
+    entries_data = []
+    entries_batch_size = 1000
+    entries_offset = 0
+
+    while True:
+        entries_range_end = entries_offset + entries_batch_size - 1
+        logger.info(
+            "Fetching entries batch for user_id=%s, offset=%s, limit=%s",
+            user_id,
+            entries_offset,
+            entries_batch_size,
+        )
+        entries_response = (
+            supabase.table("entries")
+            .select("*")
+            .eq("user_id", user_id)
+            .range(entries_offset, entries_range_end)
+            .execute()
+        )
+        batch = entries_response.data or []
+        if not batch:
+            break
+
+        entries_data.extend(batch)
+
+        if len(batch) < entries_batch_size:
+            break
+
+        entries_offset += entries_batch_size
+
     logger.info(f"Found {len(entries_data)} entries")
 
     # 3. Fetch Friendships (both as user and as friend)
@@ -248,10 +315,10 @@ def _run_export_job(user_id: str, format: ExportFormat, job_id: str) -> None:
         export_jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
 
         logger.info("Completed export job %s, file=%s", job_id, file_path)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.exception("Failed export job %s for user_id=%s", job_id, user_id)
         export_jobs[job_id]["status"] = "failed"
-        export_jobs[job_id]["error"] = str(exc)
+        export_jobs[job_id]["error"] = "Export failed. Please try again or contact support."
 
 
 @router.post("/{user_id}/export", status_code=status.HTTP_202_ACCEPTED)
@@ -267,6 +334,8 @@ async def start_user_export(
     Returns immediately with a job_id that can be polled for status and used
     to download the completed export once ready.
     """
+    _prune_export_jobs()
+
     if current_user.user.id != user_id:
         logger.warning(
             "Unauthorized export start attempt. User %s tried to export %s",
@@ -275,12 +344,30 @@ async def start_user_export(
         )
         raise HTTPException(status_code=403, detail="Not authorized to export this user's data")
 
-    job_id = f"{user_id}-{datetime.now(timezone.utc).timestamp()}"
+    # Enforce per-user cap on pending jobs
+    pending_jobs_for_user = sum(
+        1
+        for job in export_jobs.values()
+        if job.get("user_id") == user_id and job.get("status") == "pending"
+    )
+    if pending_jobs_for_user >= MAX_PENDING_EXPORT_JOBS_PER_USER:
+        logger.warning(
+            "User %s has too many pending export jobs: %s",
+            user_id,
+            pending_jobs_for_user,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many pending export jobs. Please try again later.",
+        )
+
+    job_id = f"{user_id}-{uuid.uuid4()}"
     export_jobs[job_id] = {
         "status": "pending",
         "user_id": user_id,
         "format": format,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
         "error": None,
     }
 
@@ -299,6 +386,8 @@ async def get_export_status(
     """
     Check the status of an export job.
     """
+    _prune_export_jobs()
+
     if current_user.user.id != user_id:
         logger.warning(
             "Unauthorized export status attempt. User %s tried to check %s",
@@ -330,6 +419,8 @@ async def download_user_export(
     """
     Download the result of a completed export job.
     """
+    _prune_export_jobs()
+
     if current_user.user.id != user_id:
         logger.warning(
             "Unauthorized export download attempt. User %s tried to download %s",
@@ -349,11 +440,23 @@ async def download_user_export(
     if not file_path or not Path(file_path).is_file():
         raise HTTPException(status_code=410, detail="Export file no longer available")
 
-    return FileResponse(
+    response = FileResponse(
         path=file_path,
         media_type=job.get("media_type") or "application/octet-stream",
         filename=job.get("filename") or Path(file_path).name,
     )
+
+    # Best-effort cleanup after successful download: delete file and job entry.
+    try:
+        path_obj = Path(file_path)
+        if path_obj.is_file():
+            path_obj.unlink()
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to delete export file after download for job %s", job_id)
+
+    export_jobs.pop(job_id, None)
+
+    return response
 
 
 @router.get("/{user_id}/export")

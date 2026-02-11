@@ -23,10 +23,6 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
-import { BACKEND_URL } from '@/lib/constants';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import { logger } from '@/lib/logger';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
 
@@ -64,14 +60,6 @@ const settingsItems: SettingsItem[] = [
     route: '/settings/privacy',
     color: '#DC2626',
   },
-  // {
-  //   id: 'storage',
-  //   title: 'Storage & Data',
-  //   subtitle: 'Manage your data and storage',
-  //   icon: HardDrive,
-  //   route: '/settings/storage',
-  //   color: '#7C2D12',
-  // },
   {
     id: 'about',
     title: 'About',

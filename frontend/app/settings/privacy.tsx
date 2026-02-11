@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Shield, Eye, Lock, Trash2, Download } from 'lucide-react-native';
@@ -47,6 +47,18 @@ export default function PrivacyScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportStatusMessage, setExportStatusMessage] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+  const exportPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (exportPollTimeoutRef.current) {
+        clearTimeout(exportPollTimeoutRef.current);
+        exportPollTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const settings: PrivacySetting[] = DEFAULT_SETTINGS.map((setting) => ({
     ...setting,
@@ -76,12 +88,22 @@ export default function PrivacyScreen() {
     format: 'json' | 'html',
     attempt = 0
   ) => {
+    if (!isMountedRef.current) {
+      return;
+    }
+
     if (!profile?.id || !session?.access_token) {
+      if (!isMountedRef.current) {
+        return;
+      }
       Alert.alert('Error', 'Authentication token missing. Please sign in again.');
       return;
     }
 
     if (attempt > 30) {
+      if (!isMountedRef.current) {
+        return;
+      }
       setIsExporting(false);
       setExportStatusMessage(null);
       Alert.alert('Error', 'Export is taking longer than expected. Please try again later.');
@@ -106,12 +128,18 @@ export default function PrivacyScreen() {
       const statusJson = await statusResponse.json();
 
       if (statusJson.status === 'completed') {
+        if (!isMountedRef.current) {
+          return;
+        }
         setExportStatusMessage('Export ready. Downloading your data...');
         await downloadExport(jobId, format);
         return;
       }
 
       if (statusJson.status === 'failed') {
+        if (!isMountedRef.current) {
+          return;
+        }
         setIsExporting(false);
         setExportStatusMessage(null);
         Alert.alert('Error', statusJson.error || 'Export failed. Please try again.');
@@ -124,10 +152,20 @@ export default function PrivacyScreen() {
         setExportStatusMessage('Still preparing your export...');
       }
 
-      setTimeout(() => {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      exportPollTimeoutRef.current = setTimeout(() => {
+        if (!isMountedRef.current) {
+          return;
+        }
         void pollExportStatus(jobId, format, attempt + 1);
       }, 2000);
     } catch (error: any) {
+      if (!isMountedRef.current) {
+        return;
+      }
       setIsExporting(false);
       logger.error('Export Status Error', error);
       setExportStatusMessage(null);
@@ -267,7 +305,7 @@ export default function PrivacyScreen() {
               });
 
               if (!response.ok) {
-                const errorData = await response.json();
+                const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.detail || 'Failed to delete account data');
               }
 
@@ -283,7 +321,7 @@ export default function PrivacyScreen() {
                 ]
               );
             } catch (error: any) {
-              console.error('❌ Delete Account Error:', error);
+              logger.error('Delete Account Error', error);
               Alert.alert('Error', error.message || 'Failed to delete account');
             } finally {
               setIsDeleting(false);
@@ -359,7 +397,11 @@ export default function PrivacyScreen() {
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>Data Management</Text>
           
-          <TouchableOpacity style={styles.actionButton} onPress={handleExportData}>
+          <TouchableOpacity
+            style={[styles.actionButton, isExporting && { opacity: 0.5 }]}
+            onPress={handleExportData}
+            disabled={isExporting}
+          >
             <View style={[styles.iconContainer, { backgroundColor: '#0EA5E915' }]}>
               <Download color="#0EA5E9" size={20} />
             </View>
@@ -380,7 +422,11 @@ export default function PrivacyScreen() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.actionButton} onPress={handleDeleteAccount}>
+          <TouchableOpacity
+            style={[styles.actionButton, isDeleting && { opacity: 0.5 }]}
+            onPress={handleDeleteAccount}
+            disabled={isDeleting}
+          >
             <View style={[styles.iconContainer, { backgroundColor: '#DC262615' }]}>
               <Trash2 color="#DC2626" size={20} />
             </View>
