@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { X } from 'lucide-react-native';
+import { Plus, X } from 'lucide-react-native';
 import { FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { Colors } from '@/lib/constants';
+import { moderateScale, verticalScale } from 'react-native-size-matters';
 
 export interface Friend {
   id: string;
@@ -72,7 +73,7 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
     } else {
       // For connected friends, show options to remove or block
       Alert.alert(
-        'Friend Options',
+        'Cancel Friend',
         `What would you like to do with ${friend.name}?`,
         [
           { text: 'Cancel', style: 'cancel' },
@@ -115,10 +116,8 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
     <Animated.View 
       entering={FadeInDown.delay(index * 50).duration(300).springify().damping(20).stiffness(90)}
     >
-      <TouchableOpacity 
+      <View 
         style={styles.container}
-        onPress={handlePress}
-        activeOpacity={0.7}
       >
         <View style={styles.avatarContainer}>
           <Image source={{ uri: friend.avatar }} style={styles.avatar} />
@@ -144,29 +143,24 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           {friend.status === 'pending' ? (
-            <Text style={styles.pendingText}>Tap</Text>
+            <Plus color="#10B981" strokeWidth={3} size={18} />
           ) : (
-            <X color="#EF4444" size={18} />
+            <X color="#EF4444" strokeWidth={3} size={18} />
           )}
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    //backgroundColor: 'white',
+    paddingHorizontal: verticalScale(7),
+    marginBottom: verticalScale(10),
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    //borderWidth: 1,
   },
   avatarContainer: {
     position: 'relative',
@@ -202,14 +196,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   friendName: {
-    fontSize: 16,
+    fontSize: moderateScale(14),
+    fontFamily: 'Outfit-Bold',
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 2,
   },
   friendEmail: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: moderateScale(12),
+    fontFamily: 'Jost-SemiBold',
+    color: Colors.textMuted,
   },
   statusText: {
     fontSize: 12,
@@ -219,7 +215,6 @@ const styles = StyleSheet.create({
   removeButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#FEF2F2',
     minWidth: 32,
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,4 +1,5 @@
-import { SuggestedFriend } from '@/types/friends';
+import { logger } from '@/lib/logger';
+import { FriendWithProfile, SuggestedFriend } from '@/types/friends';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -113,8 +114,8 @@ class DeviceStorage {
     await this.setItem(`friends_${userId}`, friends, 60); // Cache for 1 hour
   }
 
-  async getFriends(userId: string): Promise<any[] | null> {
-    return await this.getItem<any[]>(`friends_${userId}`);
+  async getFriends(userId: string): Promise<FriendWithProfile[] | null> {
+    return await this.getItem<FriendWithProfile[]>(`friends_${userId}`);
   }
 
   async setEntries(userId: string, entries: any[]): Promise<void> {
@@ -127,6 +128,13 @@ class DeviceStorage {
 
   async addEntry(userId: string, entry: any): Promise<void> {
     const existingEntries = await this.getEntries(userId) || [];
+    
+    // Deduplicate: Check if entry already exists
+    if (existingEntries.some(e => e.id === entry.id)) {
+      logger.info('DeviceStorage: Entry already exists in storage, skipping:', entry.id);
+      return;
+    }
+    
     const updatedEntries = [entry, ...existingEntries];
     await this.setEntries(userId, updatedEntries);
   }

@@ -41,8 +41,9 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     dateText: {
-        fontSize: scale(10),
+        fontSize: scale(12),
         color: '#1E293B',
         fontWeight: '500',
+        fontFamily: 'Outfit-SemiBold',
     },
 })

@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -144,12 +144,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     lineHeight: 20,
   },
@@ -159,6 +160,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
   emptyState: {
@@ -167,12 +169,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginTop: 12,
   },
   emptyDescription: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     marginTop: 4,
     textAlign: 'center',
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#FFFFFF',
   },
   userInfo: {
@@ -220,11 +223,12 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1F2933',
   },
   userDetail: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#6B7280',
     marginTop: 2,
   },
@@ -238,7 +242,7 @@ const styles = StyleSheet.create({
   },
   unblockText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#047857',
   },
 });

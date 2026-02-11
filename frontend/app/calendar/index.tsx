@@ -8,27 +8,29 @@ import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { verticalScale } from 'react-native-size-matters';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
-import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames, getTimefromTimezone } from '@/lib/utils';
+import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames } from '@/lib/utils';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import StreakElement from '@/components/streaks/streak-element';
+import { useTimezone } from '@/hooks/use-timezone';
 
 export default function CalendarScreen() {
   const { user } = useAuthContext();
   const { entries, isLoading } = useEntries(user?.id);
   const { currentStreak, maxStreak, isLoading: streakLoading, checkAndUpdateStreak } = useStreakTracking(user?.id);
   const scrollViewRef = useRef<FlashListRef<Date>>(null);
+  const { getLocalDateString } = useTimezone();
 
   // Process entries data for calendar display
   const entriesData = React.useMemo(() => {
     const data: { [key: string]: number } = {};
     
     entries.forEach(entry => {
-      const dateKey = getTimefromTimezone(new Date(entry.created_at)).toISOString().split('T')[0];
+      const dateKey = getLocalDateString(entry.created_at);
       data[dateKey] = (data[dateKey] || 0) + 1;
     });
     
     return data;
-  }, [entries]);
+  }, [entries, getLocalDateString]);
 
   
 
@@ -185,7 +187,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     flex: 1,
   },
@@ -203,6 +205,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+    fontFamily: 'Outfit-Regular',
     color: '#64748B',
     marginTop: 12,
   },
@@ -233,7 +236,7 @@ const styles = StyleSheet.create({
   },
   monthTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
   },
@@ -248,7 +251,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#64748B',
   },
   daysGrid: {
@@ -271,8 +274,8 @@ const styles = StyleSheet.create({
   },
   dayNumber: {
     fontSize: 16,
+    fontFamily: 'Jost-Medium',
     color: '#1E293B',
-    fontWeight: '500',
   },
   entryIndicatorContainer: {
     position: 'absolute',
@@ -292,8 +295,8 @@ const styles = StyleSheet.create({
   },
   entryCount: {
     fontSize: 10,
+    fontFamily: 'Jost-SemiBold',
     color: '#8B5CF6',
-    fontWeight: '600',
     marginTop: 1,
   },
 

@@ -3,6 +3,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { posthog } from '@/constants/posthog';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import { Profile } from '@/types/friends';
 
 export interface InviteData {
   id: string;
@@ -28,7 +30,7 @@ interface UseInviteAcceptanceResult {
   declineInvite: (inviteId: string) => Promise<InviteResult>;
 }
 
-export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResult {
+export function useInviteAcceptance(inviteCode?: string): UseInviteAcceptanceResult {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -50,7 +52,10 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
         .single();
 
       if (existingFriendship) {
-        throw new Error('You are already connected with this user');
+        return {
+          friendshipId: (existingFriendship as any).id,
+          message: 'You are already connected with this user',
+        };
       }
 
 
@@ -77,14 +82,14 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
   });
 
   const loadInvite = async () => {
-    if (!inviteId) return;
+    if (!inviteCode) return;
 
     try {
       const { data: invite, error } = await supabase
-        .from(TABLES.INVITES)
-        .select('*, profile:profiles (id, email, full_name, avatar_url, username)')
-        .eq('invite_code', inviteId.trim())
-        .single();
+        .from(TABLES.PROFILES)
+        .select('id, email, full_name, avatar_url, username, invite_code')
+        .eq('invite_code', inviteCode.trim())
+        .maybeSingle();
     
       if (error) {
         setError('This invitation link is invalid or has expired.');
@@ -98,14 +103,15 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
         return;
       }*/
 
-      const inviterProfile = (invite as any).profile;
+      const inviterProfile = invite as unknown as Pick<Profile, "id" | "email" | "full_name" | "avatar_url" | "invite_code" | "username">;
+      const inviterName = inviterProfile?.full_name || 'Unknown User';
 
       
       return {
         id: inviterProfile.id,
-        inviterName: inviterProfile?.full_name || 'Unknown User',
+        inviterName: inviterName,
         inviterEmail: inviterProfile?.email || '',
-        inviterAvatar: inviterProfile?.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=200',
+        inviterAvatar: inviterProfile?.avatar_url || getDefaultAvatarUrl(inviterName),
         message: "",
         isUsed: false,
       };
@@ -116,8 +122,8 @@ export function useInviteAcceptance(inviteId?: string): UseInviteAcceptanceResul
   };
 
   const { isLoading, data: inviteData } = useQuery({
-    queryKey: ["inviter-profile", inviteId],
-    enabled: !!inviteId,
+    queryKey: ["inviter-profile", inviteCode],
+    enabled: !!inviteCode,
     queryFn: loadInvite
   })
 

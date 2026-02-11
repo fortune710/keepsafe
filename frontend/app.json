@@ -4,7 +4,12 @@
     "slug": "keepsafe",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/keepsafe-logo.png",
+    "splash": {
+      "image": "./assets/images/keepsafe-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#8B5CF6"
+    },
     "scheme": "keepsafe",
     "assetBundlePatterns": [
       "**/*"
@@ -12,18 +17,19 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "associatedDomains": [
-        "applinks:keepsafe.app",
-        "applinks:www.keepsafe.app",
-        "applinks:app.keepsafe.app"
+        "applinks:keepsafe.fortunealebiosu.dev",
+        "applinks:www.keepsafe.fortunealebiosu.dev",
+        "applinks:app.keepsafe.fortunealebiosu.dev"
       ],
-      "bundleIdentifier": "com.fortune710.keepsafe",
+      "bundleIdentifier": "com.fortunethedev.keepsafe",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio",
           "processing"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "extra": {
@@ -40,11 +46,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "keepsafe.app"
-            },
-            {
-              "scheme": "https",
-              "host": "app.keepsafe.app"
+              "host": "keepsafe.fortunealebiosu.dev"
             }
           ],
           "category": [
@@ -57,14 +59,15 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.READ_CONTACTS",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WRITE_CONTACTS"
       ],
       "package": "com.fortune710.keepsafe"
     },
     "web": {
       "bundler": "metro",
       "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/keepsafe-logo.png"
     },
     "plugins": [
       [
@@ -78,7 +81,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/keepsafe-logo.png",
           "color": "#8B5CF6",
           "sounds": []
         }
@@ -129,7 +132,7 @@
       "typedRoutes": true
     },
     "notification": {
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/images/keepsafe-logo.png",
       "color": "#8B5CF6"
     },
     "owner": "fortune710",

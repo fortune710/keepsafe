@@ -1,4 +1,4 @@
-import { StyleProp, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, View, ViewStyle } from "react-native";
 import { ImageBackground } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { MediaType } from "@/types/media";
@@ -7,6 +7,9 @@ import { TextCanvasItem } from "@/components/capture/canvas/text-canvas-item";
 import { MusicCanvasItem } from "@/components/capture/canvas/music-canvas-item";
 import { StickerCanvasItem } from "./sticker-canvas-item";
 import { LocationCanvasItem } from "./location-canvas-item";
+import { VideoView } from "expo-video";
+import EntryVideoView from "@/components/entries/entry-video-view";
+import EntryAudioView from "@/components/entries/entry-audio-view";
 
 interface VaultCanvasProps {
   type: MediaType,
@@ -20,6 +23,15 @@ export default function VaultCanvas({ type, uri, style, items, onMusicPress }: V
 
   if (!uri) return null;
 
+  if (type === 'video') {
+    return <EntryVideoView uri={uri} />
+
+  }
+
+  if (type === 'audio') {
+    return <EntryAudioView uri={uri} />
+  }
+
   if (items?.length === 0) {
     return (
       <View style={style}>
@@ -28,7 +40,7 @@ export default function VaultCanvas({ type, uri, style, items, onMusicPress }: V
           style={style}
           contentFit="cover"
           cachePolicy="none"
-          imageStyle={{ borderRadius: 18 }}
+          imageStyle={{ borderRadius: 0 }}
           //transition={300}
           testID="vault-canvas-image"
         />
@@ -42,7 +54,7 @@ export default function VaultCanvas({ type, uri, style, items, onMusicPress }: V
         source={{ uri }}
         style={style}
         contentFit="cover"
-        imageStyle={{ borderRadius: 18 }}
+        imageStyle={{ borderRadius: 0 }}
         //cachePolicy="memory-disk"
         //transition={300}
         testID="vault-canvas-background"

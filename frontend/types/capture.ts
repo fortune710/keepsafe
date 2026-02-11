@@ -7,7 +7,7 @@ export interface MediaCanvasItem {
     sticker?: any;
     music_tag?: MusicTag;
     location?: string; // formatted address string
-    style?: { color: string; fontFamily?: string };
+    style?: { color: string; fontFamily?: string; backgroundColor?: string };
 }
 
 export interface RenderedMediaCanvasItem extends MediaCanvasItem {

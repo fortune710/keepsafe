@@ -6,6 +6,10 @@ import {
   NotificationSettingsMap,
 } from '@/services/push-notification-service';
 import { NotificationSettings } from '@/types/notifications';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+import { LocalNotificationService } from '@/services/local-notification-service';
 
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettingsMap = {
   [NotificationSettings.PUSH_NOTIFICATIONS]: true,
@@ -58,6 +62,11 @@ export function useNotificationSettings(): UseNotificationSettingsResult {
 
       queryClient.setQueryData<NotificationSettingsMap>(queryKey, next);
 
+      //If user disbaled notifications, cancel all scheduled notifications
+      if (!next[NotificationSettings.PUSH_NOTIFICATIONS]) {
+        await LocalNotificationService.cancelAllScheduledNotifications();
+      }
+      
       return { previous };
     },
     onError: (_err, _next, context) => {
@@ -78,39 +87,86 @@ export function useNotificationSettings(): UseNotificationSettingsResult {
     const isPushToggle = id === NotificationSettings.PUSH_NOTIFICATIONS;
     const pushCurrentlyEnabled = currentSettings[NotificationSettings.PUSH_NOTIFICATIONS];
 
-    let next: NotificationSettingsMap = { ...currentSettings };
-
     if (isPushToggle) {
       const nextPushEnabled = !pushCurrentlyEnabled;
 
       if (!nextPushEnabled) {
         // Turning off push disables all notifications
-        next = {
+        saveSettings({
           [NotificationSettings.PUSH_NOTIFICATIONS]: false,
           [NotificationSettings.FRIEND_ACTIVITY]: false,
           [NotificationSettings.ENTRY_REMINDER]: false,
           [NotificationSettings.FRIEND_REQUESTS]: false,
-        };
-      } else {
-        // Turning on push only enables the push toggle, keep others as-is
-        next = {
-          ...currentSettings,
-          [NotificationSettings.PUSH_NOTIFICATIONS]: true,
-        };
-      }
-    } else {
-      // For other settings, only allow toggle if push is enabled
-      if (!pushCurrentlyEnabled) {
+        });
         return;
       }
 
-      next = {
-        ...currentSettings,
-        [id]: !currentSettings[id],
-      };
+      // Turning ON push: ensure OS-level permission is granted first.
+      void (async () => {
+        // If we can't support push tokens on this device/platform, keep disabled.
+        if (!Device.isDevice || (Platform.OS !== 'ios' && Platform.OS !== 'android')) {
+          saveSettings({
+            [NotificationSettings.PUSH_NOTIFICATIONS]: false,
+            [NotificationSettings.FRIEND_ACTIVITY]: false,
+            [NotificationSettings.ENTRY_REMINDER]: false,
+            [NotificationSettings.FRIEND_REQUESTS]: false,
+          });
+          return;
+        }
+
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+
+        // Persist initial preferences row if missing (grant => all true, deny => all false).
+        const created = await PushNotificationService.initializeNotificationSettingsFromPermission(
+          user.id,
+          finalStatus === 'granted',
+        );
+
+        if (finalStatus !== 'granted') {
+          // Denied: keep everything off and persist.
+          saveSettings({
+            [NotificationSettings.PUSH_NOTIFICATIONS]: false,
+            [NotificationSettings.FRIEND_ACTIVITY]: false,
+            [NotificationSettings.ENTRY_REMINDER]: false,
+            [NotificationSettings.FRIEND_REQUESTS]: false,
+          });
+          return;
+        }
+
+        // Granted: if this is the first time, default everything to true; otherwise keep other prefs as-is.
+        if (created) {
+          saveSettings({
+            [NotificationSettings.PUSH_NOTIFICATIONS]: true,
+            [NotificationSettings.FRIEND_ACTIVITY]: true,
+            [NotificationSettings.ENTRY_REMINDER]: true,
+            [NotificationSettings.FRIEND_REQUESTS]: true,
+          });
+          return;
+        }
+
+        saveSettings({
+          ...currentSettings,
+          [NotificationSettings.PUSH_NOTIFICATIONS]: true,
+        });
+      })();
+
+      return;
     }
 
-    saveSettings(next);
+    // For other settings, only allow toggle if push is enabled
+    if (!pushCurrentlyEnabled) {
+      return;
+    }
+
+    saveSettings({
+      ...currentSettings,
+      [id]: !currentSettings[id],
+    });
   };
 
   return {

@@ -1,11 +1,34 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Image,
+  Alert,
+  Dimensions,
+} from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
+import {
+  ChevronRight,
+  User,
+  Bell,
+  Shield,
+  HardDrive,
+  Info,
+  LogOut,
+} from 'lucide-react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { BACKEND_URL } from '@/lib/constants';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { logger } from '@/lib/logger';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import { verticalScale } from 'react-native-size-matters';
 
 interface SettingsItem {
   id: string;
@@ -61,7 +84,7 @@ const settingsItems: SettingsItem[] = [
 
 export default function SettingsScreen() {
   const { profile, session } = useAuthContext();
-  
+
   const { height: screenHeight } = Dimensions.get('window');
   const SWIPE_THRESHOLD = screenHeight * 0.15; // 15% of screen height
   const startY = useRef(0);
@@ -73,11 +96,15 @@ export default function SettingsScreen() {
       startY.current = event.absoluteY;
     })
     .onUpdate((event) => {
-       // Optional: Add visual feedback logic here if needed
+      // Optional: Add visual feedback logic here if needed
     })
     .onEnd((event) => {
       // Check if swipe started at the top area and moved down rapidly
-      if (startY.current < SWIPE_THRESHOLD && event.translationY > 100 && event.velocityY > 500) {
+      if (
+        startY.current < SWIPE_THRESHOLD &&
+        event.translationY > 100 &&
+        event.velocityY > 500
+      ) {
         router.back();
       }
     });
@@ -93,86 +120,102 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={styles.container}
-    >
+    <SafeAreaView style={styles.container}>
       <GestureDetector gesture={swipeDownGesture}>
         <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => router.back()}
-          >
-            <ChevronRight color="#64748B" size={24} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <TouchableOpacity 
-            style={styles.profileSection}
-            onPress={() => router.push('/settings/profile')}
-          >
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>
-                {profile?.full_name || 'Add your name'}
-              </Text>
-              <Text style={styles.profileUsername}>
-                @{profile?.username || 'username'}
-              </Text>
-              <Text style={styles.profileEmail}>{profile?.email}</Text>
-            </View>
-            <Image 
-              source={{ 
-                uri: profile?.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=200' 
-              }}
-              style={styles.profileImage}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.settingsSection}>
-            {settingsItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.settingsItem}
-                  onPress={() => router.push(item.route as any)}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
-                    <IconComponent color={item.color} size={20} />
-                  </View>
-                  
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemTitle}>{item.title}</Text>
-                    {item.subtitle && (
-                      <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
-                    )}
-                  </View>
-                  
-                  <ChevronRight color="#CBD5E1" size={20} />
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.header}>
+            <Text style={styles.title}>Settings</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => router.back()}
+            >
+              <ChevronRight color="#64748B" size={24} />
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.settingsSection}>
-            <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
-              <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
-                <LogOut color="#64748B" size={20} />
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <TouchableOpacity
+              style={styles.profileSection}
+              onPress={() => router.push('/settings/profile')}
+            >
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName}>
+                  {profile?.full_name || 'Add your name'}
+                </Text>
+                <Text style={styles.profileUsername}>
+                  @{profile?.username || 'username'}
+                </Text>
               </View>
-              
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle}>Sign Out</Text>
-                <Text style={styles.itemSubtitle}>Sign out of your account</Text>
-              </View>
-              
-              <View style={{ width: 20 }} />
+              <Image
+                source={{
+                  uri:
+                    profile?.avatar_url ||
+                    getDefaultAvatarUrl(profile?.full_name || 'Unknown User'),
+                }}
+                style={styles.profileImage}
+              />
             </TouchableOpacity>
 
-          </View>
-        </ScrollView>
-      </View>
+            <View style={styles.settingsSection}>
+              {settingsItems.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.settingsItem}
+                    onPress={() => router.push(item.route as any)}
+                  >
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: `${item.color}15` },
+                      ]}
+                    >
+                      <IconComponent color={item.color} size={20} />
+                    </View>
+
+                    <View style={styles.itemContent}>
+                      <Text style={styles.itemTitle}>{item.title}</Text>
+                      {item.subtitle && (
+                        <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
+                      )}
+                    </View>
+
+                    <ChevronRight color="#CBD5E1" size={20} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.settingsSection}>
+              <TouchableOpacity
+                style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                onPress={handleLogout}
+              >
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: '#64748B15' },
+                  ]}
+                >
+                  <LogOut color="#64748B" size={20} />
+                </View>
+
+                <View style={styles.itemContent}>
+                  <Text style={styles.itemTitle}>Sign Out</Text>
+                  <Text style={styles.itemSubtitle}>
+                    Sign out of your account
+                  </Text>
+                </View>
+
+                <View style={{ width: 20 }} />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
       </GestureDetector>
     </SafeAreaView>
   );
@@ -196,7 +239,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -209,7 +252,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     margin: 20,
     borderRadius: 20,
-    paddingVertical: 24,
+    paddingVertical: verticalScale(12),
     paddingHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -228,18 +271,19 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 4,
   },
   profileUsername: {
     fontSize: 14,
+    fontFamily: 'Outfit-Medium',
     color: '#8B5CF6',
-    fontWeight: '500',
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 13,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
   settingsSection: {
@@ -275,12 +319,13 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   itemSubtitle: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
 });

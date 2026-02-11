@@ -3,11 +3,27 @@ import { useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import ViewShot, { captureRef } from "react-native-view-shot";
 
+/**
+ * Manage a collection of media canvas items and provide utilities to capture the canvas as an image.
+ *
+ * @returns An object exposing:
+ * - `viewShotRef`: a ref to the ViewShot instance (or `null`) for capturing the rendered view.
+ * - `items`: the current array of `MediaCanvasItem`.
+ * - `addText(text, style)`: adds a text item and returns the generated numeric id.
+ * - `addSticker(sticker)`: adds a sticker item.
+ * - `addMusic(music)`: adds a music item (`MusicTag`).
+ * - `addLocation(location)`: adds a location item.
+ * - `removeElement(id)`: removes the item with the given id.
+ * - `updateTextItem(id, text, style)`: updates the text and style of an existing text item.
+ * - `saveImage()`: captures the view and returns the captured file URI prefixed with `file://` on success, or `null` on failure.
+ */
 export function useMediaCanvas() {
     const [items, setItems] = useState<Array<MediaCanvasItem>>([]);
 
     const addText = (text: string, style: { color: string; fontFamily?: string }) => {
-        setItems([...items, { id: Date.now(), type: "text", text: text, style }]);
+        const id = Date.now();
+        setItems(prevItems => [...prevItems, { id, type: "text", text: text, style }]);
+        return id;
     };
     
     const addSticker = (sticker: any) => {
@@ -23,8 +39,15 @@ export function useMediaCanvas() {
     }
 
     const removeElement = (id: number) => {
-        const remainingElements = items.filter(item => item.id != id);
-        setItems(remainingElements);
+        setItems(prevItems => prevItems.filter(item => item.id !== id));
+    }
+
+    const updateTextItem = (id: number, text: string, style: { color: string; fontFamily?: string; backgroundColor?: string }) => {
+        setItems(prevItems => prevItems.map(item => 
+            item.id === id && item.type === "text" 
+                ? { ...item, text, style }
+                : item
+        ));
     }
 
     const viewShotRef = useRef<ViewShot | null>(null);
@@ -79,6 +102,7 @@ export function useMediaCanvas() {
         saveImage,
         removeElement,
         addMusic,
-        addLocation
+        addLocation,
+        updateTextItem
     }
 }

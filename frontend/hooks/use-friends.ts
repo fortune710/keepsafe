@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES, FRIENDSHIP_STATUS } from '@/constants/supabase';
@@ -8,6 +8,7 @@ import { FriendService } from '@/services/friend-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { posthog } from '@/constants/posthog';
 import { FriendWithProfile } from '@/types/friends';
+import { logger } from '@/lib/logger';
 
 
 
@@ -19,14 +20,16 @@ interface UseFriendsResult {
   blockedFriends: FriendWithProfile[];
   isLoading: boolean;
   error: Error | null;
+  checkFriendStatus: (friendId: string) => typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.PENDING | typeof FRIENDSHIP_STATUS.BLOCKED | null;
   sendFriendRequest: (friendId: string) => Promise<{ success: boolean; error?: string }>;
   acceptFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   declineFriendRequest: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   removeFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   blockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
-   unblockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
+  unblockFriend: (friendshipId: string) => Promise<{ success: boolean; error?: string }>;
   refetch: () => void;
   prefetchSuggestedFriends: () => Promise<{ success: boolean; error: string | null }>;
+  refreshFriends: () => Promise<void>;
 }
 
 export function useFriends(userId?: string): UseFriendsResult {
@@ -54,6 +57,20 @@ export function useFriends(userId?: string): UseFriendsResult {
     f.status === FRIENDSHIP_STATUS.BLOCKED && f.blocked_by === userId
   );
 
+  const checkFriendStatus = (
+    friendId: string
+  ): typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.PENDING | typeof FRIENDSHIP_STATUS.BLOCKED | null => {
+    if (friends.find(f => f.id === friendId)) {
+      return FRIENDSHIP_STATUS.ACCEPTED;
+    } else if (pendingRequests.find(f => f.id === friendId)) {
+      return FRIENDSHIP_STATUS.PENDING;
+    } else if (blockedFriends.find(f => f.id === friendId)) {
+      return FRIENDSHIP_STATUS.BLOCKED;
+    } else {
+      return null;
+    }
+  };
+
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (friendId: string) => {
       return await FriendService.sendFriendRequest(userId!, friendId);
@@ -69,7 +86,7 @@ export function useFriends(userId?: string): UseFriendsResult {
 
   const updateFriendshipMutation = useMutation({
     mutationFn: async ({ id, status, blocked_by }: { id: string; status: typeof FRIENDSHIP_STATUS.ACCEPTED | typeof FRIENDSHIP_STATUS.DECLINED | typeof FRIENDSHIP_STATUS.BLOCKED; blocked_by?: string | null }) => {
-      if (__DEV__) console.log('Updating friendship:', { id, status, blocked_by });
+      logger.debug('Updating friendship:', { id, status, blocked_by });
 
       const updateData: any = { status };
       if (blocked_by !== undefined) {
@@ -82,11 +99,11 @@ export function useFriends(userId?: string): UseFriendsResult {
         .eq('id', id);
         
       if (error) {
-        if (__DEV__) console.error('Error updating friendship:', error);
+        logger.error('Error updating friendship:', error);
         throw new Error(error.message);
       }
 
-      if (__DEV__) console.log('Updated friendship status successfully');
+      logger.debug('Updated friendship status successfully');
       return { id, status };
     },
     onSuccess: async () => {
@@ -166,7 +183,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         // Omitting friendship_id for privacy compliance
         posthog.capture('friend_blocked', {});
       } catch (error) {
-        if (__DEV__) console.warn('Analytics capture failed:', error);
+        logger.warn('Analytics capture failed:', error);
       }
       return { success: true };
     } catch (error) {
@@ -206,15 +223,34 @@ export function useFriends(userId?: string): UseFriendsResult {
   }, [deleteFriendshipMutation]);
 
   const prefetchSuggestedFriends = useCallback(async () => {
+    if (!profile?.id) {
+      return {
+        success: false,
+        error: 'Profile ID is required'
+      };
+    }
+
     try {
       await queryClient.prefetchQuery({
         queryKey: ["suggested-friends"],
         queryFn: async () => {
+          // Always fetch fresh data from API
           const contacts = await FriendService.getSuggestedFriendsFromContacts();
-          console.log({ contacts });
-          return contacts.filter(contact => contact.id !== profile?.id);
-        }
-      })
+          const filteredContacts = contacts.filter(contact => contact.id !== profile.id);
+          
+          // Sync device storage after successful fetch (consistent with useSuggestedFriends)
+          try {
+            await deviceStorage.setSuggestedFriends(filteredContacts);
+          } catch (storageError) {
+            logger.warn('Failed to sync suggested friends to device storage during prefetch:', storageError);
+            // Don't throw - storage sync failure shouldn't break the prefetch
+          }
+          
+          logger.debug('Prefetched suggested friends:', { contacts: filteredContacts });
+          return filteredContacts;
+        },
+        staleTime: 0, // Match the hook's configuration
+      });
 
       return {
         success: true,
@@ -228,12 +264,22 @@ export function useFriends(userId?: string): UseFriendsResult {
       }
     }
   }, [queryClient, profile?.id])
+
+  const refreshFriends = useCallback(async () => {
+    // Refetch both suggested friends and friendships queries and await completion
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['suggested-friends'] }),
+      queryClient.refetchQueries({ queryKey: ['friendships', userId] }),
+    ]);
+  }, [queryClient, userId]);
+
   return {
     friends,
     pendingRequests,
     blockedFriends,
     isLoading,
     error,
+    checkFriendStatus,
     sendFriendRequest,
     acceptFriendRequest,
     declineFriendRequest,
@@ -241,6 +287,7 @@ export function useFriends(userId?: string): UseFriendsResult {
     blockFriend,
     unblockFriend,
     refetch,
-    prefetchSuggestedFriends
+    prefetchSuggestedFriends,
+    refreshFriends
   };
 }

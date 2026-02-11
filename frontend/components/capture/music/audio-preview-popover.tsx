@@ -22,12 +22,17 @@ interface MusicPopoverProps {
   music: MusicTag;
 }
 
+/**
+ * Render a sliding "Now Playing" popover that previews a music item and its metadata.
+ *
+ * Renders an overlay with a backdrop and an animated popover containing an AudioPreview, cover image, title, artist, and a Close action. The popover mounts only when `isVisible` is true; the overlay remains while exit animation runs.
+ *
+ * @param isVisible - Whether the popover is currently visible
+ * @param onClose - Callback invoked when the backdrop or Close button is pressed
+ * @param music - The music item to preview (expects `MusicTag` shape with `preview`, `cover`, `title`, and `artist`)
+ * @returns The popover JSX element, or `null` when neither visible nor provided with a music item
+ */
 export default function AudioPreviewPopover({ isVisible, onClose, music }: MusicPopoverProps) {
-  const popoverHeight = useSharedValue(height * 0.5);
-
-  const animatedPopoverStyle = useAnimatedStyle(() => ({
-    maxHeight: popoverHeight.value,
-  }));
 
   // Don't return null - let the exit animation play
   if (!isVisible && !music) return null;
@@ -45,7 +50,7 @@ export default function AudioPreviewPopover({ isVisible, onClose, music }: Music
 
       {isVisible && (
         <Animated.View 
-          style={[styles.popover, animatedPopoverStyle]}
+          style={[styles.popover]}
           entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
           exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
         >
@@ -130,7 +135,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(24),
     padding: scale(12),
     width: '90%',
-    marginBottom: verticalScale(16),
+    marginBottom: verticalScale(42),
   },
   closeButtonText: {
     fontSize: scale(16),

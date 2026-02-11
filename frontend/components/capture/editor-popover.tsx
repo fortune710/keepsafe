@@ -1,46 +1,58 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  TextInput,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
 } from "react-native";
 import Animated, {
   SlideInDown,
   SlideOutDown,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { Music, MusicIcon, StickerIcon, TextIcon, X, MapPin } from "lucide-react-native";
 import { verticalScale } from "react-native-size-matters";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useMusicTag } from "@/hooks/use-music-tag";
 import { MediaCanvasItemType, MusicTag } from "@/types/capture";
-import { MusicListItem } from "./music/music-list-item";
-import ColorSlider from "./editor/color-slider";
-import FontStyleSelector from "./editor/font-style-selector";
 import TextTab from "./editor/text-tab";
 import StickerTab from "./editor/sticker-tab";
 import MusicTab from "./editor/music-tab";
 import LocationTab from "./editor/location-tab";
 
 const { height } = Dimensions.get("window");
+const TEXT_TAB_HEIGHT = height * 0.72;
+const DEFAULT_TAB_HEIGHT = height * 0.95;
 
 interface EditorPopoverProps {
   isVisible: boolean;
-  onClose: () => void;
-  addText: (text: string, style: { color: string; fontFamily?: string }) => void;
+  onClose: (currentText?: string) => void;
+  addText: (text: string, style: { color: string; fontFamily?: string; backgroundColor?: string }) => void;
   addSticker: (uri: string) => void;
   addMusic: (music: MusicTag) => void;
   addLocation: (location: string) => void;
+  defaultTab?: MediaCanvasItemType;
+  onTextChange?: (text: string) => void;
+  onStyleChange?: (styleUpdates: { color?: string; fontFamily?: string; backgroundColor?: string }) => void;
+  initialText?: string;
 }
 
+/**
+ * Render an editor popover that lets users add text, stickers, music, or a location to a media canvas.
+ *
+ * @param isVisible - Whether the popover is currently visible
+ * @param onClose - Callback invoked when the popover is dismissed; receives the current text input (if any)
+ * @param addText - Adds a text item with style `{ color, fontFamily?, backgroundColor? }`
+ * @param addSticker - Adds a sticker given its URI
+ * @param addMusic - Adds a music tag
+ * @param addLocation - Adds a location string
+ * @param defaultTab - Optional initial active tab (`"text" | "sticker" | "music" | "location"`)
+ * @param onTextChange - Optional callback invoked as the text input changes
+ * @param onStyleChange - Optional callback invoked when text style (color, fontFamily, backgroundColor) changes
+ * @param initialText - Optional initial value for the text input
+ * @returns The popover UI element when visible, or `null` when hidden
+ */
 export default function EditorPopover({
   isVisible,
   onClose,
@@ -48,19 +60,54 @@ export default function EditorPopover({
   addSticker,
   addMusic,
   addLocation,
+  defaultTab,
+  onTextChange,
+  onStyleChange,
+  initialText = "",
 }: EditorPopoverProps) {
-  const [activeTab, setActiveTab] = useState<MediaCanvasItemType>("text");
-  const [textInput, setTextInput] = useState("");
+  const [activeTab, setActiveTab] = useState<MediaCanvasItemType>(defaultTab || "text");
+  const [textInput, setTextInput] = useState(initialText);
   const [musicTag, setMusicTag] = useState("");
   const musicQuery = useDebounce(musicTag, 600);
+  
+  // Update activeTab when defaultTab changes
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
+  
+  // Update textInput when initialText changes
+  useEffect(() => {
+    if (initialText !== undefined) {
+      setTextInput(initialText);
+    }
+  }, [initialText]);
+  
+  // Handle text input changes
+  const handleTextChange = (text: string) => {
+    setTextInput(text);
+    if (onTextChange) {
+      onTextChange(text);
+    }
+  };
 
   const { musicTags, isLoading } = useMusicTag(musicQuery);
   const [selectedStyle, setSelectedStyle] = useState({
-    color: "#000",
+    color: "#FFFFFF",
     fontFamily: "Arial",
+    backgroundColor: "#000000",
   });
 
-  const popoverHeight = useSharedValue(height * 0.6);
+  const popoverHeight = useSharedValue(
+    activeTab === "text" ? TEXT_TAB_HEIGHT : DEFAULT_TAB_HEIGHT
+  );
+
+  // Update height when activeTab changes
+  useEffect(() => {
+    const targetHeight = activeTab === "text" ? TEXT_TAB_HEIGHT : DEFAULT_TAB_HEIGHT;
+    popoverHeight.value = withTiming(targetHeight, { duration: 300 });
+  }, [activeTab]);
 
   const animatedPopoverStyle = useAnimatedStyle(() => {
     return {
@@ -68,19 +115,8 @@ export default function EditorPopover({
     };
   });
 
-  const swipeDownGesture = Gesture.Pan().onEnd((event) => {
-    if (event.translationY > 100 && event.velocityY > 500) {
-      onClose();
-    }
-  });
-
-  const confirmTextSelection = () => {
-    if (textInput.trim()) {
-      addText(textInput.trim(), selectedStyle);
-      setTextInput("");
-      onClose();
-    }
-  }
+  // Text is now updated in real-time, so we don't need a confirm function
+  // This is kept for potential future use but not currently called
 
   const confirmStickerSelection = (uri: string) => {
     addSticker(uri);
@@ -102,102 +138,70 @@ export default function EditorPopover({
 
   return (
     <Animated.View style={styles.overlay}>
-      <TouchableOpacity style={styles.backdrop} onPress={onClose} />
+      <TouchableOpacity style={styles.backdrop} onPress={() => onClose(textInput)} />
 
-      <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View 
-          entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
-          exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
-          style={[styles.popover, animatedPopoverStyle, styles.popoverContent]}
-        >
-          {/* Handle */}
-          <View style={styles.handle} />
+      <Animated.View 
+        entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
+        exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
+        style={[styles.popover, animatedPopoverStyle]}
+      >
+        {/* Handle */}
+        <View style={styles.handle} />
 
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.tabs}>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "text" && styles.activeTab]}
-                onPress={() => setActiveTab("text")}
-              >
-                <TextIcon 
-                  color={activeTab === "text" ? 
-                  styles.activeTabText.color : styles.tabText.color} 
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "sticker" && styles.activeTab]}
-                onPress={() => setActiveTab("sticker")}
-              >
-                <StickerIcon 
-                  color={activeTab === "sticker" ? 
-                  styles.activeTabText.color : styles.tabText.color} 
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "music" && styles.activeTab]}
-                onPress={() => setActiveTab("music")}
-              >
-                <MusicIcon 
-                  color={activeTab === "music" ? 
-                  styles.activeTabText.color : styles.tabText.color} 
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "location" && styles.activeTab]}
-                onPress={() => setActiveTab("location")}
-              >
-                <MapPin 
-                  color={activeTab === "location" ? 
-                  styles.activeTabText.color : styles.tabText.color} 
-                />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X color="#64748B" size={20} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Content */}
-          <View>
+        {/* Content */}
+        <View style={styles.tabContent}>
             {activeTab === "text" ? (
               <TextTab
                 textInput={textInput}
-                onTextChange={setTextInput}
+                onTextChange={handleTextChange}
                 selectedColor={selectedStyle.color}
-                onColorChange={(color) => setSelectedStyle({ ...selectedStyle, color })}
+                onColorChange={(color) => {
+                  setSelectedStyle({ ...selectedStyle, color });
+                  if (onStyleChange) {
+                    onStyleChange({ color });
+                  }
+                }}
                 selectedFont={selectedStyle.fontFamily}
-                onFontChange={(font) => setSelectedStyle({ ...selectedStyle, fontFamily: font })}
-                onConfirm={confirmTextSelection}
+                onFontChange={(font) => {
+                  setSelectedStyle({ ...selectedStyle, fontFamily: font });
+                  if (onStyleChange) {
+                    onStyleChange({ fontFamily: font });
+                  }
+                }}
+                selectedBackgroundColor={selectedStyle.backgroundColor}
+                onBackgroundColorChange={(color) => {
+                  setSelectedStyle({ ...selectedStyle, backgroundColor: color });
+                  if (onStyleChange) {
+                    onStyleChange({ backgroundColor: color });
+                  }
+                }}
               />
-            ) : activeTab === "sticker" ? (
-              <StickerTab
-                onSelectSticker={confirmStickerSelection}
-              />
-            ) : activeTab === "music" ? (
-              <MusicTab
-                isLoading={isLoading}
-                musicQuery={musicTag}
-                onMusicQueryChange={setMusicTag}
-                musicTags={musicTags ?? []}
-                onSelectMusic={confirmMusicSelection}
-              />
-            ) : (
-              <LocationTab
-                onSelectLocation={confirmLocationSelection}
-              />
-            )}
-          </View>
-        </Animated.View>
-      </GestureDetector>
+          ) : activeTab === "sticker" ? (
+            <StickerTab
+              onSelectSticker={confirmStickerSelection}
+            />
+          ) : activeTab === "music" ? (
+            <MusicTab
+              isLoading={isLoading}
+              musicQuery={musicTag}
+              onMusicQueryChange={setMusicTag}
+              musicTags={musicTags ?? []}
+              onSelectMusic={confirmMusicSelection}
+            />
+          ) : (
+            <LocationTab
+              onSelectLocation={confirmLocationSelection}
+            />
+          )}
+        </View>
+      </Animated.View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   popoverContent: {
-    minHeight: verticalScale(670)
+    //minHeight: verticalScale(470)
   },
   overlay: {
     position: "absolute",
@@ -262,8 +266,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
     gap: 16,
   },
-
-
+  tabContent: {
+    marginVertical: verticalScale(0),
+  },
   styleButton: {
     padding: 8,
     borderWidth: 1,

@@ -250,11 +250,7 @@ export class FriendService {
 
   static async getSuggestedFriendsFromContacts(): Promise<SuggestedFriend[]> {
     try {
-      const savedSuggestions = await deviceStorage.getSuggestedFriends();
-      if (savedSuggestions.length > 0) {
-        return savedSuggestions;
-      }
-
+      // Always fetch fresh data from API - device storage is handled by React Query
       await supabase.auth.refreshSession();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -282,12 +278,33 @@ export class FriendService {
         return [];
       }
     
-      logger.info(`Getting retriving saved friends for ${session.user.id}`);
-      const friends  = await deviceStorage.getFriends(session.user.id);
+      // Query friendships table directly to get all friend IDs for the current user
+      // Use WHERE clauses with OR conditions instead of JOINs
+      const { data: friendships, error: friendshipsError } = await supabase
+        .from(TABLES.FRIENDSHIPS)
+        .select('user_id, friend_id')
+        .or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`) as {
+          data: Array<{ user_id: string; friend_id: string }> | null;
+          error: any;
+        };
+      
+      if (friendshipsError) {
+        logger.error('Failed to fetch friendships:', friendshipsError);
+        throw friendshipsError;
+      }
+      
+      // Extract friend IDs (the ones that are NOT the current user)
+      const friendIds = (friendships ?? [])
+        .map((friendship) => 
+          friendship.user_id === session.user.id 
+            ? friendship.friend_id 
+            : friendship.user_id
+        )
+        .filter((id) => id && this.isValidUUID(id));
       
       // Validate and filter excluded IDs (UUIDs)
       const validExcludedIds = [
-        ...(friends?.map((friend) => friend.friend_profile.id.trim()) ?? []),
+        ...friendIds,
         session.user.id
       ].filter((id) => this.isValidUUID(id));
       
@@ -322,7 +339,8 @@ export class FriendService {
           avatar: profile.avatar_url,
         }))
 
-        await deviceStorage.setSuggestedFriends(profiles);
+        // Note: Device storage sync is handled by React Query in useSuggestedFriends hook
+        // This keeps the service layer pure and allows React Query to manage state
 
         return profiles;
 

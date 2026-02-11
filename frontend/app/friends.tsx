@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
-import { Search, Share, ChevronRight, UserPlus, CircleAlert as AlertCircle } from 'lucide-react-native';
-import { router } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator, RefreshControl } from 'react-native';
+import { Search, ChevronRight, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import InvitePopover from '@/components/invite-popover';
 import FriendSearchBar from '@/components/friend-search-bar';
 import FriendsSection from '@/components/friends-section';
@@ -10,15 +10,19 @@ import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { useSuggestedFriends } from '@/hooks/use-suggested-friends';
 import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
+import AddFriendsSection from '@/components/friends/add-friends-section';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useResponsive } from '@/hooks/use-responsive';
+import { LocalNotificationService } from '@/services/local-notification-service';
+import { logger } from '@/lib/logger';
 
 
 export default function FriendsScreen() {
   const responsive = useResponsive();
   const { profile } = useAuthContext();
+  const { refresh } = useLocalSearchParams();
   const { 
     friends, 
     pendingRequests, 
@@ -29,14 +33,16 @@ export default function FriendsScreen() {
     blockFriend,
     acceptFriendRequest,
     declineFriendRequest,
-    refetch 
+    refetch,
+    refreshFriends
   } = useFriends(profile?.id);
 
-  const { suggestedFriends } = useSuggestedFriends();
+  const { suggestedFriends, refetch: refetchSuggestedFriends } = useSuggestedFriends();
 
   const [showInvitePopover, setShowInvitePopover] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const { toast: showToast } = useToast();
 
 
@@ -62,7 +68,11 @@ export default function FriendsScreen() {
   const handleAcceptRequest = async (friendshipId: string) => {
     const result = await acceptFriendRequest(friendshipId);
     if (result.success) {
-      showToast('Friend request accepted', 'success');
+      await LocalNotificationService.sendNotification({
+        title: 'Friend Request Accepted',
+        body: 'You are now friends!',
+        sound: true,
+      });
     } else {
       showToast(result.error || 'Failed to accept request', 'error');
     }
@@ -96,6 +106,26 @@ export default function FriendsScreen() {
     refetch();
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh both friends and suggested friends and await completion
+      await refreshFriends();
+    } catch (error) {
+      logger.warn('Error refreshing friends data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Check for refresh param and call refreshFriends if present
+  useEffect(() => {
+    const refreshParam = Array.isArray(refresh) ? refresh[0] : refresh;
+    if (refreshParam === 'true') {
+      refreshFriends();
+    }
+  }, [refresh, refreshFriends]);
+
   // Convert friendship data to Friend format for components
   const convertToFriendFormat = (friendships: any[]) => {
     return friendships.map(friendship => ({
@@ -115,19 +145,27 @@ export default function FriendsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-  
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Friends</Text>
+        <TouchableOpacity 
+          style={styles.closeButton}
+          onPress={() => router.back()}
+        >
+          <ChevronRight color="#64748B" size={24} />
+        </TouchableOpacity>
+      </View>
 
-        <View style={styles.header}>
-          <Text style={styles.title}>Friends</Text>
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => router.back()}
-          >
-            <ChevronRight color="#64748B" size={24} />
-          </TouchableOpacity>
-        </View>
-
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#8B5CF6"
+            colors={['#8B5CF6']}
+          />
+        }
+      >
         <View style={styles.content}>
           {error ? (
             <View style={styles.errorContainer}>
@@ -152,23 +190,9 @@ export default function FriendsScreen() {
                     onPress={handleSearchToggle}
                     activeOpacity={0.7}
                   >
-                    <Search color="#94A3B8" size={20} />
-                    <Text style={styles.searchPlaceholder}>Search friends...</Text>
+                    <Search color="#94A3B8" strokeWidth={3} size={20} />
+                    <Text style={styles.searchPlaceholder}>Search friends</Text>
                   </TouchableOpacity>
-
-                  <View style={styles.addFriendsSection}>
-                    <View style={styles.sectionHeader}>
-                      <UserPlus color="#8B5CF6" size={16} />
-                      <Text style={styles.sectionTitle}>Add Friends</Text>
-                    </View>
-                    
-                    <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
-                      <Share color="#8B5CF6" size={20} />
-                      <Text style={styles.shareButtonText}>Share Your Link</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <SuggestedFriendsList friends={suggestedFriends}/>
 
                   <FriendsSection
                     friends={allFriends}
@@ -179,6 +203,11 @@ export default function FriendsScreen() {
                     isLoading={false}
                     searchQuery=""
                   />
+
+                  <SuggestedFriendsList friends={suggestedFriends}/>
+
+                  <AddFriendsSection showModal={handleShareLink} />
+
                 </>
               ) : (
                 <>
@@ -241,6 +270,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
   },
@@ -260,6 +290,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+    fontFamily: 'Outfit-Regular',
     color: '#64748B',
     marginTop: 16,
   },
@@ -271,6 +302,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 20,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
     marginTop: 16,
@@ -279,6 +311,7 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     fontSize: 16,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
@@ -293,6 +326,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
     fontSize: 16,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
   },
   searchBox: {
@@ -302,54 +336,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginTop: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    // Ensure minimum touch target (iOS guideline: 44pt)
-    minHeight: 44,
+    marginTop: verticalScale(8),
+    marginBottom: verticalScale(16),
   },
   searchPlaceholder: {
-    fontSize: 16,
+    fontSize: scale(14),
+    fontFamily: 'Jost-SemiBold',
+    fontWeight: '600',
     color: '#94A3B8',
-    marginLeft: 12,
-  },
-  addFriendsSection: {
-    marginBottom: 8,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748B',
-    marginLeft: 8,
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    // Ensure minimum touch target (iOS guideline: 44pt)
-    minHeight: 44,
-  },
-  shareButtonText: {
-    color: '#8B5CF6',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: scale(12),
   },
 });

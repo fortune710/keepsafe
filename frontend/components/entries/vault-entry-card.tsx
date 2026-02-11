@@ -48,13 +48,12 @@ export default function VaultEntryCard({
   onRetry,
   onMusicPress,
 }: VaultEntryCardProps) {
-  const [isPlaying, setIsPlaying] = React.useState(false);
   
   const numberHash = useMemo(() => {
     return dateStringToNumber(entry.created_at);
   }, [])
   
-  const [sound, setSound] = React.useState<Audio.Sound | null>(null);
+  
 
   const { profile } = useAuthContext();
 
@@ -67,60 +66,6 @@ export default function VaultEntryCard({
     e.stopPropagation();
     onComments?.(entry.id);
   };
-
-  const toggleAudioPlayback = async () => {
-    if (!entry || entry.type !== 'audio') return;
-
-    try {
-      if (isPlaying) {
-        if (sound) {
-          await sound.pauseAsync();
-        }
-        setIsPlaying(false);
-      } else {
-        if (entry.content_url) {
-          if (sound) {
-            await sound.replayAsync();
-          } else {
-            const { sound: newSound } = await Audio.Sound.createAsync(
-              { uri: entry.content_url },
-              { shouldPlay: true }
-            );
-            setSound(newSound);
-            
-            newSound.setOnPlaybackStatusUpdate((status) => {
-              if (status.isLoaded && status.didJustFinish) {
-                setIsPlaying(false);
-              }
-            });
-          }
-          setIsPlaying(true);
-        }
-      }
-    } catch (error) {
-      console.error('Audio playback error:', error);
-      setIsPlaying(false);
-    }
-  };
-
-  const player = useVideoPlayer(entry.content_url as string, player => {
-    player.loop = false;
-    //player.play();
-  });
-
-  const { isPlaying: videoPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
-
-
-  // Cleanup sound on unmount
-  React.useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
-
-  
 
   const rotateStyle = useAnimatedStyle(() => {
     // Generate a random angle between -6 and 6 degrees
@@ -190,48 +135,13 @@ export default function VaultEntryCard({
         entering={FadeIn.duration(200)}
         exiting={FadeOut.duration(150)}
       >
-        {
-          entry.type === 'video' && (
-            <Pressable onPress={() => videoPlaying ? player.pause() : player.play()}>
-              <VideoView 
-                style={styles.entryImage} 
-                player={player} 
-                contentFit='cover'
-              />
-            </Pressable>
-          )
-        }
-        {entry.type === 'photo' && entry.content_url && (
-          <VaultCanvas 
-            type='photo' 
-            items={entry.attachments}
-            uri={entry.content_url} 
-            style={styles.entryImage}
-            onMusicPress={onMusicPress}
-          />
-        )}
-        {entry.type === 'audio' && (
-          <View style={styles.audioContainer}>
-            <TouchableOpacity style={styles.audioPlayButton} onPress={toggleAudioPlayback}>
-              {isPlaying ? (
-                <Pause color="#8B5CF6" size={32} fill="#8B5CF6" />
-              ) : (
-                <Play color="#8B5CF6" size={32} fill="#8B5CF6" />
-              )}
-            </TouchableOpacity>
-            <View style={styles.audioWave}>
-              {[...Array(15)].map((_, i) => (
-                <View 
-                  key={i} 
-                  style={[
-                    styles.waveBar, 
-                    { height: Math.random() * 40 + 20 }
-                  ]} 
-                />
-              ))}
-            </View>
-          </View>
-        )}
+        <VaultCanvas 
+          type={entry.type} 
+          items={entry.attachments}
+          uri={entry.content_url || ''} 
+          style={styles.entryImage}
+          onMusicPress={onMusicPress}
+        />
 
         {/* Status indicator */}
         {getStatusIndicator()}
@@ -396,12 +306,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   dateText: {
-    fontSize: 16,
+    fontSize: scale(12),
     color: '#1E293B',
     fontWeight: '500',
+    fontFamily: 'Jost-SemiBold'
   },
   entryCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fdfdfd',
     padding: scale(16),
     borderRadius: 8,
     overflow: 'hidden',
@@ -412,45 +323,16 @@ const styles = StyleSheet.create({
     elevation: 8,
     width: '80%',
     height: height * 0.45,
-    borderWidth: 1
+    borderWidth: 1,
+    borderColor: Colors.border
   },
   entryImage: {
     width: '100%',
     height: 300,
-    borderRadius: 18
+    borderRadius: 0
   },
-  audioContainer: {
-    height: 300,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 18,
-  },
-  audioPlayButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  audioWave: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 60,
-  },
-  waveBar: {
-    width: 4,
-    backgroundColor: '#8B5CF6',
-    marginHorizontal: 2,
-    borderRadius: 2,
-  },
+  
+  
   entryContent: {
     flex: 1,
   },
@@ -513,6 +395,7 @@ const styles = StyleSheet.create({
     fontSize: scale(14),
     fontWeight: '600',
     color: Colors.text,
+    fontFamily: 'Jost-SemiBold'
   },
   authorNameContainer: {
     width: '65%',

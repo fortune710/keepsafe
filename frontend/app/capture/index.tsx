@@ -1,16 +1,10 @@
-// ================================
-// FIXED CAMERA CAPTURE IMPLEMENTATION
-// ================================
-
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ScrollView, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
-  withRepeat, 
-  withTiming, 
   withSpring, 
   interpolate,
   Extrapolate,
@@ -22,31 +16,43 @@ import { useMediaCapture } from '@/hooks/use-media-capture';
 import { MediaService } from '@/services/media-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
-import { getDefaultAvatarUrl, getTimefromTimezone } from '@/lib/utils';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import { useTimezone } from '@/hooks/use-timezone';
 import { DateContainer } from '@/components/date-container';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/lib/constants';
 import AudioWaveVisualier from '@/components/audio/audio-wave-visualier';
 import { useResponsive } from '@/hooks/use-responsive';
+import { logger } from '@/lib/logger';
+import PhoneNumberBottomSheet from '@/components/phone-number-bottom-sheet';
+import { supabase } from '@/lib/supabase';
+import { getPhonePromptState } from '@/services/phone-number-prompt-service';
 
 const { height } = Dimensions.get('window');
 
 export default function CaptureScreen() {
   const responsive = useResponsive();
+  const { convertToLocalTimezone } = useTimezone();
   const [selectedMode, setSelectedMode] = useState<'camera' | 'microphone'>('camera');
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const cameraRef = useRef<CameraView>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isVideoRecording, setIsVideoRecording] = useState<boolean>(false);
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const videoTimerRef = useRef<number | null>(null);
+  const videoStateRef = useRef<'idle' | 'starting' | 'failed'>('idle');
+  const pendingVideoStartRef = useRef(false);
+  const pendingVideoStopRef = useRef(false);
+  const [cameraInstance, setCameraInstance] = useState(0);
   
   // Add camera ready state
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
-  const { profile } = useAuthContext();
+  const { profile, user } = useAuthContext();
+  const [showPhoneSheet, setShowPhoneSheet] = useState(false);
 
   const { 
     isCapturing, 
@@ -122,6 +128,43 @@ export default function CaptureScreen() {
     };
   }, []);
 
+  // Show the phone-number prompt bottom sheet when entering `/capture` if needed.
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkShouldShowPhonePrompt = async () => {
+      if (!user?.id) return;
+      if (profile?.phone_number) {
+        if (!cancelled) setShowPhoneSheet(false);
+        return;
+      }
+
+      // If the user already has a pending OTP record, always show the sheet.
+      const { data: pendingRecord } = await supabase
+        .from('phone_number_updates')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (pendingRecord?.id) {
+        if (!cancelled) setShowPhoneSheet(true);
+        return;
+      }
+
+      const state = await getPhonePromptState(user.id);
+      const now = Date.now();
+      const shouldShow =
+        !state.dontAskAgain && (!state.nextPromptAtMs || now >= state.nextPromptAtMs);
+
+      if (!cancelled) setShowPhoneSheet(shouldShow);
+    };
+
+    checkShouldShowPhonePrompt().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.phone_number, user?.id]);
+
   // Cleanup audio recording when component unmounts (navigating away)
   useEffect(() => {
     return () => {
@@ -136,7 +179,7 @@ export default function CaptureScreen() {
   // FIXED: Proper photo capture
   const takePicture = async () => {
     try {
-      console.log('Taking picture...');
+      logger.debug('Taking picture...');
       
       if (!cameraRef.current) {
         throw new Error('Camera ref not available');
@@ -154,7 +197,7 @@ export default function CaptureScreen() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      console.log('Camera ready, taking picture...');
+      logger.debug('Camera ready, taking picture...');
 
       // Process the photo using your MediaService
       const capture = await MediaService.capturePhoto(cameraRef);
@@ -172,17 +215,24 @@ export default function CaptureScreen() {
 
 
     } catch (error: any) {
-      console.error('Photo capture failed:', error);
+      logger.error('Photo capture failed:', error);
       Alert.alert('Error', `Failed to take picture: ${error.message}`);
     }
   };
 
   // FIXED: Proper video recording
   const startVideo = async () => {
-    if (!cameraRef.current || isCapturing || isVideoRecording) return;
+    if (!cameraRef.current || isCapturing || (isVideoRecording && !pendingVideoStartRef.current)) return;
     
     try {
-      console.log('Starting video recording...');
+      // On iOS, video recording typically needs microphone permission (unless muted).
+      if (micPermission?.status !== 'granted') {
+        const res = await requestMicPermission();
+        if (res?.status !== 'granted') {
+          Alert.alert('Microphone Permission Required', 'Please enable microphone permission to record videos with audio.');
+          return;
+        }
+      }
       
       if (!isCameraReady) {
         Alert.alert('Camera Not Ready', 'Please wait for camera to initialize');
@@ -191,10 +241,20 @@ export default function CaptureScreen() {
 
       // Switch to video mode
       if (cameraMode !== 'video') {
+        // We intentionally wait for `onCameraReady` to fire in video mode before calling `recordAsync`.
+        pendingVideoStartRef.current = true;
+        pendingVideoStopRef.current = false;
+        // Keep UI in a "recording" state so onPressOut can cancel before recording starts.
+        setIsVideoRecording(true);
+        videoStateRef.current = 'starting';
+        setIsCameraReady(false);
         setCameraMode('video');
-        await new Promise(resolve => setTimeout(resolve, 600));
+        return;
       }
 
+      pendingVideoStartRef.current = false;
+      pendingVideoStopRef.current = false;
+      videoStateRef.current = 'starting';
       setIsVideoRecording(true);
       
       // Start the timer
@@ -203,13 +263,13 @@ export default function CaptureScreen() {
         setVideoDuration(Math.floor((Date.now() - startTime) / 1000));
       }, 1000);
 
-      console.log('Starting recording...');
+      logger.debug('Starting recording...');
       const videoResult = await cameraRef.current.recordAsync({
         maxDuration: 60,
         //quality: '720p',
+        // NOTE: if mic permission is flaky on some devices, try setting mute: true as a fallback.
       });
-
-      console.log('Video recorded:', videoResult);
+      logger.debug('Video recorded:', videoResult);
 
       if (videoResult && videoResult.uri) {
         const capture = await MediaService.createVideoCapture(videoResult.uri);
@@ -226,16 +286,46 @@ export default function CaptureScreen() {
         }
       }
     } catch (error: any) {
-      console.error('Error starting video recording:', error);
+      logger.debug('recordAsync threw', { name: error?.name, message: error?.message, code: error?.code });
+      videoStateRef.current = 'failed';
+      // Cleanup timer/state so we don't call stopRecording after a failed start.
+      if (videoTimerRef.current) {
+        clearInterval(videoTimerRef.current);
+      }
+      setIsVideoRecording(false);
+      setVideoDuration(0);
+      // Force a remount of the camera to recover from blank/unresponsive native state.
+      setCameraInstance((v) => v + 1);
+      logger.error('Error starting video recording:', error);
       Alert.alert('Error', `Failed to start video recording: ${error.message}`);
     }
   };
 
   const stopVideo = async () => {
-    if (!cameraRef.current || !isVideoRecording) return;
+    if (!cameraRef.current) return;
     
     try {
-      console.log('Stopping video recording...');
+      logger.debug('stopVideo called', { isVideoRecording, hasCameraRef: !!cameraRef.current });
+      logger.debug('Stopping video recording...');
+      // If we're waiting to start (mode switch -> onCameraReady), just mark pending stop.
+      if (pendingVideoStartRef.current) {
+        pendingVideoStopRef.current = true;
+        pendingVideoStartRef.current = false;
+        videoStateRef.current = 'idle';
+        setIsVideoRecording(false);
+        setVideoDuration(0);
+        logger.debug('stopVideo: cancelled pending start before recordAsync');
+        return;
+      }
+      // If recordAsync already failed, do NOT call stopRecording (it can wedge the native session).
+      if (videoStateRef.current === 'failed') {
+        logger.debug('stopVideo: skipping stopRecording because videoState=failed');
+        return;
+      }
+      if (!isVideoRecording) {
+        logger.debug('stopVideo: not recording; nothing to stop');
+        return;
+      }
       
       // Clear timer
       if (videoTimerRef.current) {
@@ -246,9 +336,11 @@ export default function CaptureScreen() {
       setVideoDuration(0);
       
       // Stop recording
+      logger.debug('calling cameraRef.current.stopRecording()');
       cameraRef.current.stopRecording();
     } catch (error) {
-      console.error('Error stopping video recording:', error);
+      logger.debug('stopRecording threw', { name: (error as any)?.name, message: (error as any)?.message, code: (error as any)?.code });
+      logger.error('Error stopping video recording:', error);
       Alert.alert('Error', 'Failed to stop video recording');
     }
   };
@@ -276,6 +368,21 @@ export default function CaptureScreen() {
         });
       }
     } else {
+      // Ensure camera is stopped and video recording is stopped before starting audio
+      if (isVideoRecording && cameraRef.current) {
+        try {
+          cameraRef.current.stopRecording();
+          setIsVideoRecording(false);
+          setVideoDuration(0);
+        } catch (error) {
+          logger.error('Error stopping video before audio recording:', error);
+        }
+      }
+      
+      // Longer delay to ensure camera fully unmounts and releases audio session
+      // React needs time to unmount CameraView, and iOS needs time to release the session
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       await startAudioRecording();
     }
   };
@@ -284,7 +391,7 @@ export default function CaptureScreen() {
     const mediaType = selectedMode === 'camera' ? 'photo' : 'audio';
     const capture = await uploadMedia(mediaType);
 
-    console.log('Capture', capture);
+    logger.debug('Capture', capture);
     
     if (capture) {
       router.push({
@@ -308,11 +415,25 @@ export default function CaptureScreen() {
 
   // Camera ready handler
   const onCameraReady = () => {
-    console.log('Camera is ready');
+    logger.debug('Camera is ready');
+    logger.debug('onCameraReady', { cameraMode, selectedMode, pendingVideoStart: pendingVideoStartRef.current, pendingVideoStop: pendingVideoStopRef.current });
     setIsCameraReady(true);
-  };
 
-  const now = new Date();
+    // If we switched to video mode and were waiting to start recording, do it now.
+    if (selectedMode === 'camera' && cameraMode === 'video' && pendingVideoStartRef.current) {
+      pendingVideoStartRef.current = false;
+      if (pendingVideoStopRef.current) {
+        pendingVideoStopRef.current = false;
+        videoStateRef.current = 'idle';
+        setIsVideoRecording(false);
+        logger.debug('pending stop was set; skipping video start');
+        return;
+      }
+      logger.debug('starting pending video now that camera is ready in video mode');
+      // Fire and forget; `startVideo` will proceed because pendingVideoStartRef is now false and cameraMode is video.
+      startVideo();
+    }
+  };
 
   if (!permission) {
     return <View style={styles.container} />;
@@ -352,7 +473,7 @@ export default function CaptureScreen() {
                 />
               </TouchableOpacity>
               
-              <DateContainer date={getTimefromTimezone()} />
+              <DateContainer date={convertToLocalTimezone(new Date())} />
               
               <TouchableOpacity
                 style={styles.friendsButton}
@@ -401,6 +522,7 @@ export default function CaptureScreen() {
                 {selectedMode === 'camera' ? (
                   <>
                     <CameraView 
+                      key={`camera-view-${cameraInstance}`} // Force remount when camera gets wedged
                       mode={cameraMode} // Dynamic mode based on current action
                       style={styles.persistentCamera} 
                       facing={facing} 
@@ -471,7 +593,11 @@ export default function CaptureScreen() {
                   ]} 
                   onPress={selectedMode === 'camera' ? handleCameraCapture : toggleRecording}
                   onLongPress={selectedMode === 'camera' ? startVideo : undefined}
-                  onPressOut={selectedMode === 'camera' && isVideoRecording ? stopVideo : undefined}
+                  onPressOut={
+                    selectedMode === 'camera' && (isVideoRecording || pendingVideoStartRef.current)
+                      ? stopVideo
+                      : undefined
+                  }
                   delayLongPress={200}
                   disabled={selectedMode === 'camera' && !isCameraReady}
                 >
@@ -517,7 +643,7 @@ export default function CaptureScreen() {
               <Text style={styles.uploadHint}>
                 {selectedMode === 'camera' ? 
                   (isCameraReady ? 'Tap for photo • Long press for video' : 'Camera initializing...') : 
-                  'Upload Audio'
+                  'Tap to record audio'
                 }
               </Text>
       
@@ -526,15 +652,16 @@ export default function CaptureScreen() {
                   <Archive color="#8B5CF6" size={20} />
                   <Text style={styles.vaultButtonText}>Vault</Text>
                 </TouchableOpacity>
-                
-                <View style={styles.swipeHint}>
-                  <Text style={styles.swipeHintText}>Swipe up to view vault</Text>
-                </View>
               </View>
             </View>
           </ScrollView>
         </GestureDetector>
       </SafeAreaView>
+
+      <PhoneNumberBottomSheet
+        isVisible={showPhoneSheet}
+        onClose={() => setShowPhoneSheet(false)}
+      />
     </Animated.View>
   );
 }
@@ -557,12 +684,12 @@ const styles = StyleSheet.create({
     //marginTop: verticalScale(24)
   },
   profileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 20,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(20),
     borderWidth: 2,
     borderColor: '#8B5CF6',
-    padding: 2,
+    padding: scale(2),
   },
   profileImage: {
     width: '100%',
@@ -571,9 +698,9 @@ const styles = StyleSheet.create({
   },
   
   friendsButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
@@ -612,14 +739,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   modeText: {
-    fontSize: 11,
+    fontSize: scale(10),
     color: '#94A3B8',
     marginLeft: 4,
-    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
   },
   activeModeText: {
     color: '#8B5CF6',
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
   },
   content: {
     flex: 1,
@@ -656,7 +783,7 @@ const styles = StyleSheet.create({
   cameraLoadingText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
   },
   cameraOverlay: {
     position: 'absolute',
@@ -677,7 +804,7 @@ const styles = StyleSheet.create({
   videoTimerText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     marginLeft: 8,
   },
   audioVisualizer: {
@@ -701,7 +828,7 @@ const styles = StyleSheet.create({
   recordingText: {
     fontSize: 14,
     color: '#EF4444',
-    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
   },
   actionContainer: {
     flexDirection: 'row',
@@ -727,6 +854,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#94A3B8',
     textAlign: 'center',
+    fontFamily: 'Outfit-Regular',
   },
   flipButton: {
     width: 48,
@@ -798,9 +926,8 @@ const styles = StyleSheet.create({
   vaultButtonText: {
     color: '#8B5CF6',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     marginLeft: 8,
-    marginTop: 7
   },
   swipeHint: {
     marginTop: verticalScale(20),
@@ -809,7 +936,7 @@ const styles = StyleSheet.create({
   swipeHintText: {
     fontSize: 12,
     color: '#94A3B8',
-    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
   },
   permissionContainer: {
     flex: 1,
@@ -823,6 +950,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 24,
+    fontFamily: 'Outfit-Regular',
   },
   permissionButton: {
     backgroundColor: '#8B5CF6',
@@ -833,6 +961,6 @@ const styles = StyleSheet.create({
   permissionButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
   },
 });

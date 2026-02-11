@@ -21,7 +21,7 @@ import { useUserEntries } from '@/hooks/use-user-entries';
 import { Colors } from '@/lib/constants';
 import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
-import { verticalScale } from 'react-native-size-matters';
+import { scale, verticalScale } from 'react-native-size-matters';
 import Typewriter from '@/components/ui/typewriter';
 
 const SAMPLE_QUERIES = [
@@ -159,6 +159,7 @@ const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
               body: {
                 color: isAssistant ? styles.assistantText.color : styles.userText.color,
                 fontSize: styles.messageText.fontSize,
+                fontFamily: 'Outfit-Regular',
               },
               paragraph: {
                 marginTop: 0,
@@ -172,13 +173,13 @@ const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
               },
               heading1: {
                 fontSize: 18,
-                fontWeight: '700',
+                fontFamily: 'Outfit-Bold',
                 marginBottom: 6,
                 color: isAssistant ? styles.assistantText.color : styles.userText.color,
               },
               heading2: {
                 fontSize: 16,
-                fontWeight: '700',
+                fontFamily: 'Outfit-Bold',
                 marginBottom: 4,
                 color: isAssistant ? styles.assistantText.color : styles.userText.color,
               },
@@ -250,8 +251,7 @@ export default function SearchScreen() {
             <ArrowLeft color="#64748B" size={24} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Sparkles color={Colors.primary} size={20} />
-            <Text style={styles.headerTitle}>Search memories</Text>
+            <Text style={styles.headerTitle}>Go Back In Time</Text>
           </View>
           <View style={styles.headerSpacer} />
         </View>
@@ -259,46 +259,55 @@ export default function SearchScreen() {
         <View style={styles.content}>
           {showRecentAndSamples ? (
             <View style={styles.emptyState}>
-              <Text style={styles.sectionTitle}>Recent memories</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.entriesListContent}
-              >
-                {entries.slice(0, 5).length === 0 ? (
-                  entriesLoading ? (
-                    <Text style={styles.placeholderText}>Loading your memories…</Text>
+              <View>
+                <Text style={styles.sectionTitle}>Recent memories</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.entriesListContent}
+                >
+                  {entries.slice(0, 5).length === 0 ? (
+                    entriesLoading ? (
+                      <Text style={styles.placeholderText}>Loading your memories…</Text>
+                    ) : (
+                      <Text style={styles.placeholderText}>
+                        Your recent captures will appear here.
+                      </Text>
+                    )
                   ) : (
-                    <Text style={styles.placeholderText}>
-                      Your recent captures will appear here.
-                    </Text>
-                  )
-                ) : (
-                  entries.slice(0, 5).map((item) => (
-                    <View key={item.id}>
-                      {renderEntryItem({ item })}
-                    </View>
-                  ))
-                )}
-              </ScrollView>
-
-              <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
-                Try asking…
-              </Text>
-              <View style={styles.sampleQueriesContainer}>
-                {SAMPLE_QUERIES.map((q) => (
-                  <TouchableOpacity
-                    key={q}
-                    style={styles.sampleQueryChip}
-                    onPress={() => {
-                      setInput(q);
-                      void startSearch(q);
-                    }}
-                  >
-                    <Text style={styles.sampleQueryText}>{q}</Text>
-                  </TouchableOpacity>
-                ))}
+                    entries.slice(0, 5).map((item) => (
+                      <View key={item.id}>
+                        {renderEntryItem({ item })}
+                      </View>
+                    ))
+                  )}
+                </ScrollView>
               </View>
+
+              <View>
+                <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+                  Try asking…
+                </Text>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  contentContainerStyle={styles.sampleQueriesContainer}
+                >
+                  {SAMPLE_QUERIES.map((q) => (
+                    <TouchableOpacity
+                      key={q}
+                      style={styles.sampleQueryChip}
+                      onPress={() => {
+                        setInput(q);
+                        void startSearch(q);
+                      }}
+                    >
+                      <Text style={styles.sampleQueryText}>{q}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
             </View>
           ) : (
             <>
@@ -385,7 +394,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   headerSpacer: {
@@ -393,27 +402,32 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
     paddingTop: 8,
   },
   emptyState: {
     flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    height: '100%',
   },
   sectionTitle: {
+    paddingHorizontal: 16,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1F2933',
     marginBottom: 8,
   },
   entriesListContent: {
+    paddingHorizontal: 16,
     paddingBottom: 8,
+    height: verticalScale(120),
   },
   entryCard: {
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
-    borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   entryTitle: {
@@ -430,39 +444,46 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 4,
+    height: verticalScale(40),
+    paddingHorizontal: 16,
   },
   sampleQueryChip: {
     backgroundColor: '#EEF2FF',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: scale(8),
+    paddingHorizontal: scale(8),
+    paddingVertical: verticalScale(6),
   },
   sampleQueryText: {
     fontSize: 12,
     color: '#4F46E5',
-    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
   },
   messagesListContent: {
+    paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
   },
   messageBubble: {
-    width: '100%',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 4,
+    //width: '100%',
+    borderRadius: scale(12),
+    paddingHorizontal: scale(12),
+    paddingVertical: verticalScale(8),
+    marginBottom: verticalScale(4),
   },
   assistantBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: '#EEF2FF',
   },
   userBubble: {
     alignSelf: 'flex-end',
+    minWidth: '50%',
+    maxWidth: '80%',
+    marginLeft: 'auto',
     backgroundColor: '#DCFCE7',
   },
   messageText: {
-    fontSize: 14,
+    fontSize: scale(14),
+    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
   },
   assistantText: {
     color: '#1F2933',
@@ -492,9 +513,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     fontSize: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     color: '#111827',
+    fontFamily: 'Jost-Regular',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   searchButton: {
     borderRadius: 999,
@@ -514,16 +536,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 11,
     color: '#9CA3AF',
+    fontFamily: 'Outfit-Regular',
   },
   placeholderText: {
     fontSize: 13,
     color: '#9CA3AF',
     paddingVertical: 8,
+    fontFamily: 'Outfit-Regular',
   },
   errorText: {
     fontSize: 12,
     color: '#DC2626',
     marginBottom: 4,
+    fontFamily: 'Outfit-Regular',
   },
   searchMessageContainer: {
     width: '100%',
@@ -556,7 +581,7 @@ const styles = StyleSheet.create({
   resultPreviewType: {
     fontSize: 12,
     color: '#4B5563',
-    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
     textTransform: 'capitalize',
   },
   fullscreenOverlay: {
@@ -594,12 +619,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     color: '#E5E7EB',
+    fontFamily: 'Outfit-Regular',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginVertical: verticalScale(10)
+    marginVertical: verticalScale(10),
+    paddingHorizontal: 16,
   },
 });
 

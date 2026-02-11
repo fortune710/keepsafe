@@ -1,11 +1,9 @@
 import { MusicTag } from "@/types/capture";
-import { FlashList } from "@shopify/flash-list";
 import { KeyboardAvoidingView, Text, TextInput, StyleSheet, View, FlatList, ActivityIndicator } from "react-native";
 import { MusicListItem } from "../music/music-list-item";
-import { Album } from "lucide-react-native";
+import { Music } from "lucide-react-native";
 import { Input } from "@/components/ui/input";
 import { scale, verticalScale } from "react-native-size-matters";
-import { Colors } from "@/lib/constants";
 import Skeleton, { SkeletonText } from "@/components/ui/skeleton";
 
 interface MusicTabProps {
@@ -52,10 +50,15 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
     )
 }
 
+/**
+ * Renders the empty-state view shown when no music results are available.
+ *
+ * @returns The empty-state React element containing a music icon and the prompt "Start searching for music".
+ */
 function EmptyComponent() {
     return (
         <View style={styles.emptyContainer}>
-            <Album color="#64748B" size={40} style={{ marginBottom: 8 }} />
+            <Music color="#64748B" size={40} style={{ marginBottom: 8 }} />
             <Text style={styles.emptyText}>Start searching for music</Text>
         </View>
     )
@@ -87,7 +90,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         rowGap: verticalScale(8),
-        marginVertical: verticalScale(36),
+        marginVertical: verticalScale(120),
     },
     emptyText: {
         fontSize: 16,

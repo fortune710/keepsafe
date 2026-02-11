@@ -82,7 +82,7 @@ export default function LegalScreen() {
 
             <Text style={styles.sectionTitle}>9. Contact Information</Text>
             <Text style={styles.sectionText}>
-              If you have questions about these Terms of Service, please contact us at support@keepsafe.app.
+              If you have questions about these Terms of Service, please contact us at contact@fortunealebiosu.dev.
             </Text>
           </View>
         );
@@ -188,7 +188,7 @@ export default function LegalScreen() {
 
             <Text style={styles.sectionTitle}>10. Contact Us</Text>
             <Text style={styles.sectionText}>
-              If you have questions about this Privacy Policy, please contact us at support@keepsafe.app or through the app's support feature.
+              If you have questions about this Privacy Policy, please contact us at contact@fortunealebiosu.dev or through the app's support feature.
             </Text>
           </View>
         );
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: scale(16),
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -317,12 +317,13 @@ const styles = StyleSheet.create({
   },
   documentItemTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   documentItemDescription: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
   documentContent: {
@@ -338,24 +339,26 @@ const styles = StyleSheet.create({
   },
   documentTitle: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
     color: '#1E293B',
     marginBottom: 8,
   },
   lastUpdated: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#94A3B8',
     marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     marginTop: 24,
     marginBottom: 8,
   },
   sectionText: {
     fontSize: 15,
+    fontFamily: 'Jost-Regular',
     color: '#475569',
     lineHeight: 24,
     marginBottom: 16,
@@ -367,13 +370,14 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
     color: '#DC2626',
     marginBottom: 12,
     textAlign: 'center',
   },
   errorMessage: {
     fontSize: 15,
+    fontFamily: 'Jost-Regular',
     color: '#64748B',
     lineHeight: 22,
     textAlign: 'center',

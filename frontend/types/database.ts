@@ -317,12 +317,74 @@ export interface Database {
           updated_at?: string
         }
       }
+      user_streaks: {
+        Row: {
+          id: number
+          user_id: string
+          current_streak: number
+          max_streak: number
+          last_entry_date: string | null
+          last_access_time: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          current_streak?: number
+          max_streak?: number
+          last_entry_date?: string | null
+          last_access_time?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          current_streak?: number
+          max_streak?: number
+          last_entry_date?: string | null
+          last_access_time?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      phone_number_updates: {
+        Row: {
+          id: string
+          user_id: string
+          phone_number: string
+          otp_hash: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          phone_number: string
+          otp_hash: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          phone_number?: string
+          otp_hash?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      rpc_verify_and_update_phone: {
+        Args: {
+          p_user_id: string;
+          p_phone_number: string;
+          p_raw_otp: string;
+        };
+        Returns: Json;
+      };
     }
     Enums: {
       [_ in never]: never
