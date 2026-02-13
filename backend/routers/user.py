@@ -46,7 +46,13 @@ def _prune_export_jobs() -> None:
 
         try:
             reference_time = datetime.fromisoformat(reference_time_str)
-        except Exception:  # noqa: BLE001
+        except ValueError:
+            logger.warning(
+                "Malformed timestamp in export job job_id=%s, reference_time_str=%r; marking for deletion",
+                job_id,
+                reference_time_str,
+            )
+            expired_job_ids.append(job_id)
             continue
 
         if (now - reference_time).total_seconds() > EXPORT_JOB_TTL_SECONDS:
@@ -60,7 +66,7 @@ def _prune_export_jobs() -> None:
             try:
                 if file_path.is_file():
                     file_path.unlink()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception("Failed to delete expired export file for job %s", job_id)
 
         export_jobs.pop(job_id, None)

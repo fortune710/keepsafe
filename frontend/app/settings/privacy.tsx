@@ -274,10 +274,12 @@ export default function PrivacyScreen() {
 
       void pollExportStatus(jobId, format);
     } catch (error: any) {
-      setIsExporting(false);
-      setExportStatusMessage(null);
-      logger.error('Export Data Error', error);
-      Alert.alert('Error', error.message || 'Failed to export account data');
+      if (isMountedRef.current) {
+        setIsExporting(false);
+        setExportStatusMessage(null);
+        logger.error('Export Data Error', error);
+        Alert.alert('Error', error.message || 'Failed to export account data');
+      }
     }
   };
 
@@ -317,7 +319,12 @@ export default function PrivacyScreen() {
                 throw new Error(errorData.detail || 'Failed to delete account data');
               }
 
-              await supabase.auth.signOut();
+              try {
+                await supabase.auth.signOut();
+              } catch (signOutError: any) {
+                logger.error('Delete Account: signOut failed after backend delete', signOutError);
+              }
+
               Alert.alert(
                 'Account Deleted',
                 'Account deleted successfully, we hate to see you go',
