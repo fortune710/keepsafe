@@ -492,6 +492,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
   },
@@ -556,6 +557,7 @@ const styles = StyleSheet.create({
   },
   wordCount: {
     fontSize: 12,
+    fontFamily: 'Jost-Regular',
     color: '#94A3B8',
     textAlign: 'right',
     marginTop: -16,
@@ -583,10 +585,12 @@ const styles = StyleSheet.create({
   tagButtonText: {
     color: '#64748B',
     marginLeft: 8,
+    fontFamily: 'Outfit-Medium',
     fontWeight: '500',
   },
   locationError: {
     fontSize: 12,
+    fontFamily: 'Jost-Regular',
     color: '#EF4444',
     marginTop: 4,
     marginLeft: 8,
@@ -594,12 +598,14 @@ const styles = StyleSheet.create({
   
   privacyTitle: {
     fontSize: 18,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 16,
   },
   requiredText: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#EF4444',
     marginBottom: 16,
     fontStyle: 'italic',
@@ -618,6 +624,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: 'white',
     fontSize: 18,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
   },
 });

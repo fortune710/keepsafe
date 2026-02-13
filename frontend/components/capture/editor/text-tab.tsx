@@ -313,6 +313,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 14,
+        fontFamily: 'Outfit-SemiBold',
         fontWeight: '600',
         color: '#1E293B',
         marginBottom: 12,
@@ -381,6 +382,7 @@ const styles = StyleSheet.create({
     },
     customColorButtonText: {
         fontSize: 14,
+        fontFamily: 'Outfit-SemiBold',
         fontWeight: '600',
         color: '#8B5CF6',
     },
@@ -390,9 +392,9 @@ const styles = StyleSheet.create({
     },
     colorCode: {
         fontSize: 14,
+        fontFamily: 'Jost-Regular',
         fontWeight: '600',
         color: '#1E293B',
-        fontFamily: 'monospace',
         textAlign: 'center',
     },
 })

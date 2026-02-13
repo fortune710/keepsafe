@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react-native';
 import { CountryPickerModal } from '@/components/ui/country-picker-modal';
 import { countries } from '@/constants/countries';
 import { extractPhoneNumber, formatPhoneNumber } from '@/lib/utils';
+import { scale } from 'react-native-size-matters';
 
 export interface PhoneNumberInputChangePayload {
   /** Full phone number in E.164-like form (country code + digits). */
@@ -79,14 +80,36 @@ export function PhoneNumberInput({
   const isValid = normalized.length > 0 && phoneRegex.test(normalized);
   const fullPhoneNumber = `${countryCode}${normalized}`;
 
-  useEffect(() => {
+  /**
+   * Emits phone state changes by merging partial payload with current state.
+   * Computes derived values (normalized, isValid, fullPhoneNumber) from the provided or current state.
+   * 
+   * @param options - Options object containing:
+   *   - currentValue: Optional value to use instead of current state value
+   *   - currentCountryCode: Optional country code to use instead of current state
+   *   - Additional fields from PhoneNumberInputChangePayload to override computed values
+   */
+  const emitPhoneState = (options?: {
+    currentValue?: string;
+    currentCountryCode?: string;
+  } & Partial<PhoneNumberInputChangePayload>) => {
+    const currentValue = options?.currentValue ?? value;
+    const currentCountryCode = options?.currentCountryCode ?? countryCode;
+    const currentNormalized = currentValue.replace(/[\s\-\(\)]/g, '');
+    const currentIsValid = currentNormalized.length > 0 && phoneRegex.test(currentNormalized);
+    const currentFullPhoneNumber = `${currentCountryCode}${currentNormalized}`;
+
+    // Extract only PhoneNumberInputChangePayload fields, excluding internal options
+    const { currentValue: _, currentCountryCode: __, ...payloadOverrides } = options ?? {};
+
     onChange?.({
-      fullPhoneNumber,
-      nationalNumber: normalized,
-      countryCode,
-      isValid,
+      fullPhoneNumber: currentFullPhoneNumber,
+      nationalNumber: currentNormalized,
+      countryCode: currentCountryCode,
+      isValid: currentIsValid,
+      ...payloadOverrides,
     });
-  }, [countryCode, fullPhoneNumber, isValid, normalized, onChange]);
+  };
 
   return (
     <View>
@@ -106,7 +129,11 @@ export function PhoneNumberInput({
           placeholder={placeholder}
           placeholderTextColor="#94A3B8"
           value={value}
-          onChangeText={setValue}
+          onChangeText={(newValue) => {
+            setValue(newValue);
+            // Emit state change with new value
+            emitPhoneState({ currentValue: newValue });
+          }}
           keyboardType="phone-pad"
           autoCapitalize="none"
         />
@@ -122,6 +149,8 @@ export function PhoneNumberInput({
         onSelect={(country) => {
           setCountryCode(country.code);
           setCountryIso(country.iso);
+          // Emit state change with new country code
+          emitPhoneState({ currentCountryCode: country.code });
         }}
         selectedCountryIso={countryIso}
       />
@@ -149,6 +178,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1E293B',
     fontWeight: '500',
+    minWidth: scale(35)
   },
   input: {
     flex: 1,

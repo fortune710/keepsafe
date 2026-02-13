@@ -60,7 +60,7 @@ export default function VaultCanvas({ type, uri, style, items, onMusicPress }: V
         testID="vault-canvas-background"
         
       >
-          {items?.map((item) => (
+          {items?.filter((item) => item?.transforms).map((item) => (
             <VaultCanvasItem 
                 key={item.id} 
                 item={item}
@@ -78,11 +78,19 @@ interface VaultCanvasItemProps {
 }
 
 function VaultCanvasItem({ item, onMusicPress }: VaultCanvasItemProps) {
+    // Provide default transforms if missing (defensive programming)
+    const transforms = item.transforms || {
+        x: 0,
+        y: 0,
+        scale: 1,
+        rotation: 0
+    };
+    
     const factor = 0.90
-    const x = useSharedValue(item.transforms.x * 0.6);
-    const y = useSharedValue(item.transforms.y * factor * 0.995);
-    const scale = useSharedValue(item.transforms.scale * 0.8);
-    const rotation = useSharedValue(item.transforms.rotation);
+    const x = useSharedValue(transforms.x * 0.6);
+    const y = useSharedValue(transforms.y * factor * 0.995);
+    const scale = useSharedValue(transforms.scale * 0.8);
+    const rotation = useSharedValue(transforms.rotation);
 
     const style = useAnimatedStyle(() => ({
         transform: [
