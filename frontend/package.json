@@ -42,7 +42,7 @@
     "expo-application": "~7.0.8",
     "expo-audio": "~1.1.1",
     "expo-av": "~16.0.8",
-    "expo-background-task": "~1.0.10",
+    "expo-background-task": "~1.0.8",
     "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
     "expo-clipboard": "~8.0.8",
