@@ -165,15 +165,38 @@ def _fetch_user_export_data(user_id: str) -> Dict[str, Any]:
 
     logger.info(f"Found {len(entries_data)} entries")
 
-    # 3. Fetch Friendships (both as user and as friend)
+    # 3. Fetch Friendships (both as user and as friend) with pagination to avoid Supabase row cap
     logger.info(f"Fetching friendships for user_id: {user_id}")
-    friendships_response = (
-        supabase.table("friendships")
-        .select("*")
-        .or_(f"user_id.eq.{user_id},friend_id.eq.{user_id}")
-        .execute()
-    )
-    friendships_data = friendships_response.data
+    friendships_data: list[Dict[str, Any]] = []
+    friendships_batch_size = 1000
+    friendships_offset = 0
+
+    while True:
+        friendships_range_end = friendships_offset + friendships_batch_size - 1
+        logger.info(
+            "Fetching friendships batch for user_id=%s, offset=%s, limit=%s",
+            user_id,
+            friendships_offset,
+            friendships_batch_size,
+        )
+        friendships_response = (
+            supabase.table("friendships")
+            .select("*")
+            .or_(f"user_id.eq.{user_id},friend_id.eq.{user_id}")
+            .range(friendships_offset, friendships_range_end)
+            .execute()
+        )
+        batch = friendships_response.data or []
+        if not batch:
+            break
+
+        friendships_data.extend(batch)
+
+        if len(batch) < friendships_batch_size:
+            break
+
+        friendships_offset += friendships_batch_size
+
     logger.info(f"Found {len(friendships_data)} friendships")
 
     def remove_none(obj: Any) -> Any:
@@ -410,10 +433,22 @@ async def get_export_status(
     }
 
 
+def _cleanup_export_after_download(job_id: str, file_path: str) -> None:
+    """Remove export file and job entry after response is sent. Run as a background task."""
+    try:
+        path_obj = Path(file_path)
+        if path_obj.is_file():
+            path_obj.unlink()
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to delete export file after download for job %s", job_id)
+    export_jobs.pop(job_id, None)
+
+
 @router.get("/{user_id}/export/{job_id}/download")
 async def download_user_export(
     user_id: str,
     job_id: str,
+    background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user),
 ):
     """
@@ -446,16 +481,7 @@ async def download_user_export(
         filename=job.get("filename") or Path(file_path).name,
     )
 
-    # Best-effort cleanup after successful download: delete file and job entry.
-    try:
-        path_obj = Path(file_path)
-        if path_obj.is_file():
-            path_obj.unlink()
-    except Exception:  # noqa: BLE001
-        logger.exception("Failed to delete export file after download for job %s", job_id)
-
-    export_jobs.pop(job_id, None)
-
+    background_tasks.add_task(_cleanup_export_after_download, job_id, file_path)
     return response
 
 

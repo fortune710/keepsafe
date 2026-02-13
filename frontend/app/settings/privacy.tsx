@@ -200,33 +200,41 @@ export default function PrivacyScreen() {
         throw new Error('Failed to download export file');
       }
 
-      setIsExporting(false);
-      setExportStatusMessage(null);
+      if (isMountedRef.current) {
+        setIsExporting(false);
+        setExportStatusMessage(null);
 
-      Alert.alert(
-        'Export Complete',
-        'Your data has been successfully exported.',
-        [
-          {
-            text: 'Share / Save',
-            onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(result.uri, {
-                  mimeType: format === 'html' ? 'text/html' : 'application/json',
-                  dialogTitle: 'Export User Data',
-                });
-              } else {
-                Alert.alert('Success', 'File downloaded to: ' + result.uri);
-              }
+        Alert.alert(
+          'Export Complete',
+          'Your data has been successfully exported.',
+          [
+            {
+              text: 'Share / Save',
+              onPress: async () => {
+                if (!isMountedRef.current) return;
+                if (await Sharing.isAvailableAsync()) {
+                  await Sharing.shareAsync(result.uri, {
+                    mimeType: format === 'html' ? 'text/html' : 'application/json',
+                    dialogTitle: 'Export User Data',
+                  });
+                } else {
+                  if (isMountedRef.current) {
+                    Alert.alert('Success', 'File downloaded to: ' + result.uri);
+                  }
+                }
+              },
             },
-          },
-          { text: 'Close', style: 'cancel' },
-        ]
-      );
+            { text: 'Close', style: 'cancel' },
+          ]
+        );
+      }
     } catch (error: any) {
-      setIsExporting(false);
       logger.error('Export Download Error', error);
-      Alert.alert('Error', error.message || 'Failed to download export file');
+      if (isMountedRef.current) {
+        setIsExporting(false);
+        setExportStatusMessage(null);
+        Alert.alert('Error', error.message || 'Failed to download export file');
+      }
     }
   };
 
