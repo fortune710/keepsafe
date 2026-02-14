@@ -191,6 +191,11 @@ export class StreakService {
     
     if (newStreakData.currentStreak >= 1) {
       // Active streak - remind about keeping streak alive
+      // Schedule the notification for 12pm (noon) the next day
+      const nextNoon = new Date(now);
+      nextNoon.setDate(now.getDate() + 1);
+      nextNoon.setHours(12, 0, 0, 0);
+
       await LocalNotificationService.scheduleNotification({
         content: {
           title: 'How are you doing today?',
@@ -200,9 +205,8 @@ export class StreakService {
           }
         },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: 12,
-          minute: 0,
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: nextNoon,
         },
         identifier: `streak_${userId}`,
       });
