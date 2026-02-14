@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, InfiniteData } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES } from '@/constants/supabase';
 import { Database } from '@/types/database';
@@ -214,7 +214,8 @@ export function useUserEntries(): UseUserEntriesResult {
         return;
       }
 
-      const currentEntries = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', userId]) || [];
+      const infiniteData = queryClient.getQueryData<InfiniteData<EntryWithProfile[]>>(['user-entries', userId]);
+      const currentEntries = infiniteData?.pages.flat() || [];
       const currentEntryIds = new Set(currentEntries.map(e => e.id));
 
       // Find entries that were missed
@@ -226,23 +227,35 @@ export function useUserEntries(): UseUserEntriesResult {
       if (missedEntries.length > 0) {
         logger.info(`Found ${missedEntries.length} missed entries after reconnection`);
 
-        // Merge missed entries with existing entries and sort by created_at descending (newest first)
-        const allEntries = [...missedEntries, ...currentEntries];
-        const sortedEntries = allEntries.sort((a, b) => {
-          const dateA = new Date(a.created_at).getTime();
-          const dateB = new Date(b.created_at).getTime();
-          return dateB - dateA; // Descending order (newest first)
-        });
-
-        // Update cache with properly sorted entries
-        queryClient.setQueryData<EntryWithProfile[]>(
+        // Sort only the new entries if we want to prepend, or merge all and sort
+        // For simplicity and correct visual order, we prepend them to the first page
+        queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
           ['user-entries', userId],
-          sortedEntries
+          (oldData) => {
+            if (!oldData) return undefined;
+
+            const firstPage = [...missedEntries, ...oldData.pages[0]];
+            const sortedFirstPage = firstPage.sort((a, b) => {
+              const dateA = new Date(a.created_at).getTime();
+              const dateB = new Date(b.created_at).getTime();
+              return dateB - dateA;
+            });
+
+            return {
+              ...oldData,
+              pages: [sortedFirstPage, ...oldData.pages.slice(1)],
+            };
+          }
+        );
+
+        // Update entries for device storage (full set)
+        const updatedAllEntries = [...missedEntries, ...currentEntries].sort((a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
         // Save all entries to device storage at once (properly sorted)
         try {
-          await deviceStorage.setEntries(userId, sortedEntries);
+          await deviceStorage.setEntries(userId, updatedAllEntries);
         } catch (storageError) {
           logger.error('Error saving missed entries to storage:', storageError);
         }
@@ -322,19 +335,27 @@ export function useUserEntries(): UseUserEntriesResult {
               profile: ownerProfile,
             };
 
-            // Deduplicate: Check if entry already exists in React Query cache
-            const currentEntries: EntryWithProfile[] = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', userId]) || [];
-            if (currentEntries.some(e => e.id === typedNewEntry.id)) {
+            // deduplicate and update
+            const infiniteData = queryClient.getQueryData<InfiniteData<EntryWithProfile[]>>(['user-entries', userId]);
+            const allCurrentEntries = infiniteData?.pages.flat() || [];
+
+            if (allCurrentEntries.some(e => e.id === typedNewEntry.id)) {
               logger.info('Entry already exists in cache, skipping:', typedNewEntry.id);
               return;
             }
 
             logger.info('New entry received via realtime:', typedNewEntry.id);
 
-            // Update React Query cache optimistically
-            queryClient.setQueryData<EntryWithProfile[]>(
+            // Update React Query cache optimistically adding to the first page
+            queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
               ['user-entries', userId],
-              (old = []) => [typedNewEntry, ...old]
+              (oldData) => {
+                if (!oldData) return undefined;
+                return {
+                  ...oldData,
+                  pages: [[typedNewEntry, ...oldData.pages[0]], ...oldData.pages.slice(1)],
+                };
+              }
             );
 
             // Update device storage (with deduplication handled in addEntry)
