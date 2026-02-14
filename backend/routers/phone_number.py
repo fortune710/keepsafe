@@ -120,7 +120,7 @@ async def start_phone_otp(
     try:
 
         phone_number_masked = f"...{payload.phone_number[-4:]}" if payload.phone_number and len(payload.phone_number) >= 4 else "****"
-        logger.info("Upserting phone_number_updates row", extra={"user_id": user_id, "phone_number": phone_number_masked, "otp_hash": otp_hash, "created_at": now_iso})
+        logger.info("Upserting phone_number_updates row", extra={"user_id": user_id, "phone_number": phone_number_masked, "created_at": now_iso})
         supabase.table("phone_number_updates").upsert(
             {
                 "user_id": user_id,
@@ -177,7 +177,7 @@ async def resend_phone_otp(
 
     try:
         phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
-        logger.info("Upserting phone_number_updates row for resend", extra={"user_id": user_id, "phone_number": phone_number_masked, "otp_hash": otp_hash, "created_at": now_iso})
+        logger.info("Upserting phone_number_updates row for resend", extra={"user_id": user_id, "phone_number": phone_number_masked, "created_at": now_iso})
         supabase.table("phone_number_updates").upsert(
             {
                 "user_id": user_id,
