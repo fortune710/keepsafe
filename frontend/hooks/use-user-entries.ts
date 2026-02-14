@@ -7,6 +7,7 @@ import { useAuthContext } from '@/providers/auth-provider';
 import { deviceStorage } from '@/services/device-storage';
 import { groupBy } from '@/lib/utils';
 import { retryEntryProcessing } from '@/services/background-task-manager';
+import { generateIdempotencyKey } from '@/hooks/use-entry-operations';
 import { EntryWithProfile } from '@/types/entries';
 import { useTimezone } from '@/hooks/use-timezone';
 import { logger } from '@/lib/logger';
@@ -93,6 +94,9 @@ export function useUserEntries(): UseUserEntriesResult {
   const [optimisticEntries, setOptimisticEntries] = useState<EntryWithProfile[]>([]);
   const [unseenEntryIds, setUnseenEntryIds] = useState<Set<string>>(new Set());
   const wasOfflineRef = useRef(false);
+  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
 
   const {
     data: entries = [],
@@ -159,15 +163,94 @@ export function useUserEntries(): UseUserEntriesResult {
     });
   }, []);
 
-  // Realtime subscription for new shared entries
-  useEffect(() => {
-    if (!user?.id) return;
+  // Helper function to handle missed entries after reconnection
+  const fetchMissedEntries = useCallback(async (userId: string) => {
+    try {
+      // Fetch entries created in the last 10 minutes
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      
+      const { data: recentEntries, error: fetchError } = await supabase
+        .from(TABLES.ENTRIES)
+        .select(`*, profile:${TABLES.PROFILES}(*)`)
+        .contains('shared_with', [userId])
+        .gte('created_at', tenMinutesAgo)
+        .order('created_at', { ascending: false });
+
+      if (fetchError || !recentEntries) {
+        logger.error('Error fetching missed entries:', fetchError);
+        return;
+      }
+
+      const currentEntries = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', userId]) || [];
+      const currentEntryIds = new Set(currentEntries.map(e => e.id));
+      
+      // Find entries that were missed
+      const missedEntries = recentEntries.filter(
+        (entry: EntryWithProfile) => 
+          !currentEntryIds.has(entry.id) && entry.user_id !== userId
+      );
+
+      if (missedEntries.length > 0) {
+        logger.info(`Found ${missedEntries.length} missed entries after reconnection`);
+        
+        // Merge missed entries with existing entries and sort by created_at descending (newest first)
+        const allEntries = [...missedEntries, ...currentEntries];
+        const sortedEntries = allEntries.sort((a, b) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateB - dateA; // Descending order (newest first)
+        });
+
+        // Update cache with properly sorted entries
+        queryClient.setQueryData<EntryWithProfile[]>(
+          ['user-entries', userId],
+          sortedEntries
+        );
+
+        // Save all entries to device storage at once (properly sorted)
+        try {
+          await deviceStorage.setEntries(userId, sortedEntries);
+        } catch (storageError) {
+          logger.error('Error saving missed entries to storage:', storageError);
+        }
+
+        // Add to unseen list
+        setUnseenEntryIds(prev => {
+          const updated = new Set(prev);
+          missedEntries.forEach((entry: EntryWithProfile) => {
+            if (updated.size < 50) {
+              updated.add(entry.id);
+            }
+          });
+          return updated;
+        });
+      }
+    } catch (error) {
+      logger.error('Error in fetchMissedEntries:', error);
+    }
+  }, [queryClient]);
+
+  // Helper function to setup subscription
+  const setupSubscription = useCallback((userId: string) => {
+    // Clean up any existing subscription first
+    if (subscriptionRef.current) {
+      subscriptionRef.current.unsubscribe();
+      subscriptionRef.current = null;
+    }
+
+    // Clear any pending reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    logger.info(`Setting up realtime subscription for user: ${userId}`);
 
     // Subscribe to entries table changes
     // Note: Supabase realtime doesn't support array contains filters directly,
     // so we listen to all INSERTs and filter in the callback to check if user.id is in shared_with array
     const channel = supabase
-      .channel(`shared-entries-${user.id}`)
+      .channel(`shared-entries-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -181,19 +264,19 @@ export function useUserEntries(): UseUserEntriesResult {
             const newEntryData = payload.new as any;
             
             // Skip own entries
-            if (newEntryData.user_id === user.id) return;
+            if (newEntryData.user_id === userId) return;
 
             // Filter: Check if entry is shared with this user
             const sharedWith = newEntryData.shared_with || [];
             const sharedWithEveryone = newEntryData.shared_with_everyone || false;
             
             // Skip if not shared with this user
-            if (!sharedWithEveryone && !sharedWith.includes(user.id)) {
+            if (!sharedWithEveryone && !sharedWith.includes(userId)) {
               return;
             }
 
             // Get the entry owner's profile using our helper function
-            const ownerProfile = await getEntryOwnerProfile(newEntryData.user_id, user.id);
+            const ownerProfile = await getEntryOwnerProfile(newEntryData.user_id, userId);
             
             if (!ownerProfile) {
               logger.error('Could not fetch entry owner profile');
@@ -207,21 +290,23 @@ export function useUserEntries(): UseUserEntriesResult {
             };
 
             // Deduplicate: Check if entry already exists in React Query cache
-            const currentEntries: EntryWithProfile[] = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', user.id]) || [];
+            const currentEntries: EntryWithProfile[] = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', userId]) || [];
             if (currentEntries.some(e => e.id === typedNewEntry.id)) {
               logger.info('Entry already exists in cache, skipping:', typedNewEntry.id);
               return;
             }
 
+            logger.info('New entry received via realtime:', typedNewEntry.id);
+
             // Update React Query cache optimistically
             queryClient.setQueryData<EntryWithProfile[]>(
-              ['user-entries', user.id],
+              ['user-entries', userId],
               (old = []) => [typedNewEntry, ...old]
             );
 
             // Update device storage (with deduplication handled in addEntry)
             try {
-              await deviceStorage.addEntry(user.id, typedNewEntry);
+              await deviceStorage.addEntry(userId, typedNewEntry);
             } catch (storageError) {
               logger.error('Error saving entry to device storage:', storageError);
               // Don't block - continue even if storage fails
@@ -237,87 +322,94 @@ export function useUserEntries(): UseUserEntriesResult {
               return updated;
             });
           } catch (error) {
-            console.error('Error handling realtime entry:', error);
+            logger.error('Error handling realtime entry:', error);
             // Graceful degradation - don't crash the app
           }
         }
       )
       .subscribe((status) => {
+        logger.info(`Realtime subscription status: ${status}`);
+        
         if (status === 'SUBSCRIBED') {
-          console.log('Subscribed to shared entries');
+          logger.info('Successfully subscribed to shared entries');
+          reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful subscription
           
           // Handle offline reconnection: fetch missed entries
           if (wasOfflineRef.current) {
+            logger.info('Fetching missed entries due to offline reconnection');
             wasOfflineRef.current = false;
-            
-            // Fetch entries created in the last 10 minutes
-            const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-            
-            supabase
-              .from(TABLES.ENTRIES)
-              .select(`*, profile:${TABLES.PROFILES}(*)`)
-              .contains('shared_with', [user.id])
-              .gte('created_at', tenMinutesAgo)
-              .order('created_at', { ascending: false })
-              .then(({ data: recentEntries, error: fetchError }) => {
-                if (fetchError || !recentEntries) {
-                  console.error('Error fetching missed entries:', fetchError);
-                  return;
-                }
-
-                const currentEntries = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', user.id]) || [];
-                const currentEntryIds = new Set(currentEntries.map(e => e.id));
-                
-                // Find entries that were missed
-                const missedEntries = recentEntries.filter(
-                  (entry: EntryWithProfile) => 
-                    !currentEntryIds.has(entry.id) && entry.user_id !== user.id
-                );
-
-                if (missedEntries.length > 0) {
-                  // Add missed entries to cache
-                  queryClient.setQueryData<EntryWithProfile[]>(
-                    ['user-entries', user.id],
-                    (old = []) => [...missedEntries, ...old]
-                  );
-
-                  // Save to device storage
-                  missedEntries.forEach(async (entry: EntryWithProfile) => {
-                    try {
-                      await deviceStorage.addEntry(user.id, entry);
-                    } catch (storageError) {
-                      console.error('Error saving missed entry to storage:', storageError);
-                    }
-                  });
-
-                  // Add to unseen list
-                  setUnseenEntryIds(prev => {
-                    const updated = new Set(prev);
-                    missedEntries.forEach((entry: EntryWithProfile) => {
-                      if (updated.size < 50) {
-                        updated.add(entry.id);
-                      }
-                    });
-                    return updated;
-                  });
-                }
-              });
+            fetchMissedEntries(userId);
           }
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime subscription error');
+          logger.error('Realtime subscription error - will attempt to reconnect');
           wasOfflineRef.current = true;
+          scheduleReconnect(userId);
         } else if (status === 'TIMED_OUT') {
-          console.warn('Realtime subscription timed out');
+          logger.warn('Realtime subscription timed out - will attempt to reconnect');
           wasOfflineRef.current = true;
+          scheduleReconnect(userId);
         } else if (status === 'CLOSED') {
+          logger.warn('Realtime subscription closed - will attempt to reconnect');
           wasOfflineRef.current = true;
+          scheduleReconnect(userId);
         }
       });
 
+    subscriptionRef.current = channel;
+  }, [queryClient, fetchMissedEntries]);
+
+  // Helper function to schedule reconnection with exponential backoff
+  const scheduleReconnect = useCallback((userId: string) => {
+    // Clear any existing timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+    reconnectAttemptsRef.current += 1;
+
+    logger.info(`Scheduling reconnection attempt ${reconnectAttemptsRef.current} in ${delay}ms`);
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      reconnectTimeoutRef.current = null;
+      setupSubscription(userId);
+    }, delay) as unknown as number;
+  }, [setupSubscription]);
+
+  // Realtime subscription for new shared entries
+  useEffect(() => {
+    if (!user?.id) {
+      // Clean up subscription if user logs out
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    // Setup subscription
+    setupSubscription(user.id);
+
     return () => {
-      channel.unsubscribe();
+      // Cleanup: unsubscribe from channel
+      if (subscriptionRef.current) {
+        logger.info('Cleaning up realtime subscription');
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+      // Clear reconnect timeout
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      reconnectAttemptsRef.current = 0;
     };
-  }, [user?.id, queryClient]);
+  }, [user?.id, setupSubscription]);
 
   const addOptimisticEntry = useCallback((entry: EntryWithProfile) => {
     const optimisticEntry = {
@@ -370,6 +462,19 @@ export function useUserEntries(): UseUserEntriesResult {
         return;
       }
 
+      // Generate idempotency key from entry data (same as original save)
+      const idempotencyKey = await generateIdempotencyKey({
+        captureUri: entry.content_url,
+        userId: user.id,
+        selectedFriends: entry.shared_with?.filter((id: string) => id !== user.id) || [],
+        isPrivate: entry.is_private,
+        isEveryone: entry.shared_with_everyone,
+        attachments: entry.attachments || [],
+        locationTag: entry.location_tag || undefined,
+        musicTag: entry.music_tag || undefined,
+        textContent: entry.text_content || '',
+      });
+
       // Prepare retry data
       const retryData = {
         entryId: entry.id,
@@ -388,6 +493,7 @@ export function useUserEntries(): UseUserEntriesResult {
         isEveryone: entry.shared_with_everyone,
         selectedFriends: entry.shared_with?.filter((id: string) => id !== user.id) || [],
         attachments: entry.attachments || [],
+        idempotencyKey,
       };
 
       // Retry the processing
