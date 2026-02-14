@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 from config import settings
 from services.supabase_client import get_supabase_client
 from utils.auth import get_current_user
+from twilio.rest import Client
 
 logger = logging.getLogger(__name__)
 
@@ -78,23 +80,21 @@ async def _send_sms_otp(phone_number: str, otp: str) -> None:
     if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN or not settings.TWILIO_FROM_NUMBER:
         raise HTTPException(status_code=500, detail="Twilio is not configured on the backend")
 
-    url = (
-        f"https://api.twilio.com/2010-04-01/Accounts/{settings.TWILIO_ACCOUNT_SID}/Messages.json"
-    )
-    body = f"Your Keepsafe verification code is: {otp}"
-
-    async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.post(
-            url,
-            data={"To": phone_number, "From": settings.TWILIO_FROM_NUMBER, "Body": body},
-            auth=(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN),
+    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+    try:
+        await asyncio.to_thread(
+            client.messages.create,
+            to=phone_number,
+            from_=settings.TWILIO_FROM_NUMBER,
+            body=f"Your Keepsafe verification code is: {otp}",
         )
-
-    if response.status_code not in (200, 201):
-        logger.error("Twilio send failed", extra={"status": response.status_code, "body": response.text})
-        raise HTTPException(status_code=502, detail="Failed to send OTP SMS")
-
-
+        phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
+        logger.info("Twilio send successful", extra={"phone_number": phone_number_masked})
+    except Exception as e:
+        phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
+        logger.exception("Twilio send failed", extra={"phone_number": phone_number_masked})
+        raise HTTPException(status_code=500, detail="Failed to send OTP SMS") from e
+    
 @router.post("/otp/start")
 async def start_phone_otp(
     payload: StartPhoneOtpRequest,
@@ -110,9 +110,17 @@ async def start_phone_otp(
     otp = _generate_6_digit_otp()
     otp_hash = _sha256_hex(otp)
 
+    phone_number_masked = f"...{payload.phone_number[-4:]}" if payload.phone_number and len(payload.phone_number) >= 4 else "****"
+    logger.info("Sending OTP SMS", extra={"phone_number": phone_number_masked})
+    await _send_sms_otp(payload.phone_number, otp)
+
+
     # Upsert the verification record
     now_iso = datetime.now(timezone.utc).isoformat()
     try:
+
+        phone_number_masked = f"...{payload.phone_number[-4:]}" if payload.phone_number and len(payload.phone_number) >= 4 else "****"
+        logger.info("Upserting phone_number_updates row", extra={"user_id": user_id, "phone_number": phone_number_masked, "created_at": now_iso})
         supabase.table("phone_number_updates").upsert(
             {
                 "user_id": user_id,
@@ -126,7 +134,6 @@ async def start_phone_otp(
         logger.exception("Failed to upsert phone_number_updates row")
         raise HTTPException(status_code=500, detail="Failed to create phone verification record") from e
 
-    await _send_sms_otp(payload.phone_number, otp)
 
     return {"message": "OTP sent"}
 
@@ -166,7 +173,11 @@ async def resend_phone_otp(
     otp_hash = _sha256_hex(otp)
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    await _send_sms_otp(phone_number, otp)
+
     try:
+        phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
+        logger.info("Upserting phone_number_updates row for resend", extra={"user_id": user_id, "phone_number": phone_number_masked, "created_at": now_iso})
         supabase.table("phone_number_updates").upsert(
             {
                 "user_id": user_id,
@@ -180,7 +191,6 @@ async def resend_phone_otp(
         logger.exception("Failed to upsert phone_number_updates row for resend")
         raise HTTPException(status_code=500, detail="Failed to recreate phone verification record") from e
 
-    await _send_sms_otp(phone_number, otp)
     return {"message": "OTP resent"}
 
 

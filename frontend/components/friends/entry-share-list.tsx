@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
     privacyText: {
         textAlign: "center",
         fontSize: scale(16),
+        fontFamily: 'Outfit-SemiBold',
         fontWeight: '500',
         marginVertical: verticalScale(8)
     },
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     selectedFriendOption: {
-        backgroundColor: '#EEF2FF',
+        //backgroundColor: '#EEF2FF',
     },
     disabledFriendOption: {
         opacity: 0.5,
@@ -150,11 +151,13 @@ const styles = StyleSheet.create({
     },
     friendName: {
         fontSize: 12,
+        fontFamily: 'Jost-SemiBold',
         color: '#64748B',
         fontWeight: '500',
         textAlign: 'center',
     },
     selectedFriendName: {
+        fontFamily: 'Jost-SemiBold',
         color: '#8B5CF6',
         fontWeight: '600',
     },

@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring, 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
   interpolate,
   Extrapolate,
   SlideInUp
@@ -15,6 +15,7 @@ import { UserPlus, Camera, Mic, Circle, RotateCw, Upload, Archive } from "lucide
 import { useMediaCapture } from '@/hooks/use-media-capture';
 import { MediaService } from '@/services/media-service';
 import { useAuthContext } from '@/providers/auth-provider';
+import { useSaveLock } from '@/providers/save-lock-provider';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { useTimezone } from '@/hooks/use-timezone';
@@ -46,27 +47,33 @@ export default function CaptureScreen() {
   const pendingVideoStartRef = useRef(false);
   const pendingVideoStopRef = useRef(false);
   const [cameraInstance, setCameraInstance] = useState(0);
-  
+
   // Add camera ready state
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
   const { profile, user } = useAuthContext();
+  const { unlockSave } = useSaveLock();
   const [showPhoneSheet, setShowPhoneSheet] = useState(false);
 
-  const { 
-    isCapturing, 
-    capturedMedia, 
-    recordingDuration, 
-    startAudioRecording, 
+  // Release save lock when capture screen mounts (after navigating back from details)
+  useEffect(() => {
+    unlockSave();
+  }, []);
+
+  const {
+    isCapturing,
+    capturedMedia,
+    recordingDuration,
+    startAudioRecording,
     startVideoRecording,
     stopVideoRecording,
-    stopAudioRecording, 
-    uploadMedia, 
-    clearCapture 
+    stopAudioRecording,
+    uploadMedia,
+    clearCapture
   } = useMediaCapture();
-  
-  
+
+
   const translateY = useSharedValue(0);
 
   // Pan gesture for dragging up to vault
@@ -78,7 +85,7 @@ export default function CaptureScreen() {
     })
     .onEnd((event) => {
       const shouldOpenVault = event.translationY < -height * 0.15 && event.velocityY < -300;
-      
+
       if (shouldOpenVault && !isNavigating) {
         setIsNavigating(true);
         translateY.value = withSpring(0, { damping: 20, stiffness: 90 });
@@ -144,7 +151,7 @@ export default function CaptureScreen() {
         .from('phone_number_updates')
         .select('id')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .maybeSingle() as { data: { id: string } | null };
 
       if (pendingRecord?.id) {
         if (!cancelled) setShowPhoneSheet(true);
@@ -153,13 +160,12 @@ export default function CaptureScreen() {
 
       const state = await getPhonePromptState(user.id);
       const now = Date.now();
-      const shouldShow =
-        !state.dontAskAgain && (!state.nextPromptAtMs || now >= state.nextPromptAtMs);
+      const shouldShow = !state.dontAskAgain && (!state.nextPromptAtMs || now >= state.nextPromptAtMs);
 
       if (!cancelled) setShowPhoneSheet(shouldShow);
     };
 
-    checkShouldShowPhonePrompt().catch(() => {});
+    checkShouldShowPhonePrompt().catch(() => { });
     return () => {
       cancelled = true;
     };
@@ -180,7 +186,7 @@ export default function CaptureScreen() {
   const takePicture = async () => {
     try {
       logger.debug('Taking picture...');
-      
+
       if (!cameraRef.current) {
         throw new Error('Camera ref not available');
       }
@@ -201,11 +207,11 @@ export default function CaptureScreen() {
 
       // Process the photo using your MediaService
       const capture = await MediaService.capturePhoto(cameraRef);
-        
+
       if (capture) {
         router.push({
           pathname: '/capture/details',
-          params: { 
+          params: {
             captureId: capture.id,
             type: capture.type,
             uri: encodeURIComponent(capture.uri)
@@ -223,7 +229,7 @@ export default function CaptureScreen() {
   // FIXED: Proper video recording
   const startVideo = async () => {
     if (!cameraRef.current || isCapturing || (isVideoRecording && !pendingVideoStartRef.current)) return;
-    
+
     try {
       // On iOS, video recording typically needs microphone permission (unless muted).
       if (micPermission?.status !== 'granted') {
@@ -233,7 +239,7 @@ export default function CaptureScreen() {
           return;
         }
       }
-      
+
       if (!isCameraReady) {
         Alert.alert('Camera Not Ready', 'Please wait for camera to initialize');
         return;
@@ -256,7 +262,7 @@ export default function CaptureScreen() {
       pendingVideoStopRef.current = false;
       videoStateRef.current = 'starting';
       setIsVideoRecording(true);
-      
+
       // Start the timer
       const startTime = Date.now();
       videoTimerRef.current = setInterval(() => {
@@ -276,7 +282,7 @@ export default function CaptureScreen() {
         if (capture) {
           router.push({
             pathname: '/capture/details',
-            params: { 
+            params: {
               captureId: capture.id,
               type: capture.type,
               uri: encodeURIComponent(capture.uri),
@@ -303,7 +309,7 @@ export default function CaptureScreen() {
 
   const stopVideo = async () => {
     if (!cameraRef.current) return;
-    
+
     try {
       logger.debug('stopVideo called', { isVideoRecording, hasCameraRef: !!cameraRef.current });
       logger.debug('Stopping video recording...');
@@ -326,15 +332,15 @@ export default function CaptureScreen() {
         logger.debug('stopVideo: not recording; nothing to stop');
         return;
       }
-      
+
       // Clear timer
       if (videoTimerRef.current) {
         clearInterval(videoTimerRef.current);
       }
-      
+
       setIsVideoRecording(false);
       setVideoDuration(0);
-      
+
       // Stop recording
       logger.debug('calling cameraRef.current.stopRecording()');
       cameraRef.current.stopRecording();
@@ -378,11 +384,11 @@ export default function CaptureScreen() {
           logger.error('Error stopping video before audio recording:', error);
         }
       }
-      
+
       // Longer delay to ensure camera fully unmounts and releases audio session
       // React needs time to unmount CameraView, and iOS needs time to release the session
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       await startAudioRecording();
     }
   };
@@ -392,7 +398,7 @@ export default function CaptureScreen() {
     const capture = await uploadMedia(mediaType);
 
     logger.debug('Capture', capture);
-    
+
     if (capture) {
       router.push({
         pathname: '/capture/details',
@@ -453,7 +459,7 @@ export default function CaptureScreen() {
   }
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[{ flex: 1 }, animatedStyle, styles.pageStyle]}
       entering={SlideInUp}
     >
@@ -461,20 +467,20 @@ export default function CaptureScreen() {
         <GestureDetector gesture={panGesture}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.header}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.profileButton}
                 onPress={() => router.push('/calendar')}
               >
-                <Image 
-                  source={{ 
+                <Image
+                  source={{
                     uri: profile?.avatar_url || defaultAvatarUrl
                   }}
                   style={styles.profileImage}
                 />
               </TouchableOpacity>
-              
+
               <DateContainer date={convertToLocalTimezone(new Date())} />
-              
+
               <TouchableOpacity
                 style={styles.friendsButton}
                 onPress={() => router.push('/friends')}
@@ -482,7 +488,7 @@ export default function CaptureScreen() {
                 <UserPlus color="#64748B" size={18} />
               </TouchableOpacity>
             </View>
-      
+
             {/* Top Mode Selector */}
             <View style={[styles.modeSelector, { minHeight: responsive.minTouchTarget }]}>
               <TouchableOpacity
@@ -494,7 +500,7 @@ export default function CaptureScreen() {
                   Camera
                 </Text>
               </TouchableOpacity>
-      
+
               <TouchableOpacity
                 style={[styles.modeTab, selectedMode === 'microphone' && styles.activeModeTab]}
                 onPress={() => setSelectedMode('microphone')}
@@ -505,8 +511,8 @@ export default function CaptureScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-      
-            <View 
+
+            <View
               style={[
                 styles.content,
                 {
@@ -516,27 +522,27 @@ export default function CaptureScreen() {
               ]}
             >
               {/* Persistent Camera or Audio Visualizer */}
-              <Animated.View 
+              <Animated.View
                 style={[styles.mediaContainer, selectedMode === 'microphone' && styles.borderContainer]}
               >
                 {selectedMode === 'camera' ? (
                   <>
-                    <CameraView 
+                    <CameraView
                       key={`camera-view-${cameraInstance}`} // Force remount when camera gets wedged
                       mode={cameraMode} // Dynamic mode based on current action
-                      style={styles.persistentCamera} 
-                      facing={facing} 
+                      style={styles.persistentCamera}
+                      facing={facing}
                       ref={cameraRef}
                       onCameraReady={onCameraReady} // Add camera ready handler
                     />
-                    
+
                     {/* Camera status indicator */}
                     {!isCameraReady && (
                       <View style={styles.cameraLoadingOverlay}>
                         <Text style={styles.cameraLoadingText}>Initializing camera...</Text>
                       </View>
                     )}
-                    
+
                     {/* Video recording indicator */}
                     {isVideoRecording && (
                       <View style={styles.cameraOverlay}>
@@ -565,32 +571,32 @@ export default function CaptureScreen() {
                   </View>
                 )}
               </Animated.View>
-      
+
               {/* Bottom Action Buttons */}
               <View style={styles.actionContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
                     styles.uploadButton,
                     {
                       minWidth: responsive.minTouchTarget,
                       minHeight: responsive.minTouchTarget,
                     },
-                  ]} 
+                  ]}
                   onPress={handleUpload}
                   disabled={selectedMode !== 'camera'}
                 >
-                  <Upload 
-                    color={selectedMode === 'camera' ? "#94A3B8" : "#E5E7EB"}  
-                    size={20} 
+                  <Upload
+                    color={selectedMode === 'camera' ? "#94A3B8" : "#E5E7EB"}
+                    size={20}
                   />
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={[
-                    styles.captureButton, 
+                    styles.captureButton,
                     (isCapturing || isVideoRecording) && styles.recordingButton,
                     !isCameraReady && selectedMode === 'camera' && styles.disabledButton
-                  ]} 
+                  ]}
                   onPress={selectedMode === 'camera' ? handleCameraCapture : toggleRecording}
                   onLongPress={selectedMode === 'camera' ? startVideo : undefined}
                   onPressOut={
@@ -606,12 +612,12 @@ export default function CaptureScreen() {
                       isVideoRecording ? (
                         <View style={styles.stopIcon} />
                       ) : (
-                        <Circle 
-                          color="white" 
-                          stroke="black" 
-                          strokeWidth={0.3} 
-                          size={scale(75)} 
-                          fill="white" 
+                        <Circle
+                          color="white"
+                          stroke="black"
+                          strokeWidth={0.3}
+                          size={scale(75)}
+                          fill="white"
                         />
                       )
                     ) : isCapturing ? (
@@ -621,32 +627,32 @@ export default function CaptureScreen() {
                     )}
                   </View>
                 </TouchableOpacity>
-      
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={[
                     styles.flipButton,
                     {
                       minWidth: responsive.minTouchTarget,
                       minHeight: responsive.minTouchTarget,
                     },
-                  ]} 
+                  ]}
                   onPress={selectedMode === 'camera' ? toggleCameraFacing : undefined}
                   disabled={selectedMode !== 'camera' || !isCameraReady}
                 >
-                  <RotateCw 
-                    color={selectedMode === 'camera' && isCameraReady ? "#94A3B8" : "#E5E7EB"} 
-                    size={20} 
+                  <RotateCw
+                    color={selectedMode === 'camera' && isCameraReady ? "#94A3B8" : "#E5E7EB"}
+                    size={20}
                   />
                 </TouchableOpacity>
               </View>
 
               <Text style={styles.uploadHint}>
-                {selectedMode === 'camera' ? 
-                  (isCameraReady ? 'Tap for photo • Long press for video' : 'Camera initializing...') : 
+                {selectedMode === 'camera' ?
+                  (isCameraReady ? 'Tap for photo • Long press for video' : 'Camera initializing...') :
                   'Tap to record audio'
                 }
               </Text>
-      
+
               <View style={styles.vaultButtonContainer}>
                 <TouchableOpacity style={styles.vaultButton} onPress={() => router.push('/vault')}>
                   <Archive color="#8B5CF6" size={20} />
@@ -696,7 +702,7 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 16,
   },
-  
+
   friendsButton: {
     width: scale(36),
     height: scale(36),
@@ -813,7 +819,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',

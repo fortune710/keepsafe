@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useProfile } from '@/hooks/use-profile';
+import { AuthChangeEvent } from '@supabase/supabase-js';
 import { User, Session } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 
@@ -12,6 +13,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   profileLoading: boolean;
+  authEvent: AuthChangeEvent | null;
   signUp: (
     email: string,
     password: string,
@@ -19,6 +21,8 @@ interface AuthContextType {
   ) => Promise<{ error: any; data?: { userId: string } }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
+  resetPasswordForEmail: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
 }
@@ -30,7 +34,7 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { user, session, loading, signUp, signIn, signOut } = useAuth();
+  const { user, session, loading, authEvent, signUp, signIn, signOut, resetPasswordForEmail, updatePassword } = useAuth();
   const { profile, isLoading: profileLoading, fetchProfile, updateProfile, refreshProfile: refreshProfileData } = useProfile();
 
   // Fetch profile when user changes
@@ -52,9 +56,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     session,
     loading,
     profileLoading,
+    authEvent,
     signUp,
     signIn,
     signOut,
+    resetPasswordForEmail,
+    updatePassword,
     updateProfile,
     refreshProfile,
   };

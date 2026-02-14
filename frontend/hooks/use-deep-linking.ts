@@ -30,6 +30,8 @@ export function useDeepLinking(): UseDeepLinkingResult {
         router.push('/friends');
       } else if (path === '/settings') {
         router.push('/settings');
+      } else if (path === '/reset-password' || path === '/onboarding/reset-password') {
+        router.push('/onboarding/reset-password');
       }
       // Removed the else block that was forcing redirect to /capture
     } catch (error) {

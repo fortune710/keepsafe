@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingV
 import { router, useLocalSearchParams } from 'expo-router';
 import { X, Sticker, UserPlus, UserPlus2 } from 'lucide-react-native';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
+import { useSaveLock } from '@/providers/save-lock-provider';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
@@ -63,6 +64,7 @@ export default function DetailsScreen() {
 
   const { user } = useAuthContext();
   const { saveEntry, isLoading } = useEntryOperations();
+  const { isSaveLocked, lockSave } = useSaveLock();
   const { friends } = useFriends(user?.id);
   const { addOptimisticEntry, replaceOptimisticEntry } = useUserEntries();
   const { settings: privacySettings } = usePrivacySettings();
@@ -98,8 +100,8 @@ export default function DetailsScreen() {
   const [isEveryone, setIsEveryone] = useState(showEveryoneDefault);
   const [selectedFriends, setSelectedFriends] = useState<string[]>(
     showEveryoneDefault ? realFriends.map(friend => friend.id).filter(isStringId) : []
-  ); 
-  
+  );
+
 
   const { toast } = useToast();
 
@@ -109,7 +111,7 @@ export default function DetailsScreen() {
   const [pendingTextItemId, setPendingTextItemId] = useState<number | null>(null);
   const [pendingTextValue, setPendingTextValue] = useState<string>("");
   const [attachmentListStateBeforeEditor, setAttachmentListStateBeforeEditor] = useState<boolean>(false);
-  
+
 
 
   const player = useVideoPlayer(uri as string, player => {
@@ -131,9 +133,9 @@ export default function DetailsScreen() {
   const handleFriendToggle = (friendId: string) => {
     setIsPrivate(false);
     setIsEveryone(false);
-    
-    setSelectedFriends(prev => 
-      prev.includes(friendId) 
+
+    setSelectedFriends(prev =>
+      prev.includes(friendId)
         ? prev.filter(id => id !== friendId)
         : [...prev, friendId]
     );
@@ -155,10 +157,10 @@ export default function DetailsScreen() {
     }
   };
 
-  
+
 
   const { viewShotRef, items, addText, addSticker, addMusic, addLocation, removeElement, updateTextItem } = useMediaCanvas();
-  
+
   // Custom addText handler that handles pending text items
   const handleAddText = (text: string, style: { color: string; fontFamily?: string; backgroundColor?: string }) => {
     // If there's a pending text item, remove it first
@@ -170,12 +172,12 @@ export default function DetailsScreen() {
     // Add the new text item
     addText(text, style);
   };
-  
+
   // Handle attachment type selection
   const handleAttachmentSelect = (type: MediaCanvasItemType) => {
     // Save the current attachment list state before opening editor
     setAttachmentListStateBeforeEditor(showAttachmentList);
-    
+
     if (type === "text") {
       // Auto-add text with default value
       const defaultText = "Enter text";
@@ -197,7 +199,7 @@ export default function DetailsScreen() {
     }
     setShowAttachmentList(false);
   };
-  
+
   // Handle editor popover close
   const handleEditorClose = (currentText?: string) => {
     // If there's a pending text item and it hasn't been changed or is empty, remove it
@@ -212,7 +214,7 @@ export default function DetailsScreen() {
     // Restore the attachment list state to what it was before opening the editor
     setShowAttachmentList(attachmentListStateBeforeEditor);
   };
-  
+
   // Handle text changes in editor - update in real-time
   const handleTextChange = (text: string) => {
     if (pendingTextItemId !== null) {
@@ -228,7 +230,7 @@ export default function DetailsScreen() {
       }
     }
   };
-  
+
   // Handle style changes in real-time
   const handleStyleChange = (styleUpdates: { color?: string; fontFamily?: string; backgroundColor?: string }) => {
     if (pendingTextItemId !== null) {
@@ -239,8 +241,8 @@ export default function DetailsScreen() {
           ...styleUpdates,
         };
         updateTextItem(
-          pendingTextItemId, 
-          currentItem.text ?? pendingTextValue, 
+          pendingTextItemId,
+          currentItem.text ?? pendingTextValue,
           updatedStyle as { color: string; fontFamily?: string; backgroundColor?: string }
         );
       }
@@ -248,7 +250,7 @@ export default function DetailsScreen() {
   };
 
 
-  
+
 
   const handleSave = async () => {
     if (!capture || !user || !hasSelectedSharing()) {
@@ -263,7 +265,7 @@ export default function DetailsScreen() {
 
     // Generate a proper UUID for optimistic entry
     const tempId = Crypto.randomUUID();
-    
+
     try {
 
       const entryAttachments: RenderedMediaCanvasItem[] = items.map((item) => {
@@ -274,7 +276,7 @@ export default function DetailsScreen() {
         }
       })
       const showLocation = privacySettings[PrivacySettings.LOCATION_SHARE] ?? false;
-      const locationTag = showLocation && location?.city 
+      const locationTag = showLocation && location?.city
         ? [location.city, location.region ?? location.country].filter(Boolean).join(', ')
         : null;
 
@@ -332,7 +334,7 @@ export default function DetailsScreen() {
         } catch (error) {
           if (__DEV__) console.warn('Analytics capture failed:', error);
         }
-        
+
         // Create notification message based on sharing options
         let notificationBody = '';
         if (isPrivate) {
@@ -344,16 +346,19 @@ export default function DetailsScreen() {
         } else {
           notificationBody = 'Entry saved successfully';
         }
-        
+
         await LocalNotificationService.sendNotification({
           title: 'New Diary Entry Created',
           body: notificationBody,
           sound: true,
         });
-        
-        setTimeout(() => {
-          router.push('/capture');
-        }, 200);
+
+        lockSave();
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/capture');
+        }
       } else {
         // Remove optimistic entry on failure
         replaceOptimisticEntry(tempId);
@@ -371,6 +376,7 @@ export default function DetailsScreen() {
 
   const getSaveButtonText = () => {
     if (isLoading) return 'Saving...';
+    if (isSaveLocked) return 'Entry Saved';
     if (!hasSelectedSharing()) return 'Select Sharing Option';
     if (isPrivate) return 'Save Privately';
     if (isEveryone) return 'Share with Everyone';
@@ -381,7 +387,7 @@ export default function DetailsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => router.back()}
         >
@@ -390,7 +396,7 @@ export default function DetailsScreen() {
 
         <Text style={styles.title}>Add Details</Text>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => setShowAttachmentList(!showAttachmentList)}
         >
@@ -405,11 +411,11 @@ export default function DetailsScreen() {
       </View>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Animated.View 
+        <Animated.View
           style={[styles.mediaContainer, capture?.type === 'audio' && styles.borderContainer]}
         >
           {capture?.type === 'photo' && capture.uri ? (
-            <MediaCanvas 
+            <MediaCanvas
               uri={capture.uri}
               type='photo'
               ref={viewShotRef}
@@ -417,28 +423,28 @@ export default function DetailsScreen() {
               transformsRef={transformsRef}
               removeElement={removeElement}
             />
-          ) : 
-          capture?.type === 'video' ? (
-            <Pressable onPress={() => videPlaying ? player.pause() : player.play()}>
-              <VideoView 
-                style={styles.mediaPreview} 
-                player={player} 
-                contentFit='cover'
-              />
-            </Pressable>
           ) :
-          capture?.type === 'audio' ? (
-            <AudioEntry entry={capture}/>
-          ) : null}
+            capture?.type === 'video' ? (
+              <Pressable onPress={() => videPlaying ? player.pause() : player.play()}>
+                <VideoView
+                  style={styles.mediaPreview}
+                  player={player}
+                  contentFit='cover'
+                />
+              </Pressable>
+            ) :
+              capture?.type === 'audio' ? (
+                <AudioEntry entry={capture} />
+              ) : null}
         </Animated.View>
 
         <View style={styles.form}>
           {showAttachmentList ? (
-            <EntryAttachmentList 
+            <EntryAttachmentList
               onSelectAttachment={handleAttachmentSelect}
             />
           ) : (
-            <EntryShareList 
+            <EntryShareList
               isPrivate={isPrivate}
               isEveryone={isEveryone}
               selectedFriends={selectedFriends}
@@ -449,13 +455,13 @@ export default function DetailsScreen() {
             />
           )}
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.saveButton, 
-              (isLoading || !hasSelectedSharing()) && styles.saveButtonDisabled
-            ]} 
+              styles.saveButton,
+              (isLoading || isSaveLocked || !hasSelectedSharing()) && styles.saveButtonDisabled
+            ]}
             onPress={handleSave}
-            disabled={isLoading || !hasSelectedSharing()}
+            disabled={isLoading || isSaveLocked || !hasSelectedSharing()}
           >
             <Text style={styles.saveButtonText}>{getSaveButtonText()}</Text>
           </TouchableOpacity>
@@ -492,6 +498,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
   },
@@ -522,7 +529,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
 
-  
+
   audioWave: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -535,7 +542,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 1,
     borderRadius: 2,
   },
-  
+
   form: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -556,6 +563,7 @@ const styles = StyleSheet.create({
   },
   wordCount: {
     fontSize: 12,
+    fontFamily: 'Jost-Regular',
     color: '#94A3B8',
     textAlign: 'right',
     marginTop: -16,
@@ -583,28 +591,32 @@ const styles = StyleSheet.create({
   tagButtonText: {
     color: '#64748B',
     marginLeft: 8,
+    fontFamily: 'Outfit-Medium',
     fontWeight: '500',
   },
   locationError: {
     fontSize: 12,
+    fontFamily: 'Jost-Regular',
     color: '#EF4444',
     marginTop: 4,
     marginLeft: 8,
   },
-  
+
   privacyTitle: {
     fontSize: 18,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 16,
   },
   requiredText: {
     fontSize: 14,
+    fontFamily: 'Jost-Regular',
     color: '#EF4444',
     marginBottom: 16,
     fontStyle: 'italic',
   },
-  
+
   saveButton: {
     backgroundColor: '#8B5CF6',
     borderRadius: 12,
@@ -618,6 +630,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: 'white',
     fontSize: 18,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '600',
   },
 });

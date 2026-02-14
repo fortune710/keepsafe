@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import Animated, { 
+import Animated, {
   SlideInUp,
   SlideInDown
 } from 'react-native-reanimated';
@@ -17,7 +17,7 @@ import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
 import { useResponsive, useTabletLayout } from '@/hooks/use-responsive';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Sparkles } from 'lucide-react-native';
 import { Colors } from '@/lib/constants';
 import NewEntriesIndicator from '@/components/new-entries-indicator';
 import { useTimezone } from '@/hooks/use-timezone';
@@ -31,7 +31,19 @@ const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 export default function VaultScreen() {
   const responsive = useResponsive();
   const tabletLayout = useTabletLayout();
-  const { entries, entriesByDate, isLoading, error, refetch, retryEntry, unseenEntryIds, markEntriesAsSeen } = useUserEntries();
+  const {
+    entries,
+    entriesByDate,
+    isLoading,
+    isFetchingNextPage,
+    error,
+    refetch,
+    retryEntry,
+    unseenEntryIds,
+    markEntriesAsSeen,
+    loadMore,
+    hasMore
+  } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
   const { convertToLocalTimezone } = useTimezone();
 
@@ -45,7 +57,7 @@ export default function VaultScreen() {
 
   const handleScroll = (event: any) => {
     if (!event?.nativeEvent?.contentOffset) return;
-    
+
     const currentOffset = event.nativeEvent.contentOffset.y;
 
     if (currentOffset > prevOffset.current && isHeaderVisible) {
@@ -111,7 +123,7 @@ export default function VaultScreen() {
   // Handler for when viewable items change
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
     const visibleEntryIds: string[] = [];
-    
+
     viewableItems.forEach(item => {
       const dateKey = item.item;
       const dateEntries = entriesByDate?.[dateKey] || [];
@@ -121,7 +133,7 @@ export default function VaultScreen() {
         }
       });
     });
-    
+
     if (visibleEntryIds.length > 0) {
       markEntriesAsSeen(visibleEntryIds);
     }
@@ -160,7 +172,7 @@ export default function VaultScreen() {
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No entries yet</Text>
           <Text style={styles.emptySubtext}>Start capturing moments to see them here</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.captureButton}
             onPress={() => router.back()}
           >
@@ -172,8 +184,17 @@ export default function VaultScreen() {
 
     return (
       <EntryPage>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <ChevronLeft color="#64748B" size={24} />
+        </Pressable>
+        <Pressable
+          style={styles.sparklesButton}
+          onPress={() => router.push('/search')}
+        >
+          <Sparkles color="#64748B" size={24} />
         </Pressable>
         <FlashList
           ref={flashListRef}
@@ -192,27 +213,36 @@ export default function VaultScreen() {
           scrollEnabled={!isMusicPlayerVisible}
           viewabilityConfig={viewabilityConfig}
           onViewableItemsChanged={onViewableItemsChanged}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={() => (
+            isFetchingNextPage ? (
+              <View style={styles.footerLoading}>
+                <ActivityIndicator size="small" color="#8B5CF6" />
+              </View>
+            ) : null
+          )}
           renderItem={({ item }) => {
             const entries = entriesByDate?.[item];
             if (!entries || entries.length === 0) {
               return null;
             }
-            
+
             // Convert date string to Date object, handling UTC conversion if needed
             // item is a date string in YYYY-MM-DD format from groupBy
             // We need to create a Date object for that date in local timezone
             const dateString = item; // YYYY-MM-DD format
             const [year, month, day] = dateString.split('-').map(Number);
             const entriesDate = new Date(year, month - 1, day); // month is 0-indexed
-            
+
             if (isNaN(entriesDate.getTime())) {
               return null;
             }
-            
+
             return (
               <View>
                 <View style={styles.listHeader}>
-                  <DateContainer date={entriesDate}/>
+                  <DateContainer date={entriesDate} />
                 </View>
                 {
                   entries.map((entry) => {
@@ -240,11 +270,7 @@ export default function VaultScreen() {
   };
 
   return (
-    <Animated.View 
-      entering={SlideInDown.duration(400).springify().damping(20).stiffness(90)} 
-      exiting={SlideInUp.duration(400).springify().damping(20).stiffness(90)}
-      style={styles.container}
-    >
+    <Animated.View style={styles.container}>
       <>
 
         <View style={styles.content}>
@@ -313,6 +339,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: verticalScale(50),
     left: scale(20),
+    backgroundColor: Colors.white,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: 100,
+    zIndex: 9999,
+  },
+  sparklesButton: {
+    padding: scale(10),
+    position: 'absolute',
+    top: verticalScale(50),
+    right: scale(20),
     backgroundColor: Colors.white,
     borderColor: Colors.border,
     borderWidth: 1,
@@ -568,5 +605,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94A3B8',
     fontWeight: '500',
+  },
+  footerLoading: {
+    paddingVertical: verticalScale(20),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

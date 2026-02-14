@@ -1,46 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+import { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { Platform } from 'react-native';
 import { TABLES } from '@/constants/supabase';
 import { posthog } from '@/constants/posthog';
+import { logger } from '@/lib/logger';
+import { AccountDisabledError, EmailNotVerifiedError, InvalidCredentialsError, TooManyAttemptsError } from '@/lib/errors';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
-// Custom error types for specific auth scenarios
-export class EmailNotVerifiedError extends Error {
-  constructor() {
-    super('Please verify your email address before signing in. Check your inbox for a verification link.');
-    this.name = 'EmailNotVerifiedError';
-  }
-}
-
-export class AccountDisabledError extends Error {
-  constructor() {
-    super('Your account has been disabled. Please contact support for assistance.');
-    this.name = 'AccountDisabledError';
-  }
-}
-
-export class TooManyAttemptsError extends Error {
-  constructor() {
-    super('Too many sign-in attempts. Please wait a few minutes before trying again.');
-    this.name = 'TooManyAttemptsError';
-  }
-}
-
-export class InvalidCredentialsError extends Error {
-  constructor() {
-    super('Invalid email or password. Please check your credentials and try again.');
-    this.name = 'InvalidCredentialsError';
-  }
-}
 
 interface UseAuthResult {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  authEvent: AuthChangeEvent | null;
   signUp: (
     email: string,
     password: string,
@@ -48,45 +23,45 @@ interface UseAuthResult {
   ) => Promise<{ error: Error | null; data?: { userId: string } }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<{ error: Error | null }>;
+  resetPasswordForEmail: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
+/**
+ * Manages authentication state and provides sign-in, sign-up, sign-out,
+ * password reset, and password update flows via Supabase Auth.
+*/
 export function useAuth(): UseAuthResult {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  
+  const [authEvent, setAuthEvent] = useState<AuthChangeEvent | null>(null);
+
   // Use ref to avoid circular dependency with updateProfile
   const updateProfileRef = useRef<((updates: Partial<Profile>) => Promise<{ error: Error | null }>) | null>(null);
 
   useEffect(() => {
-   // Platform-specific initialization
-   const initializeAuth = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        // Web-specific initialization
+    // Platform-specific initialization
+    const initializeAuth = async () => {
+      try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
-      } else {
-        // Native initialization
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        setSession(initialSession);
-        setUser(initialSession?.user ?? null);
+      } catch (error) {
+        // Don't crash the app, just log the error
+        logger.error('Auth initialization error:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Auth initialization error:', error);
-      // Don't crash the app, just log the error
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  initializeAuth();
+    initializeAuth();
 
     // Add this auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session);
+        logger.info('Auth state changed:', { event, session });
+        setAuthEvent(event);
         if (session) {
           posthog.identify(session.user.id, {
             email: session.user.email ?? '',
@@ -102,8 +77,8 @@ export function useAuth(): UseAuthResult {
   }, []);
 
   const signUp = useCallback(async (
-    email: string, 
-    password: string, 
+    email: string,
+    password: string,
     userData?: Partial<Profile>
   ) => {
     setLoading(true);
@@ -119,7 +94,7 @@ export function useAuth(): UseAuthResult {
 
       // Wait for user to be authenticated and session to be established
       if (!data.user) return { error: new Error('User not found') };
-      
+
       const userId = data.user.id;
 
       // Create profile manually after successful signup.
@@ -140,11 +115,11 @@ export function useAuth(): UseAuthResult {
           .upsert(profileData as never, { onConflict: 'id' });
 
         if (profileError) {
-          console.error('Error creating profile:', profileError);
+          logger.error('Error creating profile:', profileError);
           // Don't return error here as signup was successful
         }
       } catch (profileError) {
-        console.error('Error creating profile:', profileError);
+        logger.error('Error creating profile:', profileError);
         // Don't return error here as signup was successful
       }
 
@@ -201,10 +176,10 @@ export function useAuth(): UseAuthResult {
 
       return { error: null };
     } catch (error) {
-      if (error instanceof EmailNotVerifiedError || 
-          error instanceof AccountDisabledError || 
-          error instanceof TooManyAttemptsError || 
-          error instanceof InvalidCredentialsError) {
+      if (error instanceof EmailNotVerifiedError ||
+        error instanceof AccountDisabledError ||
+        error instanceof TooManyAttemptsError ||
+        error instanceof InvalidCredentialsError) {
         return { error };
       }
       return { error: error as Error };
@@ -217,7 +192,7 @@ export function useAuth(): UseAuthResult {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
-      
+
       if (!error) {
         setUser(null);
         setSession(null);
@@ -231,12 +206,52 @@ export function useAuth(): UseAuthResult {
     }
   }, []);
 
+  const resetPasswordForEmail = useCallback(async (email: string) => {
+    try {
+      // Build redirect URL based on platform
+      const redirectTo = Platform.OS === 'web'
+        ? `${window.location.origin}/reset-password`
+        : `https://keepsafe.fortunealebiosu.dev/reset-password`
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      });
+
+      if (error) {
+        return { error: new Error(error.message) };
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        return { error: new Error(error.message) };
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }, []);
+
   return {
     user,
     session,
     loading,
+    authEvent,
     signUp,
     signIn,
     signOut,
+    resetPasswordForEmail,
+    updatePassword,
   };
 }

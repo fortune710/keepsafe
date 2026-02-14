@@ -317,7 +317,7 @@ def test_get_push_tokens_cache_miss(cache_service, mock_redis_client, mock_supab
     mock_response = MagicMock()
     mock_response.data = tokens_data
     mock_table = MagicMock()
-    mock_table.select.return_value.eq.return_value.execute.return_value = mock_response
+    mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_response
     mock_supabase_client.table.return_value = mock_table
     
     # Act
@@ -343,7 +343,7 @@ def test_get_push_tokens_empty_list_cached(cache_service, mock_redis_client, moc
     mock_response = MagicMock()
     mock_response.data = []
     mock_table = MagicMock()
-    mock_table.select.return_value.eq.return_value.execute.return_value = mock_response
+    mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_response
     mock_supabase_client.table.return_value = mock_table
     
     # Act
@@ -400,7 +400,7 @@ def test_get_push_tokens_batch_partial_cache(cache_service, mock_redis_client, m
         {"user_id": "user-2", "token": "token3"}
     ]
     mock_table = MagicMock()
-    mock_table.select.return_value.in_.return_value.execute.return_value = mock_response
+    mock_table.select.return_value.in_.return_value.eq.return_value.execute.return_value = mock_response
     mock_supabase_client.table.return_value = mock_table
     
     # Act

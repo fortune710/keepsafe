@@ -10,7 +10,7 @@ export default function CaptureLayout() {
   const { profile } = useAuthContext();
   const { expoPushToken, error } = usePushNotifications(profile?.id);
 
-  
+
   useEffect(() => {
     if (expoPushToken && profile?.id) {
       console.log('Push token registered:', expoPushToken);
@@ -23,7 +23,11 @@ export default function CaptureLayout() {
   }, [expoPushToken, error, profile?.id]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{
+      headerShown: false,
+      animation: 'fade_from_bottom',
+      animationDuration: 350,
+    }}>
       <Stack.Screen name="details" />
     </Stack>
   );
