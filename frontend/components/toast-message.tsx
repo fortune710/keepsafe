@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Animated, { SlideInDown, SlideOutUp, runOnJS } from 'react-native-reanimated';
+import Animated, { SlideInDown, SlideInUp, SlideOutUp, runOnJS } from 'react-native-reanimated';
+import { scale } from 'react-native-size-matters';
 
 interface ToastMessageProps {
   message: string;
@@ -13,8 +14,8 @@ export default function ToastMessage({ message, type, visible, onHide }: ToastMe
   if (!visible) return null;
 
   return (
-    <Animated.View 
-      entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)} 
+    <Animated.View
+      entering={SlideInUp.duration(300).springify().damping(20).stiffness(90)}
       exiting={SlideOutUp.duration(200).withCallback(() => {
         if (onHide) {
           runOnJS(onHide)();
@@ -47,12 +48,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    paddingHorizontal: 20,
+    paddingHorizontal: scale(16),
   },
   toastContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 20,
+    paddingHorizontal: scale(20),
+    paddingVertical: scale(16),
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -70,6 +71,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+    fontFamily: 'Outfit-SemiBold'
   },
   successText: {
     color: 'white',
