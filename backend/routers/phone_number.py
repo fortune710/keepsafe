@@ -173,7 +173,11 @@ async def resend_phone_otp(
     otp_hash = _sha256_hex(otp)
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    await _send_sms_otp(phone_number, otp)
+
     try:
+        phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
+        logger.info("Upserting phone_number_updates row for resend", extra={"user_id": user_id, "phone_number": phone_number_masked, "otp_hash": otp_hash, "created_at": now_iso})
         supabase.table("phone_number_updates").upsert(
             {
                 "user_id": user_id,
@@ -187,7 +191,6 @@ async def resend_phone_otp(
         logger.exception("Failed to upsert phone_number_updates row for resend")
         raise HTTPException(status_code=500, detail="Failed to recreate phone verification record") from e
 
-    await _send_sms_otp(phone_number, otp)
     return {"message": "OTP resent"}
 
 
