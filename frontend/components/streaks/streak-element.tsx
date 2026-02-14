@@ -14,20 +14,20 @@ export default function StreakElement({ isLoading, currentStreak, maxStreak }: S
         <View style={styles.streakContainerWrapper}>
             <View style={styles.streakContainer}>
                 {isLoading ? (
-                <ActivityIndicator size="small" color="#8B5CF6" />
+                    <ActivityIndicator size="small" color="#8B5CF6" />
                 ) : (
                     <View style={styles.streakStats}>
-                    <View style={styles.streakStat}>
-                        <Star color="#8B5CF6" size={20} />
-                        <Text style={styles.streakNumber}>{currentStreak}</Text>
-                        <Text style={styles.streakLabel}>Current</Text>
-                    </View>
-                    <View style={styles.streakDivider} />
-                    <View style={styles.streakStat}>
-                        <Star color="#8B5CF6" size={20} />
-                        <Text style={styles.streakNumber}>{maxStreak}</Text>
-                        <Text style={styles.streakLabel}>Best</Text>
-                    </View>
+                        <View style={styles.streakStat}>
+                            <Star color="#8B5CF6" size={20} />
+                            <Text style={styles.streakNumber}>{currentStreak}</Text>
+                            <Text style={styles.streakLabel}>Current</Text>
+                        </View>
+                        <View style={styles.streakDivider} />
+                        <View style={styles.streakStat}>
+                            <Star color="#8B5CF6" size={20} />
+                            <Text style={styles.streakNumber}>{maxStreak}</Text>
+                            <Text style={styles.streakLabel}>Best</Text>
+                        </View>
                     </View>
                 )}
             </View>
@@ -36,9 +36,9 @@ export default function StreakElement({ isLoading, currentStreak, maxStreak }: S
 }
 
 const styles = StyleSheet.create({
-    streakContainerWrapper: { 
-        justifyContent: 'center', 
-        flexDirection: 'row' 
+    streakContainerWrapper: {
+        justifyContent: 'center',
+        flexDirection: 'row'
     },
     streakContainer: {
         backgroundColor: 'white',
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     },
     streakTitle: {
         fontSize: moderateScale(12),
-        fontWeight: '600',
+        fontFamily: 'Outfit-SemiBold',
         color: '#1E293B',
         textAlign: 'center',
         marginRight: 12
@@ -74,14 +74,14 @@ const styles = StyleSheet.create({
     },
     streakNumber: {
         fontSize: moderateScale(16),
-        fontWeight: '500',
+        fontFamily: 'Outfit-Medium',
         color: '#8B5CF6',
         marginLeft: 2
     },
     streakLabel: {
         fontSize: moderateScale(16),
         color: '#64748B',
-        fontWeight: '400',
+        fontFamily: 'Outfit-Regular',
         marginLeft: 8
     },
     streakDivider: {
