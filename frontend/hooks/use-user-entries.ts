@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES } from '@/constants/supabase';
 import { Database } from '@/types/database';
@@ -18,9 +18,13 @@ interface UseUserEntriesResult {
   entries: EntryWithProfile[];
   entriesByDate: Record<string, EntryWithProfile[]>;
   isLoading: boolean;
+  isFetchingNextPage: boolean;
   error: Error | null;
   refetch: () => void;
+  loadMore: () => void;
   hasMore: boolean;
+  nextCursor: string | null;
+  pageSize: number;
   addOptimisticEntry: (entry: EntryWithProfile) => void;
   replaceOptimisticEntry: (tempId: string, realEntry?: EntryWithProfile) => void;
   retryEntry: (entryId: string) => Promise<void>;
@@ -68,7 +72,7 @@ async function getEntryOwnerProfile(
     const friendship = friends.find(
       (f) => f.user_id === ownerUserId || f.friend_id === ownerUserId
     );
-    
+
     if (!friendship?.friend_profile || friendship.friend_profile.id !== ownerUserId) {
       return await fetchFromSupabase();
     }
@@ -87,10 +91,11 @@ async function getEntryOwnerProfile(
   }
 }
 
+const DEFAULT_PAGE_SIZE = 20;
+
 export function useUserEntries(): UseUserEntriesResult {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
-  const [hasMore, setHasMore] = useState(true);
   const [optimisticEntries, setOptimisticEntries] = useState<EntryWithProfile[]>([]);
   const [unseenEntryIds, setUnseenEntryIds] = useState<Set<string>>(new Set());
   const wasOfflineRef = useRef(false);
@@ -99,23 +104,29 @@ export function useUserEntries(): UseUserEntriesResult {
   const reconnectAttemptsRef = useRef(0);
 
   const {
-    data: entries = [],
+    data,
     isLoading,
+    isFetchingNextPage,
     error,
     refetch,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
     queryKey: ['user-entries', user?.id],
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       if (!user) return [];
 
-      // Try to get cached entries first
-      const cachedEntries = await deviceStorage.getEntries(user.id);
-      if (cachedEntries && cachedEntries.length > MIN_ENTRIES_TO_CACHE) {
-        return cachedEntries;
+      // Try to get cached entries first for initial load
+      if (!pageParam) {
+        const cachedEntries = await deviceStorage.getEntries(user.id);
+        if (cachedEntries && cachedEntries.length > MIN_ENTRIES_TO_CACHE) {
+          // If we have cached data, we use it. 
+          // Note: This might overlap with first page fetch but gives instant UI.
+          return cachedEntries;
+        }
       }
 
-      // First, get entries that the user created OR that are shared with everyone
-      const { data: entries, error: userEntriesError }: { data: EntryWithProfile[] | null, error: any } = await supabase
+      let query = supabase
         .from(TABLES.ENTRIES)
         .select(`
           *,
@@ -125,23 +136,45 @@ export function useUserEntries(): UseUserEntriesResult {
         `)
         .contains('shared_with', [user.id])
         .order('created_at', { ascending: false })
-        //.limit(20);
+        .limit(DEFAULT_PAGE_SIZE);
+
+      if (pageParam) {
+        query = query.lt('created_at', pageParam);
+      }
+
+      const { data: entries, error: userEntriesError }: { data: EntryWithProfile[] | null, error: any } = await query;
 
       if (userEntriesError || !entries) {
         throw new Error(userEntriesError.message);
       }
 
-      
-      // Cache the entries data
-      if (entries?.length > MIN_ENTRIES_TO_CACHE) {
+      // Cache the first page data
+      if (!pageParam && entries?.length > 0) {
         await deviceStorage.setEntries(user.id, entries);
       }
 
       return entries;
     },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage: EntryWithProfile[]) => {
+      if (!lastPage || lastPage.length < DEFAULT_PAGE_SIZE) {
+        return undefined;
+      }
+      return lastPage[lastPage.length - 1].created_at;
+    },
     enabled: !!user,
-    staleTime: 1000 * 60 * 10, // 5 minutes
+    staleTime: 1000 * 60 * 10, // 10 minutes
   });
+
+  const entries = data?.pages.flat() || [];
+  const nextCursor = data?.pages[data.pages.length - 1]?.slice(-1)[0]?.created_at || null;
+  const hasMore = !!hasNextPage;
+
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Subscribe to device storage updates to keep UI in sync without manual refresh
   useEffect(() => {
@@ -168,7 +201,7 @@ export function useUserEntries(): UseUserEntriesResult {
     try {
       // Fetch entries created in the last 10 minutes
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      
+
       const { data: recentEntries, error: fetchError } = await supabase
         .from(TABLES.ENTRIES)
         .select(`*, profile:${TABLES.PROFILES}(*)`)
@@ -183,16 +216,16 @@ export function useUserEntries(): UseUserEntriesResult {
 
       const currentEntries = queryClient.getQueryData<EntryWithProfile[]>(['user-entries', userId]) || [];
       const currentEntryIds = new Set(currentEntries.map(e => e.id));
-      
+
       // Find entries that were missed
       const missedEntries = recentEntries.filter(
-        (entry: EntryWithProfile) => 
+        (entry: EntryWithProfile) =>
           !currentEntryIds.has(entry.id) && entry.user_id !== userId
       );
 
       if (missedEntries.length > 0) {
         logger.info(`Found ${missedEntries.length} missed entries after reconnection`);
-        
+
         // Merge missed entries with existing entries and sort by created_at descending (newest first)
         const allEntries = [...missedEntries, ...currentEntries];
         const sortedEntries = allEntries.sort((a, b) => {
@@ -262,14 +295,14 @@ export function useUserEntries(): UseUserEntriesResult {
         async (payload) => {
           try {
             const newEntryData = payload.new as any;
-            
+
             // Skip own entries
             if (newEntryData.user_id === userId) return;
 
             // Filter: Check if entry is shared with this user
             const sharedWith = newEntryData.shared_with || [];
             const sharedWithEveryone = newEntryData.shared_with_everyone || false;
-            
+
             // Skip if not shared with this user
             if (!sharedWithEveryone && !sharedWith.includes(userId)) {
               return;
@@ -277,7 +310,7 @@ export function useUserEntries(): UseUserEntriesResult {
 
             // Get the entry owner's profile using our helper function
             const ownerProfile = await getEntryOwnerProfile(newEntryData.user_id, userId);
-            
+
             if (!ownerProfile) {
               logger.error('Could not fetch entry owner profile');
               return;
@@ -329,11 +362,11 @@ export function useUserEntries(): UseUserEntriesResult {
       )
       .subscribe((status) => {
         logger.info(`Realtime subscription status: ${status}`);
-        
+
         if (status === 'SUBSCRIBED') {
           logger.info('Successfully subscribed to shared entries');
           reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful subscription
-          
+
           // Handle offline reconnection: fetch missed entries
           if (wasOfflineRef.current) {
             logger.info('Fetching missed entries due to offline reconnection');
@@ -416,9 +449,9 @@ export function useUserEntries(): UseUserEntriesResult {
       ...entry,
       status: 'pending' as const,
     };
-    
+
     setOptimisticEntries(prev => [optimisticEntry, ...prev]);
-    
+
     // Also add to device storage
     if (user) {
       deviceStorage.addEntry(user.id, optimisticEntry);
@@ -456,7 +489,7 @@ export function useUserEntries(): UseUserEntriesResult {
       // Get the entry data from device storage
       const entries = await deviceStorage.getEntries(user.id);
       const entry = entries?.find(e => e.id === entryId);
-      
+
       if (!entry) {
         console.error('Entry not found for retry:', entryId);
         return;
@@ -498,20 +531,20 @@ export function useUserEntries(): UseUserEntriesResult {
 
       // Retry the processing
       await retryEntryProcessing(retryData);
-      
+
     } catch (error) {
       console.error('Failed to retry entry:', error);
     }
   }, [user]);
-  
+
   // Get timezone utilities for date grouping
   const { getLocalDateString, isUTC } = useTimezone();
-  
+
   // Combine real entries with optimistic entries
   const allEntries = [...optimisticEntries, ...(entries || [])];
 
   // Ensure entriesByDate is always an object, never undefined
-  const entriesByDate = allEntries.length > 0 
+  const entriesByDate = allEntries.length > 0
     ? groupBy(allEntries, "created_at", { getLocalDateString, isUTC })
     : {};
 
@@ -519,9 +552,13 @@ export function useUserEntries(): UseUserEntriesResult {
     entries: allEntries,
     entriesByDate,
     isLoading,
+    isFetchingNextPage,
     error,
     refetch,
+    loadMore,
     hasMore,
+    nextCursor,
+    pageSize: DEFAULT_PAGE_SIZE,
     addOptimisticEntry,
     replaceOptimisticEntry,
     retryEntry,

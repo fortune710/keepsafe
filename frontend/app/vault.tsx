@@ -31,7 +31,19 @@ const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 export default function VaultScreen() {
   const responsive = useResponsive();
   const tabletLayout = useTabletLayout();
-  const { entries, entriesByDate, isLoading, error, refetch, retryEntry, unseenEntryIds, markEntriesAsSeen } = useUserEntries();
+  const {
+    entries,
+    entriesByDate,
+    isLoading,
+    isFetchingNextPage,
+    error,
+    refetch,
+    retryEntry,
+    unseenEntryIds,
+    markEntriesAsSeen,
+    loadMore,
+    hasMore
+  } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, showReactions, showComments, hidePopup } = usePopupParams();
   const { convertToLocalTimezone } = useTimezone();
 
@@ -201,6 +213,15 @@ export default function VaultScreen() {
           scrollEnabled={!isMusicPlayerVisible}
           viewabilityConfig={viewabilityConfig}
           onViewableItemsChanged={onViewableItemsChanged}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={() => (
+            isFetchingNextPage ? (
+              <View style={styles.footerLoading}>
+                <ActivityIndicator size="small" color="#8B5CF6" />
+              </View>
+            ) : null
+          )}
           renderItem={({ item }) => {
             const entries = entriesByDate?.[item];
             if (!entries || entries.length === 0) {
@@ -584,5 +605,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94A3B8',
     fontWeight: '500',
+  },
+  footerLoading: {
+    paddingVertical: verticalScale(20),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
