@@ -218,7 +218,14 @@ export default function SettingsScreen() {
               }
               
               // 2. Sign out (Supabase auth session)
-              await supabase.auth.signOut();
+              // Attempt sign out in its own try/catch so failure doesn't block navigation
+              try {
+                await supabase.auth.signOut();
+              } catch (signOutError: any) {
+                logger.error('Error signing out after successful account deletion', signOutError);
+                // Continue to success flow despite sign out error
+              }
+
               Alert.alert(
                 'Account Deleted',
                 'Account deleted successfully, we hate to see you go',
