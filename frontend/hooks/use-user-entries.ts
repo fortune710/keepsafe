@@ -144,8 +144,12 @@ export function useUserEntries(): UseUserEntriesResult {
 
       const { data: entries, error: userEntriesError }: { data: EntryWithProfile[] | null, error: any } = await query;
 
-      if (userEntriesError || !entries) {
-        throw new Error(userEntriesError.message);
+      if (userEntriesError) {
+        throw new Error(userEntriesError.message || 'Error fetching entries');
+      }
+
+      if (entries === null) {
+        throw new Error('No entries returned from Supabase');
       }
 
       // Cache the first page data
