@@ -27,6 +27,10 @@ interface UseAuthResult {
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
+/**
+ * Manages authentication state and provides sign-in, sign-up, sign-out,
+ * password reset, and password update flows via Supabase Auth.
+*/
 export function useAuth(): UseAuthResult {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
