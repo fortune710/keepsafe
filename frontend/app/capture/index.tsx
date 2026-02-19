@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ScrollView, Image } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import Animated, {
   useSharedValue,
@@ -53,13 +53,16 @@ export default function CaptureScreen() {
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
   const { profile, user } = useAuthContext();
-  const { unlockSave } = useSaveLock();
+  const { unlockSave, isSaveLocked } = useSaveLock();
   const [showPhoneSheet, setShowPhoneSheet] = useState(false);
 
   // Release save lock when capture screen mounts (after navigating back from details)
-  useEffect(() => {
-    unlockSave();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      unlockSave();
+      logger.info('isSaveLocked', isSaveLocked);
+    }, [])
+  );
 
   const {
     isCapturing,
