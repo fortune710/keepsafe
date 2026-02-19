@@ -4,13 +4,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { useAuthContext } from '@/providers/auth-provider';
-import { EmailNotVerifiedError, AccountDisabledError, TooManyAttemptsError, InvalidCredentialsError } from '@/hooks/use-auth';
+import { EmailNotVerifiedError, AccountDisabledError, TooManyAttemptsError, InvalidCredentialsError } from '@/lib/errors';
 import { useToast } from '@/hooks/use-toast';
 import { Colors } from '@/lib/constants';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { Image } from 'expo-image';
 import { supabase } from '@/lib/supabase';
 import { getDefaultAvatarUrl } from '@/lib/utils';
+import { TABLES } from '@/constants/supabase';
 
 type SignUpStep = 'email' | 'password' | 'name' | 'username' | 'review';
 
@@ -70,7 +71,7 @@ export default function AuthScreen() {
     try {
       // Check if email exists in profiles
       const { data, error } = await supabase
-        .from('profiles')
+        .from(TABLES.PROFILES)
         .select('id')
         .eq('email', emailToCheck.toLowerCase().trim())
         .single();
@@ -91,7 +92,7 @@ export default function AuthScreen() {
     setLoading(true);
 
     try {
-      const { error, data } = await signUp(email.toLowerCase().trim(), password, {
+      const { error } = await signUp(email.toLowerCase().trim(), password, {
         full_name: fullName.trim(),
         username: username.trim(),
         avatar_url: getDefaultAvatarUrl(fullName.trim())
@@ -102,17 +103,7 @@ export default function AuthScreen() {
         return;
       }
 
-      if (!data?.userId) {
-        router.replace('/capture');
-        return;
-      }
-
-      return router.push({
-        pathname: '/onboarding/invite',
-        params: {
-          user_id: data.userId,
-        },
-      });
+      return router.replace('/onboarding/sign-up-success');
     } catch (error) {
       showToast('An unexpected error occurred', 'error');
     } finally {
