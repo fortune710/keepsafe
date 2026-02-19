@@ -34,8 +34,6 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
     
     const { location: currentLocation, isLoading: isLoadingCurrent, placesInState, isLoadingPlaces } = useDeviceLocation();
 
-    console.log('currentLocation', currentLocation);
-
     const coordinates =
         currentLocation?.latitude != null && currentLocation?.longitude != null
             ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
@@ -107,8 +105,6 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
         if (currentLocation) return "Places Nearby";
         return "Places Nearby";
     };
-
-    console.log('allResults', allResults);
 
     return (
         <View style={styles.container}>
@@ -209,6 +205,7 @@ const styles = StyleSheet.create({
     },
     resultsContainer: {
         //flex: 1,
+        marginTop: verticalScale(10)
     },
     list: {
         // Give the VirtualizedList a measurable viewport inside the popover
@@ -219,6 +216,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 14,
+        fontFamily: "Outfit-SemiBold",
         fontWeight: "600",
         color: "#64748B",
         marginVertical: 12,
@@ -226,8 +224,8 @@ const styles = StyleSheet.create({
     locationItem: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: verticalScale(16),
-        paddingHorizontal: 16,
+        paddingVertical: verticalScale(12),
+        paddingHorizontal: scale(14),
         backgroundColor: Colors.card,
         borderRadius: 12,
         marginBottom: 8,
@@ -238,6 +236,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: scale(12),
+        fontFamily: "Jost-Regular",
         fontWeight: "400",
         color: Colors.text,
     },
@@ -247,6 +246,7 @@ const styles = StyleSheet.create({
     },
     locationName: {
         fontSize: scale(14),
+        fontFamily: "Outfit-SemiBold",
         fontWeight: "600",
         color: Colors.text,
     },
@@ -255,6 +255,7 @@ const styles = StyleSheet.create({
     },
     badge: {
         fontSize: 11,
+        fontFamily: "Outfit-SemiBold",
         fontWeight: "600",
         color: "#8B5CF6",
         backgroundColor: "#EEF2FF",
@@ -272,10 +273,12 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         fontSize: 14,
+        fontFamily: "Jost-Regular",
         color: "#64748B",
     },
     emptyText: {
         fontSize: 14,
+        fontFamily: "Jost-Regular",
         color: "#94A3B8",
         textAlign: "center",
         paddingVertical: 20,
@@ -286,5 +289,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 12,
         fontSize: 16,
+        fontFamily: "Outfit-Regular",
     },
 });

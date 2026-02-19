@@ -61,6 +61,7 @@ const styles = StyleSheet.create({
     attachmentText: {
         textAlign: "center",
         fontSize: scale(16),
+        fontFamily: 'Outfit-SemiBold',
         fontWeight: '500',
         marginVertical: verticalScale(8)
     },
@@ -90,6 +91,7 @@ const styles = StyleSheet.create({
     },
     attachmentName: {
         fontSize: 12,
+        fontFamily: 'Jost-SemiBold',
         color: '#64748B',
         fontWeight: '500',
         textAlign: 'center',

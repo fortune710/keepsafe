@@ -64,6 +64,35 @@ def _prune_export_jobs() -> None:
                 logger.exception("Failed to delete expired export file for job %s", job_id)
 
         export_jobs.pop(job_id, None)
+        
+@router.get("/me")
+async def get_current_user_info(
+    current_user = Depends(get_current_user)
+):
+    """
+    Test endpoint that returns the current authenticated user's information.
+    Useful for debugging and verifying authentication is working correctly.
+    """
+    try:
+        user_info = {
+            "id": current_user.user.id,
+            "email": current_user.user.email,
+            "email_confirmed_at": current_user.user.email_confirmed_at,
+            "created_at": current_user.user.created_at,
+            "updated_at": current_user.user.updated_at,
+            "last_sign_in_at": current_user.user.last_sign_in_at,
+            "app_metadata": current_user.user.app_metadata,
+            "user_metadata": current_user.user.user_metadata,
+        }
+        
+        logger.info(f"Returning user info for user_id: {current_user.user.id}")
+        return {
+            "status": "success",
+            "user": user_info
+        }
+    except Exception as e:
+        logger.exception("Failed to get user info")
+        raise HTTPException(status_code=500, detail="Failed to retrieve user information") from e
 
 @router.delete("/{user_id}")
 async def delete_user(

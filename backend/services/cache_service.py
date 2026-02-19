@@ -31,6 +31,24 @@ class CacheService:
         else:
             logger.info("CacheService initialized without Redis (Supabase only)")
     
+    def _get_environment(self) -> str:
+        """
+        Get the push token environment based on settings.ENVIRONMENT.
+        Maps 'development' to 'dev', 'production' to 'prod', and falls back to 'prod' for any other value.
+        
+        Returns:
+            str: 'dev' or 'prod'
+        """
+        env = settings.ENVIRONMENT.lower()
+        if env == 'development':
+            return 'dev'
+        elif env == 'production':
+            return 'prod'
+        else:
+            # Fallback to 'prod' if environment is not recognized
+            logger.warning(f"Unknown environment '{settings.ENVIRONMENT}', defaulting to 'prod'")
+            return 'prod'
+    
     def get_notification_settings(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Retrieve a user's notification settings, using the Redis cache when available and falling back to Supabase on a cache miss.
@@ -151,7 +169,8 @@ class CacheService:
         # Cache miss - fetch from Supabase
         logger.debug(f"Cache miss for push tokens: {user_id}")
         try:
-            response = self.supabase.table("push_tokens").select("token").eq("user_id", user_id).execute()
+            environment = self._get_environment()
+            response = self.supabase.table("push_tokens").select("token").eq("user_id", user_id).eq("environment", environment).execute()
             
             tokens = response.data if response.data else []
             token_list = [token["token"] for token in tokens if token.get("token")]
@@ -210,7 +229,8 @@ class CacheService:
         # Fetch uncached items from Supabase
         if uncached_user_ids:
             try:
-                response = self.supabase.table("push_tokens").select("user_id, token").in_("user_id", uncached_user_ids).execute()
+                environment = self._get_environment()
+                response = self.supabase.table("push_tokens").select("user_id, token").in_("user_id", uncached_user_ids).eq("environment", environment).execute()
                 
                 tokens_list = response.data if response.data else []
                 
