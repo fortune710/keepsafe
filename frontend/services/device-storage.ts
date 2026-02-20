@@ -10,8 +10,16 @@ export interface StorageItem<T> {
 }
 
 class DeviceStorage {
+  private operationLock: Promise<any> = Promise.resolve();
   private isWeb = Platform.OS === 'web';
   private listeners: Record<string, Set<(payload?: any) => void>> = {};
+
+  private async withLock<T>(operation: () => Promise<T>): Promise<T> {
+    const nextOperation = this.operationLock.then(operation);
+    this.operationLock = nextOperation.catch(() => { });
+    return nextOperation;
+  }
+
 
   on(event: string, listener: (payload?: any) => void): () => void {
     if (!this.listeners[event]) this.listeners[event] = new Set();
@@ -25,7 +33,7 @@ class DeviceStorage {
 
   private emit(event: string, payload?: any): void {
     this.listeners[event]?.forEach(l => {
-      try { l(payload); } catch {}
+      try { l(payload); } catch { }
     });
   }
 
@@ -119,51 +127,91 @@ class DeviceStorage {
   }
 
   async setEntries(userId: string, entries: any[]): Promise<void> {
-    await this.setItem(`entries_${userId}`, entries);
+    return this.withLock(async () => {
+      const existingEntries = await this.getEntries(userId) || [];
+
+      // Identify local-only entries that should be preserved (pending, processing, completed, or failed)
+      // We also include 'completed' and 'failed' to ensure they don't vanish until we see them on server
+      const localEntries = existingEntries?.filter(e =>
+        e?.status === 'pending' || e?.status === 'processing' || e?.status === 'completed' || e?.status === 'failed'
+      );
+
+      // Merge: Server entries + Local-only entries that aren't already in server data
+      const serverEntryIds = new Set(entries?.map(e => e.id));
+      const uniqueLocalEntries = localEntries?.filter(le => !serverEntryIds.has(le.id));
+
+      // Combine and sort by created_at (descending)
+      const combined = [...uniqueLocalEntries, ...entries].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+
+      // Special Case: If an entry was 'completed' locally and now exists in server entries,
+      // it will be naturally replaced by the server entry in the set above (since it's in serverEntryIds).
+      // The sort ensures the latest state is preserved if timestamps match.
+
+      await this.setItem(`entries_${userId}`, combined);
+    });
   }
+
+
+
 
   async getEntries(userId: string): Promise<any[] | null> {
     return await this.getItem<any[]>(`entries_${userId}`);
   }
 
   async addEntry(userId: string, entry: any): Promise<void> {
-    const existingEntries = await this.getEntries(userId) || [];
-    
-    // Deduplicate: Check if entry already exists
-    if (existingEntries.some(e => e.id === entry.id)) {
-      logger.info('DeviceStorage: Entry already exists in storage, skipping:', entry.id);
-      return;
-    }
-    
-    const updatedEntries = [entry, ...existingEntries];
-    await this.setEntries(userId, updatedEntries);
+    return this.withLock(async () => {
+      const existingEntries = await this.getEntries(userId) || [];
+
+      // Deduplicate: Check if entry already exists
+      if (existingEntries.some(e => e.id === entry.id)) {
+        logger.info('DeviceStorage: Entry already exists in storage, skipping:', entry.id);
+        return;
+      }
+
+      const updatedEntries = [entry, ...existingEntries];
+      await this.setItem(`entries_${userId}`, updatedEntries);
+    });
   }
+
 
   async updateEntry(userId: string, entryId: string, updates: any): Promise<void> {
-    const existingEntries = await this.getEntries(userId) || [];
-    const updatedEntries = existingEntries.map(entry => 
-      entry.id === entryId ? { ...entry, ...updates } : entry
-    );
-    await this.setEntries(userId, updatedEntries);
+    return this.withLock(async () => {
+      const existingEntries = await this.getEntries(userId) || [];
+      const updatedEntries = existingEntries.map(entry =>
+        entry.id === entryId ? { ...entry, ...updates } : entry
+      );
+      await this.setItem(`entries_${userId}`, updatedEntries);
+    });
   }
+
 
   async replaceEntry(userId: string, tempId: string, realEntry: any): Promise<void> {
-    const existingEntries = await this.getEntries(userId) || [];
-    const hasTemp = existingEntries.some(e => e.id === tempId);
-    let updatedEntries;
-    if (hasTemp) {
-      updatedEntries = existingEntries.map(e => e.id === tempId ? realEntry : e);
-    } else {
-      updatedEntries = [realEntry, ...existingEntries];
-    }
-    await this.setEntries(userId, updatedEntries);
+    return this.withLock(async () => {
+      const existingEntries = await this.getEntries(userId) || [];
+      const hasTemp = existingEntries.some(e => e.id === tempId);
+      let updatedEntries;
+      if (hasTemp) {
+        updatedEntries = existingEntries.map(e => e.id === tempId ? realEntry : e);
+      } else {
+        updatedEntries = [realEntry, ...existingEntries];
+      }
+      await this.setItem(`entries_${userId}`, updatedEntries);
+    });
   }
 
+
   async removeEntry(userId: string, entryId: string): Promise<void> {
-    const existingEntries = await this.getEntries(userId) || [];
-    const updatedEntries = existingEntries.filter(entry => entry.id !== entryId);
-    await this.setEntries(userId, updatedEntries);
+    return this.withLock(async () => {
+      const existingEntries = await this.getEntries(userId) || [];
+      const updatedEntries = existingEntries.filter(entry => entry.id !== entryId);
+      await this.setItem(`entries_${userId}`, updatedEntries);
+    });
   }
+
 
   async getSuggestedFriends(): Promise<SuggestedFriend[]> {
     return await this.getItem('suggested_friends') ?? []
