@@ -60,7 +60,9 @@
         "android.permission.CAMERA",
         "android.permission.READ_CONTACTS",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.WRITE_CONTACTS"
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "package": "com.fortune710.keepsafe"
     },
@@ -126,7 +128,15 @@
         }
       ],
       "expo-background-task",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationAlwaysPermission": "Allow Keepsafe to use your location at all times.",
+          "locationWhenInUsePermission": "Allow Keepsafe to use your location while you are using the app.",
+          "isIosBackgroundLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
