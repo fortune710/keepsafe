@@ -1,4 +1,4 @@
-import { Image } from "react-native";
+import { Image } from "expo-image";
 
 interface StickerCanvasItemProps {
     uri: string;
@@ -6,6 +6,11 @@ interface StickerCanvasItemProps {
 
 export function StickerCanvasItem({ uri }: StickerCanvasItemProps) {
     return (
-        <Image source={{ uri }} style={{ width: 60, height: 60 }} />
+        <Image
+            source={{ uri }}
+            style={{ width: 60, height: 60 }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+        />
     )
 }
