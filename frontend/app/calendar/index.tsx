@@ -23,23 +23,23 @@ export default function CalendarScreen() {
   // Process entries data for calendar display
   const entriesData = React.useMemo(() => {
     const data: { [key: string]: number } = {};
-    
+
     entries.forEach(entry => {
       const dateKey = getLocalDateString(entry.created_at);
       data[dateKey] = (data[dateKey] || 0) + 1;
     });
-    
+
     return data;
   }, [entries, getLocalDateString]);
 
-  
+
 
   const months = generateMonths();
 
   const handleDayPress = (day: number, monthDate: Date) => {
     const selectedDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
     const dateString = selectedDate.toISOString().split('T')[0];
-    
+
     if (hasEntries(day, monthDate, entriesData)) {
       router.push({
         pathname: '/calendar/day',
@@ -64,31 +64,24 @@ export default function CalendarScreen() {
 
 
   return (
-    <Animated.View 
-      entering={SlideInLeft} 
+    <Animated.View
+      entering={SlideInLeft}
       exiting={SlideOutLeft}
       style={styles.container}
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Timeline</Text>
-          
+
           <View style={styles.rightIcons}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => router.push('/search')}
-            >
-              <Sparkles color="#64748B" size={20} />
-            </TouchableOpacity>
-            
             <TouchableOpacity
               style={styles.iconButton}
               onPress={() => router.push('/settings')}
             >
               <Settings color="#64748B" size={20} />
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.iconButton}
               onPress={() => router.back()}
             >
@@ -134,8 +127,8 @@ export default function CalendarScreen() {
 
                       <View style={styles.daysGrid}>
                         {days.map((day, dayIndex) => (
-                          <TouchableOpacity 
-                            key={dayIndex} 
+                          <TouchableOpacity
+                            key={dayIndex}
                             style={styles.dayCell}
                             disabled={day === null || !hasEntries(day, monthDate, entriesData)}
                             onPress={() => day && handleDayPress(day, monthDate)}
@@ -145,11 +138,11 @@ export default function CalendarScreen() {
                                 <Text style={styles.dayNumber}>{day}</Text>
                                 {hasEntries(day, monthDate, entriesData) && (
                                   <View style={styles.entryIndicatorContainer}>
-                                    <View 
+                                    <View
                                       style={[
                                         styles.entryIndicator,
                                         getEntryCount(day, monthDate, entriesData) > 1 && styles.multipleEntries
-                                      ]} 
+                                      ]}
                                     />
                                     {getEntryCount(day, monthDate, entriesData) > 1 && (
                                       <Text style={styles.entryCount}>{getEntryCount(day, monthDate, entriesData)}</Text>

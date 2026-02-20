@@ -198,7 +198,7 @@ async def test_enqueue_entry_notification_with_cache_miss(notification_enqueue_s
         elif table_name == "notification_settings":
             mock_table.select.return_value.in_.return_value.execute.return_value = mock_settings_response
         elif table_name == "push_tokens":
-            mock_table.select.return_value.in_.return_value.execute.return_value = mock_tokens_response
+            mock_table.select.return_value.in_.return_value.eq.return_value.execute.return_value = mock_tokens_response
         return mock_table
     
     mock_supabase_client.table.side_effect = table_side_effect
@@ -274,7 +274,7 @@ async def test_enqueue_entry_notification_redis_failure(notification_enqueue_ser
         elif table_name == "notification_settings":
             mock_table.select.return_value.in_.return_value.execute.return_value = mock_settings_response
         elif table_name == "push_tokens":
-            mock_table.select.return_value.in_.return_value.execute.return_value = mock_tokens_response
+            mock_table.select.return_value.in_.return_value.eq.return_value.execute.return_value = mock_tokens_response
         return mock_table
     
     mock_supabase_client.table.side_effect = table_side_effect
@@ -340,7 +340,7 @@ async def test_enqueue_entry_notification_no_redis(notification_enqueue_service,
         elif table_name == "notification_settings":
             mock_table.select.return_value.in_.return_value.execute.return_value = mock_settings_response
         elif table_name == "push_tokens":
-            mock_table.select.return_value.in_.return_value.execute.return_value = mock_tokens_response
+            mock_table.select.return_value.in_.return_value.eq.return_value.execute.return_value = mock_tokens_response
         return mock_table
     
     mock_supabase_client.table.side_effect = table_side_effect

@@ -21,6 +21,7 @@ interface EntryProcessingData {
   isEveryone: boolean;
   selectedFriends: string[];
   attachments: RenderedMediaCanvasItem[];
+  idempotencyKey: string;
 }
 
 // A lightweight foreground queue persisted to device storage.
@@ -233,8 +234,16 @@ export async function startForegroundQueueProcessor(): Promise<void> {
  */
 export async function scheduleEntryProcessing(data: EntryProcessingData): Promise<void> {
   try {
-    // Enqueue and kick off the foreground processor
+    // Check if entry with this idempotency key already exists in queue
     const queue = await loadQueue();
+    const existingEntry = queue.find(item => item.idempotencyKey === data.idempotencyKey);
+    
+    if (existingEntry) {
+      console.log('Entry with idempotency key already in queue, skipping duplicate:', data.idempotencyKey);
+      return;
+    }
+
+    // Enqueue and kick off the foreground processor
     queue.push(data);
     await saveQueue(queue);
     console.log('Queued entry for processing:', data.entryId);
@@ -276,9 +285,15 @@ export async function retryEntryProcessing(data: EntryProcessingData): Promise<v
     error: null
   });
 
-  // Re-enqueue the task
+  // Re-enqueue the task (check for duplicates)
   const queue = await loadQueue();
-  queue.push(data);
-  await saveQueue(queue);
-  void startForegroundQueueProcessor();
+  const existingEntry = queue.find(item => item.idempotencyKey === data.idempotencyKey);
+  
+  if (!existingEntry) {
+    queue.push(data);
+    await saveQueue(queue);
+    void startForegroundQueueProcessor();
+  } else {
+    console.log('Entry with idempotency key already in queue, skipping retry:', data.idempotencyKey);
+  }
 }

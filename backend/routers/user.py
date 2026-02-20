@@ -1,18 +1,29 @@
 import json
 import logging
-import tempfile
+import threading
 import uuid
+import html
 from datetime import datetime, timezone
 from enum import Enum
+
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 
+from config import settings
 from services.pinecone_client import get_pinecone_index
 from services.supabase_client import get_supabase_client
 from utils.auth import get_current_user
+
+
+def _sanitize_metadata(metadata: Dict[str, Any], safe_keys: list[str]) -> Dict[str, Any]:
+    """Extract only allowed keys from a metadata dictionary."""
+    if not metadata:
+        return {}
+    return {k: v for k, v in metadata.items() if k in safe_keys}
 
 class ExportFormat(str, Enum):
     json = "json"
@@ -29,6 +40,7 @@ MAX_PENDING_EXPORT_JOBS_PER_USER = 3
 
 ExportJobState = Dict[str, Any]
 export_jobs: Dict[str, ExportJobState] = {}
+export_jobs_lock = threading.Lock()
 
 
 def _prune_export_jobs() -> None:
@@ -73,7 +85,16 @@ async def get_current_user_info(
     Test endpoint that returns the current authenticated user's information.
     Useful for debugging and verifying authentication is working correctly.
     """
+    # Security: Only allow this endpoint in development mode
+    if settings.ENVIRONMENT != "development":
+        logger.warning(f"Attempted to access debug /me endpoint in {settings.ENVIRONMENT} mode")
+        raise HTTPException(status_code=403, detail="Endpoint disabled in production")
+
     try:
+        # Define safe fields for metadata to prevent exposure of internal/sensitive info
+        safe_app_metadata_keys = ["provider", "providers"]
+        safe_user_metadata_keys = ["full_name", "avatar_url", "username", "name"]
+
         user_info = {
             "id": current_user.user.id,
             "email": current_user.user.email,
@@ -81,8 +102,8 @@ async def get_current_user_info(
             "created_at": current_user.user.created_at,
             "updated_at": current_user.user.updated_at,
             "last_sign_in_at": current_user.user.last_sign_in_at,
-            "app_metadata": current_user.user.app_metadata,
-            "user_metadata": current_user.user.user_metadata,
+            "app_metadata": _sanitize_metadata(current_user.user.app_metadata or {}, safe_app_metadata_keys),
+            "user_metadata": _sanitize_metadata(current_user.user.user_metadata or {}, safe_user_metadata_keys),
         }
         
         logger.info(f"Returning user info for user_id: {current_user.user.id}")
@@ -543,4 +564,6 @@ def download_user_data(
     except Exception as e:  # noqa: BLE001
         logger.exception("Failed to export data for user_id: %s", user_id)
         raise HTTPException(status_code=500, detail="Failed to export user data") from e
+
+
 

@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     selectedFriendOption: {
-        backgroundColor: '#EEF2FF',
+        //backgroundColor: '#EEF2FF',
     },
     disabledFriendOption: {
         opacity: 0.5,

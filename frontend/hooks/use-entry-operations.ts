@@ -38,6 +38,53 @@ interface UseEntryOperationsResult {
 }
 
 /**
+ * Generates a deterministic idempotency key from entry parameters
+ * Uses SHA-256 hash to ensure uniqueness based on entry content and configuration
+ */
+export async function generateIdempotencyKey(params: {
+  captureUri: string;
+  userId: string;
+  selectedFriends: string[];
+  isPrivate: boolean;
+  isEveryone: boolean;
+  attachments: RenderedMediaCanvasItem[];
+  locationTag?: string;
+  musicTag?: string;
+  textContent: string;
+}): Promise<string> {
+  // Sort arrays for consistency
+  const sortedFriends = [...params.selectedFriends].sort();
+  
+  // Sort attachments by ID for consistency
+  const sortedAttachments = [...params.attachments].sort((a, b) => {
+    const aId = a.id?.toString() || '';
+    const bId = b.id?.toString() || '';
+    return aId.localeCompare(bId);
+  });
+
+  // Create a deterministic string from all parameters
+  const dataString = JSON.stringify({
+    captureUri: params.captureUri,
+    userId: params.userId,
+    selectedFriends: sortedFriends,
+    isPrivate: params.isPrivate,
+    isEveryone: params.isEveryone,
+    attachments: sortedAttachments,
+    locationTag: params.locationTag || null,
+    musicTag: params.musicTag || null,
+    textContent: params.textContent || '',
+  });
+
+  // Generate SHA-256 hash
+  const hash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    dataString
+  );
+
+  return hash;
+}
+
+/**
  * Converts a URI/File to ArrayBuffer for upload
  * Works on both web and React Native
  */
@@ -169,6 +216,20 @@ export function useEntryOperations(): UseEntryOperationsResult {
       // Use provided tempId or generate a uuid to keep ids consistent across UI and processing
       const tempId = entryData.tempId || Crypto.randomUUID();
 
+      // Generate idempotency key from all entry parameters
+      // This prevents duplicate entries if save is called multiple times with same configuration
+      const idempotencyKey = await generateIdempotencyKey({
+        captureUri: entryData.capture.uri,
+        userId: user.id,
+        selectedFriends: entryData.selectedFriends,
+        isPrivate: entryData.isPrivate,
+        isEveryone: entryData.isEveryone,
+        attachments: entryData.attachments,
+        locationTag: entryData.locationTag,
+        musicTag: entryData.musicTag,
+        textContent: entryData.textContent,
+      });
+
       // Prepare data for background processing
       const processingData = {
         entryId: tempId,
@@ -181,6 +242,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
         isEveryone: entryData.isEveryone,
         selectedFriends: entryData.selectedFriends,
         attachments: entryData.attachments,
+        idempotencyKey,
       };
 
       // Schedule background processing

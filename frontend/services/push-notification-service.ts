@@ -4,10 +4,12 @@ import Constants from "expo-constants";
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
+import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import { deviceStorage } from '@/services/device-storage';
 import { NotificationSettings } from '@/types/notifications';
 import { logger } from "@/lib/logger";
+import { TABLES } from "@/constants/supabase";
 
 export type NotificationSettingsMap = Record<NotificationSettings, boolean>;
 
@@ -32,35 +34,43 @@ const NOTIFICATION_SETTINGS_STORAGE_KEY = (userId: string) =>
  * Gets a unique device identifier that works across Expo Go and standalone apps.
  * Uses platform-specific IDs when available, with fallbacks.
  */
-async function getUniqueDeviceId(): Promise<string> {
+async function getUniqueDeviceId(userId: string): Promise<string> {
+  const DEVICE_UUID_KEY = `device_uuid_${userId}`;
+
   try {
+    // 1. Try to get the existing stored ID first for stability across sessions
+    const storedId = await deviceStorage.getItem<string>(DEVICE_UUID_KEY);
+    if (storedId) {
+      return storedId;
+    }
+
+    let deviceId: string | null = null;
+
+    // 2. Try to get native platform ID
     if (Platform.OS === 'android') {
-      // Android ID is unique per device/app combination
-      const androidId = await Application.getAndroidId();
-      if (androidId) {
-        return androidId;
-      }
+      deviceId = await Application.getAndroidId();
     } else if (Platform.OS === 'ios') {
-      // iOS ID for vendor is unique per device/vendor combination
-      const iosId = await Application.getIosIdForVendorAsync();
-      if (iosId) {
-        return iosId;
-      }
+      deviceId = await Application.getIosIdForVendorAsync();
     }
-    
-    // Fallback to installationId (unique per app installation)
-    if (Constants.installationId) {
-      return Constants.installationId;
+
+    // 3. Fallback to installationId (legacy Expo Go ID)
+    if (!deviceId && (Constants as any).installationId) {
+      deviceId = (Constants as any).installationId;
     }
-    
-    // Last resort: combine platform and model info
-    const fallbackId = `${Platform.OS}-${Device.modelId || Device.modelName || 'unknown'}-${Constants.sessionId || Date.now()}`;
-    console.warn('Using fallback device ID:', fallbackId);
-    return fallbackId;
+
+    // 4. Generate a new UUID as a stable last resort
+    if (!deviceId) {
+      deviceId = Crypto.randomUUID();
+    }
+
+    // Persist for future sessions to ensure restarts upsert rather than insert
+    await deviceStorage.setItem(DEVICE_UUID_KEY, deviceId);
+    return deviceId;
   } catch (error) {
-    console.error('Error getting unique device ID:', error);
-    // Ultimate fallback
-    return `${Platform.OS}-${Constants.sessionId || Date.now()}`;
+    logger.error('Error getting unique device ID:', error);
+    // Ultimate fallback is a new UUID to at least have a valid format, 
+    // though stability might be compromised if storage is failing.
+    return Crypto.randomUUID();
   }
 }
 
@@ -109,7 +119,7 @@ export class PushNotificationService {
       });
 
       logger.debug('Push token:', this.currentToken);
-      
+
       // Save token to Supabase
       if (this.userId && !this.currentToken) {
         this.currentToken = tokenData.data;
@@ -132,12 +142,12 @@ export class PushNotificationService {
         return;
       }
 
-      const deviceId = await getUniqueDeviceId();
+      const deviceId = await getUniqueDeviceId(userId);
       const platform: 'ios' | 'android' = Platform.OS;
       const environment: 'prod' | 'dev' = __DEV__ ? 'dev' : 'prod';
 
       const { error } = await supabase
-        .from('push_tokens')
+        .from(TABLES.PUSH_TOKENS)
         .upsert({
           user_id: userId,
           token: token,
@@ -162,11 +172,11 @@ export class PushNotificationService {
   // Remove push token (logout)
   async removePushToken(userId: string): Promise<void> {
     try {
-      const deviceId = await getUniqueDeviceId();
+      const deviceId = await getUniqueDeviceId(userId);
       const environment: 'prod' | 'dev' = __DEV__ ? 'dev' : 'prod';
-      
+
       const { error } = await this.supabase
-        .from('push_tokens')
+        .from(TABLES.PUSH_TOKENS)
         .delete()
         .eq('user_id', userId)
         .eq('device_id', deviceId)
@@ -276,7 +286,7 @@ export class PushNotificationService {
     };
 
     const { error } = await supabase
-      .from('notification_settings')
+      .from(TABLES.NOTIFICATION_SETTINGS)
       .upsert(row as never, { onConflict: 'user_id' } as never);
 
     if (error) {
@@ -311,7 +321,7 @@ export class PushNotificationService {
     try {
       // Check remote row existence directly (local cache may exist without remote in older versions)
       const { data, error } = await supabase
-        .from('notification_settings')
+        .from(TABLES.NOTIFICATION_SETTINGS)
         .select('user_id')
         .eq('user_id', userId)
         .maybeSingle<{ user_id: string }>();

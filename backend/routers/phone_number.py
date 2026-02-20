@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -81,14 +82,17 @@ async def _send_sms_otp(phone_number: str, otp: str) -> None:
 
     client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
     try:
-        client.messages.create(
+        await asyncio.to_thread(
+            client.messages.create,
             to=phone_number,
             from_=settings.TWILIO_FROM_NUMBER,
             body=f"Your Keepsafe verification code is: {otp}",
         )
-        logger.info("Twilio send successful", extra={"phone_number": phone_number, "otp": otp})
+        phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
+        logger.info("Twilio send successful", extra={"phone_number": phone_number_masked})
     except Exception as e:
-        logger.exception("Twilio send failed", extra={"phone_number": phone_number, "otp": otp})
+        phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
+        logger.exception("Twilio send failed", extra={"phone_number": phone_number_masked})
         raise HTTPException(status_code=500, detail="Failed to send OTP SMS") from e
     
 @router.post("/otp/start")
@@ -106,7 +110,8 @@ async def start_phone_otp(
     otp = _generate_6_digit_otp()
     otp_hash = _sha256_hex(otp)
 
-    logger.info("Sending OTP SMS", extra={"phone_number": payload.phone_number, "otp": otp})
+    phone_number_masked = f"...{payload.phone_number[-4:]}" if payload.phone_number and len(payload.phone_number) >= 4 else "****"
+    logger.info("Sending OTP SMS", extra={"phone_number": phone_number_masked})
     await _send_sms_otp(payload.phone_number, otp)
 
 
@@ -114,7 +119,8 @@ async def start_phone_otp(
     now_iso = datetime.now(timezone.utc).isoformat()
     try:
 
-        logger.info("Upserting phone_number_updates row", extra={"user_id": user_id, "phone_number": payload.phone_number, "otp_hash": otp_hash, "created_at": now_iso})
+        phone_number_masked = f"...{payload.phone_number[-4:]}" if payload.phone_number and len(payload.phone_number) >= 4 else "****"
+        logger.info("Upserting phone_number_updates row", extra={"user_id": user_id, "phone_number": phone_number_masked, "created_at": now_iso})
         supabase.table("phone_number_updates").upsert(
             {
                 "user_id": user_id,
@@ -167,7 +173,11 @@ async def resend_phone_otp(
     otp_hash = _sha256_hex(otp)
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    await _send_sms_otp(phone_number, otp)
+
     try:
+        phone_number_masked = f"...{phone_number[-4:]}" if phone_number and len(phone_number) >= 4 else "****"
+        logger.info("Upserting phone_number_updates row for resend", extra={"user_id": user_id, "phone_number": phone_number_masked, "created_at": now_iso})
         supabase.table("phone_number_updates").upsert(
             {
                 "user_id": user_id,
@@ -181,7 +191,6 @@ async def resend_phone_otp(
         logger.exception("Failed to upsert phone_number_updates row for resend")
         raise HTTPException(status_code=500, detail="Failed to recreate phone verification record") from e
 
-    await _send_sms_otp(phone_number, otp)
     return {"message": "OTP resent"}
 
 
