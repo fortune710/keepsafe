@@ -1,15 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut, Trash2, DownloadIcon } from 'lucide-react-native';
+import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
-import { BACKEND_URL } from '@/lib/constants';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import { logger } from '@/lib/logger';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
 
@@ -66,9 +62,7 @@ const settingsItems: SettingsItem[] = [
 ];
 
 export default function SettingsScreen() {
-  const { profile, session } = useAuthContext();
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+  const { profile } = useAuthContext();
   
   const { height: screenHeight } = Dimensions.get('window');
   const SWIPE_THRESHOLD = screenHeight * 0.15; // 15% of screen height
@@ -312,37 +306,6 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.settingsSection}>
-            
-            <TouchableOpacity style={styles.settingsItem} onPress={handleExportData} disabled={isExporting}>
-              <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
-                {isExporting ? (
-                  <ActivityIndicator color="#64748B" size="small" />
-                ) : (
-                  <DownloadIcon color="#64748B" size={20} />
-                )}
-              </View>
-              
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle}>{isExporting ? 'Exporting Data...' : 'Export Data'}</Text>
-                <Text style={styles.itemSubtitle}>Export your account data</Text>
-              </View>
-              
-              <View style={{ width: 20 }} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingsItem} onPress={handleDeleteAccount} disabled={isDeleting}>
-              <View style={[styles.iconContainer, { backgroundColor: '#DC262615' }]}>
-                <Trash2 color="#DC2626" size={20} />
-              </View>
-              
-              <View style={styles.itemContent}>
-                <Text style={[styles.itemTitle, { color: '#DC2626' }]}>
-                  {isDeleting ? 'Deleting Account...' : 'Delete Account'}
-                </Text>
-                <Text style={styles.itemSubtitle}>Permanently delete your data</Text>
-              </View>
-              
-              <View style={{ width: 20 }} />
-            </TouchableOpacity>
             <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
               <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
                 <LogOut color="#64748B" size={20} />
@@ -355,7 +318,6 @@ export default function SettingsScreen() {
               
               <View style={{ width: 20 }} />
             </TouchableOpacity>
-
           </View>
         </ScrollView>
       </View>
