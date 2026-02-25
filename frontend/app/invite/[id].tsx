@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert, ActivityIndicator } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Check, X, Users } from 'lucide-react-native';
 import { useInviteAcceptance } from '@/hooks/use-invite-acceptance';
 import { useAuthContext } from '@/providers/auth-provider';
+import { Image } from 'expo-image';
 
 export default function AcceptInviteScreen() {
   const { id } = useLocalSearchParams();

@@ -91,7 +91,7 @@ export default function DetailsScreen() {
         id,
         name: friendProfile?.full_name || 'Unknown User',
         username: friendProfile?.username ?? "",
-        avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
+        avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? "", 'svg'),
       };
     })
     .filter((friend): friend is Friend => friend !== null);
