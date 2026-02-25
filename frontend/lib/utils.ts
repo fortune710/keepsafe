@@ -3,8 +3,8 @@ import { MediaType } from "@/types/media"
 import { TZDate } from "@date-fns/tz";
 import { getRandomBytesAsync } from 'expo-crypto';
 
-export const getDefaultAvatarUrl = (fullName: string) => {
-    return `https://api.dicebear.com/9.x/adventurer-neutral/png?seed=${fullName}`
+export const getDefaultAvatarUrl = (fullName: string, format: 'png' | 'svg' = 'png') => {
+    return `https://api.dicebear.com/9.x/adventurer/${format}?seed=${fullName}`
 }
 
 export const getFileExtension = (type: MediaType) => {
