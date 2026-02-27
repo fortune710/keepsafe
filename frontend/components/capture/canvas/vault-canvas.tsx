@@ -1,5 +1,5 @@
-import { Pressable, StyleProp, View, ViewStyle } from "react-native";
-import { ImageBackground } from "expo-image";
+import { Pressable, StyleProp, View, ViewStyle, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { MediaType } from "@/types/media";
 import { RenderedMediaCanvasItem, MusicTag } from "@/types/capture";
@@ -17,9 +17,10 @@ interface VaultCanvasProps {
   items: Array<RenderedMediaCanvasItem>,
   style?: StyleProp<ViewStyle>,
   onMusicPress?: (music: MusicTag) => void;
+  metadata?: any;
 }
 
-export default function VaultCanvas({ type, uri, style, items, onMusicPress }: VaultCanvasProps) {
+export default function VaultCanvas({ type, uri, style, items, onMusicPress, metadata }: VaultCanvasProps) {
 
   if (!uri) return null;
 
@@ -32,33 +33,19 @@ export default function VaultCanvas({ type, uri, style, items, onMusicPress }: V
     return <EntryAudioView uri={uri} />
   }
 
-  if (items?.length === 0) {
-    return (
-      <View style={style}>
-        <ImageBackground
-          source={{ uri }}
-          style={style}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          imageStyle={{ borderRadius: 0 }}
-          transition={200}
-          testID="vault-canvas-image"
-        />
-      </View>
-    )
-  }
+  const isMirrored = metadata?.facing === 'front';
 
   return (
     <View style={style}>
-      <ImageBackground
+      <Image
         source={{ uri }}
-        style={style}
+        style={[style as any, isMirrored && { transform: [{ scaleX: -1 }] }]}
         contentFit="cover"
-        imageStyle={{ borderRadius: 0 }}
         cachePolicy="memory-disk"
         transition={200}
-        testID="vault-canvas-background"
-      >
+        testID="vault-canvas-image"
+      />
+      <View style={StyleSheet.absoluteFill}>
         {items?.filter((item) => item?.transforms).map((item) => (
           <VaultCanvasItem
             key={item.id}
@@ -66,7 +53,7 @@ export default function VaultCanvas({ type, uri, style, items, onMusicPress }: V
             onMusicPress={onMusicPress}
           />
         ))}
-      </ImageBackground>
+      </View>
     </View>
   );
 }
