@@ -28,6 +28,7 @@ import { logger } from '@/lib/logger';
 import PhoneNumberBottomSheet from '@/components/phone-number-bottom-sheet';
 import { supabase } from '@/lib/supabase';
 import { getPhonePromptState } from '@/services/phone-number-prompt-service';
+import { useVaultPreloader } from '@/hooks/use-vault-preloader';
 
 const { height } = Dimensions.get('window');
 
@@ -57,6 +58,7 @@ export default function CaptureScreen() {
   const [showPhoneSheet, setShowPhoneSheet] = useState(false);
 
   // Release save lock when capture screen mounts (after navigating back from details)
+  useVaultPreloader();
   useFocusEffect(
     useCallback(() => {
       unlockSave();
@@ -217,7 +219,8 @@ export default function CaptureScreen() {
           params: {
             captureId: capture.id,
             type: capture.type,
-            uri: encodeURIComponent(capture.uri)
+            uri: encodeURIComponent(capture.uri),
+            facing: facing
           }
         });
       }
