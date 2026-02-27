@@ -11,39 +11,39 @@ export class InviteService {
         return generateInviteCode();
     }
 
-    static async createInvite(inviterId: string, inviteCode: string): Promise<void> {
-        const invite = await supabase.from(TABLES.INVITES).upsert({
-            inviter_id: inviterId,
-            invite_code: inviteCode,
-            max_uses: this.MAX_INVITE_USES,
-        } as never, { onConflict: 'inviter_id' });
-
-        if (invite.error) {
-            throw new Error(invite.error.message);
-        }
-    }
-
     static async getInvite(userId: string): Promise<Invite> {
-        const { data: invite, error } = await supabase
-            .from(TABLES.INVITES)
-            .select('*')
-            .eq('inviter_id', userId)
-            .maybeSingle();
+        const { data: profile, error } = await (supabase
+            .from('profiles')
+            .select('id, invite_code')
+            .eq('id', userId)
+            .single() as any);
+
         if (error) {
             throw new Error(error.message);
         }
 
-        if (!invite) {
-            throw new Error('Invite not found');
+        if (!profile || !profile.invite_code) {
+            throw new Error('Invite code not found for user');
         }
-        return invite;
+
+        // Return a shape that matches the Invite type but using data from profiles
+        return {
+            id: profile.id,
+            inviter_id: profile.id,
+            invite_code: profile.invite_code,
+            message: null,
+            max_uses: this.MAX_INVITE_USES,
+            current_uses: 0,
+            is_active: true,
+            created_at: new Date().toISOString(),
+        } as Invite;
     }
 
     static async updateInvite(inviteCode: string, updates: Partial<Invite>): Promise<void> {
-        const { error } = await supabase
-        .from(TABLES.INVITES)
-        .update(updates as never)
-        .eq('invite_code', inviteCode);
+        const { error } = await (supabase
+            .from('profiles')
+            .update({ invite_code: updates.invite_code } as any)
+            .eq('invite_code', inviteCode) as any);
         if (error) {
             throw new Error(error.message);
         }
