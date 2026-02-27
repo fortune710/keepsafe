@@ -31,7 +31,7 @@ class DeviceStorage {
     this.listeners[event]?.delete(listener);
   }
 
-  private emit(event: string, payload?: any): void {
+  emit(event: string, payload?: any): void {
     this.listeners[event]?.forEach(l => {
       try { l(payload); } catch { }
     });

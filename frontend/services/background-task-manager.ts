@@ -107,6 +107,11 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
       status: 'processing',
       processingStartedAt: new Date().toISOString()
     });
+    deviceStorage.emit('entryStatusChanged', {
+      userId: data.userId,
+      entryId: data.entryId,
+      status: 'processing'
+    });
 
     // Prepare entry data
     let finalContentUrl = data.capture.uri;
@@ -185,6 +190,12 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
       data.entryId,
       { ...entryWithProfile, status: 'completed', processingCompletedAt: new Date().toISOString() }
     );
+    deviceStorage.emit('entryStatusChanged', {
+      userId: data.userId,
+      entryId: data.entryId,
+      status: 'completed',
+      entry: entryWithProfile
+    });
 
     console.log('Entry processed successfully:', data.entryId);
     return { success: true, entry };
@@ -199,6 +210,12 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
     await deviceStorage.updateEntry(data.userId, data.entryId, {
       status: 'failed',
       processingFailedAt: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    deviceStorage.emit('entryStatusChanged', {
+      userId: data.userId,
+      entryId: data.entryId,
+      status: 'failed',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
 
