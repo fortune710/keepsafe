@@ -206,7 +206,7 @@ export default function AuthScreen() {
           style={styles.avatarContainer}
         >
           <Image
-            source={{ uri: getDefaultAvatarUrl(fullName) }}
+            source={{ uri: getDefaultAvatarUrl(fullName, 'svg') }}
             style={styles.reviewAvatar}
             contentFit="cover"
           />
