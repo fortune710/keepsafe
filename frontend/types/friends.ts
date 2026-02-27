@@ -5,6 +5,8 @@ export interface SuggestedFriend {
   name: string;
   username: string;
   avatar: string | null;
+  email: string;
+  phone: string | null;
 }
 
 export interface Friend extends SuggestedFriend {

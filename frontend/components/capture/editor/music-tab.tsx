@@ -15,7 +15,7 @@ interface MusicTabProps {
 }
 
 export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, musicTags, onSelectMusic }: MusicTabProps) {
-    
+
     return (
         <FlatList
             keyboardShouldPersistTaps="handled"
@@ -26,23 +26,24 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
                         onChangeText={onMusicQueryChange}
                         placeholder="Enter music tags..."
                         style={[styles.input]}
+                        autoFocus
                         keyboardType="web-search"
                     />
                 </KeyboardAvoidingView>
             }
-            ListEmptyComponent={<EmptyComponent/>}
+            ListEmptyComponent={<EmptyComponent />}
             data={isLoading ? new Array(10) : musicTags}
             renderItem={({ item }) => {
-                if (isLoading) return <LoadingComponent/>
-                
+                if (isLoading) return <LoadingComponent />
+
                 return (
-                    <MusicListItem 
+                    <MusicListItem
                         onPress={(music) => onSelectMusic(music)}
-                        music={item} 
+                        music={item}
                     />
                 )
             }}
-            ListFooterComponent={<View style={styles.listFooter}/>}
+            ListFooterComponent={<View style={styles.listFooter} />}
             ListHeaderComponentStyle={styles.listHeader}
             contentContainerStyle={styles.listContentContainer}
             style={styles.flashListStyle}
@@ -67,12 +68,12 @@ function EmptyComponent() {
 function LoadingComponent() {
     return (
         <View style={styles.loadingMusicItem}>
-            <Skeleton 
-                width={scale(40)} 
+            <Skeleton
+                width={scale(40)}
                 height={verticalScale(35)}
             />
 
-            <SkeletonText lines={2}/>
+            <SkeletonText lines={2} />
         </View>
     )
 }
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
         color: "#64748B",
     },
     listHeader: { marginBottom: 10 },
-    flashListStyle: { paddingVertical: 10, height: 950 },
+    flashListStyle: { paddingVertical: 10, height: verticalScale(570) },
     listContentContainer: { paddingVertical: 10 },
     loadingMusicItem: {
         display: "flex",

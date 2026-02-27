@@ -31,7 +31,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedQuery = useDebounce(searchQuery, 500);
     const [requestedCurrentLocation, setRequestedCurrentLocation] = useState(false);
-    
+
     const { location: currentLocation, isLoading: isLoadingCurrent, placesInState, isLoadingPlaces } = useDeviceLocation();
 
     const coordinates =
@@ -66,7 +66,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
             setRequestedCurrentLocation(true);
             return;
         }
-        
+
         if (currentLocation.formattedAddress) {
             onSelectLocation(currentLocation.address);
         }
@@ -79,7 +79,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
     // Build results list: current location + (Mapbox search results OR places in state)
     const allResults = useMemo(() => {
         const results: LocationSearchResult[] = [];
-        
+
         // Add current location if available
         if (currentLocation) {
             results.push({
@@ -89,10 +89,10 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
                 isCurrentLocation: true,
             });
         }
-        
+
         // Add Mapbox Places search results if query exists, otherwise add places in state
         results.push(...mapboxPlacesResults);
-        
+
         return results;
     }, [currentLocation, mapboxPlacesResults, debouncedQuery]);
 
@@ -119,19 +119,19 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
 
             <View style={styles.resultsContainer}>
                 <Text style={styles.sectionTitle}>{getSectionTitle()}</Text>
-                
+
                 {showLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="small" color="#8B5CF6" />
                         <Text style={styles.loadingText}>
-                            {isLoadingCurrent && !currentLocation 
-                                ? "Getting your location..." 
+                            {isLoadingCurrent && !currentLocation
+                                ? "Getting your location..."
                                 : isLoadingPlaces && !hasQuery
-                                ? "Loading places..."
-                                : "Searching..."}
+                                    ? "Loading places..."
+                                    : "Searching..."}
                         </Text>
                     </View>
-                ): (
+                ) : (
                     <FlatList
                         data={allResults}
                         keyExtractor={(item) => item.id}
@@ -165,7 +165,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
                                         />
                                     )
                                 }
-                                 <View style={styles.textColumn}>
+                                <View style={styles.textColumn}>
                                     <Text style={[styles.locationName, item.isCurrentLocation && styles.currentLocationText]}>{item.name}</Text>
                                     <Text
                                         style={[
@@ -186,7 +186,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
 
                 )}
 
-            
+
 
             </View>
         </View>
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     },
     list: {
         // Give the VirtualizedList a measurable viewport inside the popover
-        maxHeight: verticalScale(320),
+        height: verticalScale(420),
     },
     listContent: {
         paddingBottom: verticalScale(8),
