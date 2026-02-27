@@ -43,17 +43,17 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
 
 
   return (
-    <Animated.View 
+    <Animated.View
       entering={FadeInDown.delay(index * 50).duration(300).springify().damping(20).stiffness(90)}
     >
       <View style={styles.container}>
         <View style={styles.avatarContainer}>
-          <Image 
-            source={{ uri: friend.avatar ?? getDefaultAvatarUrl(friend.name) }} 
-            style={styles.avatar} 
+          <Image
+            source={{ uri: friend.avatar ?? getDefaultAvatarUrl(friend.name) }}
+            style={styles.avatar}
           />
         </View>
-        
+
         <View style={styles.friendInfo}>
           <Text style={styles.friendName}>{friend.name}</Text>
           <Text style={styles.friendEmail}>{friend.username}</Text>
@@ -61,7 +61,7 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
 
         {
           !friendStatus ? (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addButton}
               onPress={handleAccept}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -70,24 +70,24 @@ export default function SuggestedFriendItem({ friend, index }: FriendItemProps) 
               <Plus color={Colors.white} strokeWidth={3} size={20} />
               <Text style={styles.addButtonText}>Add</Text>
             </TouchableOpacity>
-          ) : 
-          friendStatus === FRIENDSHIP_STATUS.PENDING || friendStatus === FRIENDSHIP_STATUS.ACCEPTED ? (
-            <TouchableOpacity 
-              style={styles.pendingButton}
-              disabled={true}
-            >
-              <Plus color={Colors.white} strokeWidth={3} size={20} />
-              <Text style={styles.addButtonText}>Add</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={styles.blockedButton}
-              disabled={true}
-            >
-              <X color={Colors.white} strokeWidth={3} size={20} />
-              <Text style={styles.addButtonText}>Blocked</Text>
-            </TouchableOpacity>
-          )
+          ) :
+            friendStatus === FRIENDSHIP_STATUS.PENDING || friendStatus === FRIENDSHIP_STATUS.ACCEPTED ? (
+              <TouchableOpacity
+                style={styles.pendingButton}
+                disabled={true}
+              >
+                <Plus color={Colors.white} strokeWidth={3} size={20} />
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.blockedButton}
+                disabled={true}
+              >
+                <X color={Colors.white} strokeWidth={3} size={20} />
+                <Text style={styles.addButtonText}>Blocked</Text>
+              </TouchableOpacity>
+            )
         }
 
       </View>
@@ -99,7 +99,6 @@ const styles = StyleSheet.create({
   container: {
     //backgroundColor: 'white',
     borderRadius: 16,
-    paddingHorizontal: verticalScale(7),
     marginBottom: verticalScale(10),
     //marginBottom: verticalScale(0),
     flexDirection: 'row',
