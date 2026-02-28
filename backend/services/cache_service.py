@@ -45,9 +45,10 @@ class CacheService:
         elif env == 'production':
             return 'prod'
         else:
-            # Fallback to 'prod' if environment is not recognized
-            logger.warning(f"Unknown environment '{settings.ENVIRONMENT}', defaulting to 'prod'")
-            return 'prod'
+            # Raise an error if environment is not recognized to avoid accidental production usage
+            error_msg = f"Unknown environment '{settings.ENVIRONMENT}'. Must be 'development' or 'production'."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
     
     def get_notification_settings(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -184,6 +185,9 @@ class CacheService:
             
             return token_list
             
+        except ValueError:
+            # Re-raise configuration errors (like unknown environment) so they aren't swallowed
+            raise
         except Exception as e:
             logger.error(f"Error fetching push tokens from Supabase for user {user_id}: {str(e)}")
             return []
@@ -252,6 +256,9 @@ class CacheService:
                     self._set_in_redis(cache_key, token_list, self.cache_ttl)
                     logger.debug(f"Cached push tokens: {user_id}")
                 
+            except ValueError:
+                # Re-raise configuration errors so they aren't swallowed
+                raise
             except Exception as e:
                 logger.error(f"Error batch fetching push tokens from Supabase: {str(e)}")
         
