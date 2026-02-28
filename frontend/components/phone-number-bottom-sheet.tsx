@@ -12,7 +12,7 @@ import { usePhoneNumberUpdateRecord } from '@/hooks/use-phone-number-update-reco
 import { useProfileOperations } from '@/hooks/use-profile-operations';
 import { useDeviceLocation } from '@/hooks/use-device-location';
 import { PhoneNumberInput } from '@/components/profile/phone-number-input';
-import { OtpInput } from '@/components/ui/otp-input';
+//import { OtpInput } from '@/components/ui/otp-input';
 import {
   clearPhonePromptState,
   getPhonePromptState,

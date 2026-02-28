@@ -53,13 +53,13 @@ export function PhoneNumberInput({
         if (country) {
           setCountryCode(country.code);
           setCountryIso(country.iso);
-          setValue('');
+          if (!value) setValue('');
           return;
         }
       }
       setCountryCode('');
       setCountryIso('');
-      setValue('');
+      if (!value) setValue('');
       return;
     }
 
