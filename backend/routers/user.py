@@ -48,25 +48,36 @@ def _prune_export_jobs() -> None:
     now = datetime.now(timezone.utc)
     expired_job_ids = []
 
-    for job_id, job in list(export_jobs.items()):
-        created_at_str = job.get("created_at")
-        completed_at_str = job.get("completed_at")
-        reference_time_str = completed_at_str or created_at_str
+    with export_jobs_lock:
+        for job_id, job in export_jobs.items():
+            # Skip pruning jobs that are still in-progress
+            status = job.get("status")
+            if status in ["pending", "running", "in_progress"] or status is None:
+                continue
 
-        if not reference_time_str:
-            continue
+            created_at_str = job.get("created_at")
+            completed_at_str = job.get("completed_at")
+            reference_time_str = completed_at_str or created_at_str
 
-        try:
-            reference_time = datetime.fromisoformat(reference_time_str)
-        except Exception:  # noqa: BLE001
-            continue
+            if not reference_time_str:
+                continue
 
-        if (now - reference_time).total_seconds() > EXPORT_JOB_TTL_SECONDS:
-            expired_job_ids.append(job_id)
+            try:
+                reference_time = datetime.fromisoformat(reference_time_str)
+            except Exception:  # noqa: BLE001
+                continue
+
+            if (now - reference_time).total_seconds() > EXPORT_JOB_TTL_SECONDS:
+                expired_job_ids.append(job_id)
 
     for job_id in expired_job_ids:
-        job = export_jobs.get(job_id) or {}
-        file_path_str = job.get("file_path")
+        with export_jobs_lock:
+            job = export_jobs.get(job_id)
+            if not job:
+                continue
+            job_copy = job.copy()
+            
+        file_path_str = job_copy.get("file_path")
         if file_path_str:
             file_path = Path(file_path_str)
             try:
@@ -75,7 +86,8 @@ def _prune_export_jobs() -> None:
             except Exception:  # noqa: BLE001
                 logger.exception("Failed to delete expired export file for job %s", job_id)
 
-        export_jobs.pop(job_id, None)
+        with export_jobs_lock:
+            export_jobs.pop(job_id, None)
         
 @router.get("/me")
 async def get_current_user_info(
@@ -381,17 +393,25 @@ def _run_export_job(user_id: str, format: ExportFormat, job_id: str) -> None:
         file_path = EXPORT_BASE_DIR / f"{job_id}_{filename}"
         file_path.write_bytes(content)
 
-        export_jobs[job_id]["status"] = "completed"
-        export_jobs[job_id]["file_path"] = str(file_path)
-        export_jobs[job_id]["media_type"] = media_type
-        export_jobs[job_id]["filename"] = filename
-        export_jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+        with export_jobs_lock:
+            if job_id in export_jobs:
+                export_jobs[job_id].update({
+                    "status": "completed",
+                    "file_path": str(file_path),
+                    "media_type": media_type,
+                    "filename": filename,
+                    "completed_at": datetime.now(timezone.utc).isoformat()
+                })
 
         logger.info("Completed export job %s, file=%s", job_id, file_path)
     except Exception as exc:
         logger.exception("Failed export job %s for user_id=%s", job_id, user_id)
-        export_jobs[job_id]["status"] = "failed"
-        export_jobs[job_id]["error"] = "Export failed. Please try again or contact support."
+        with export_jobs_lock:
+            if job_id in export_jobs:
+                export_jobs[job_id].update({
+                    "status": "failed",
+                    "error": "Export failed. Please try again or contact support."
+                })
 
 
 @router.post("/{user_id}/export", status_code=status.HTTP_202_ACCEPTED)
@@ -418,11 +438,14 @@ async def start_user_export(
         raise HTTPException(status_code=403, detail="Not authorized to export this user's data")
 
     # Enforce per-user cap on pending jobs
-    pending_jobs_for_user = sum(
-        1
-        for job in export_jobs.values()
-        if job.get("user_id") == user_id and job.get("status") == "pending"
-    )
+    pending_jobs_for_user = 0
+    with export_jobs_lock:
+        pending_jobs_for_user = sum(
+            1
+            for job in export_jobs.values()
+            if job.get("user_id") == user_id and job.get("status") == "pending"
+        )
+        
     if pending_jobs_for_user >= MAX_PENDING_EXPORT_JOBS_PER_USER:
         logger.warning(
             "User %s has too many pending export jobs: %s",
@@ -435,14 +458,15 @@ async def start_user_export(
         )
 
     job_id = f"{user_id}-{uuid.uuid4()}"
-    export_jobs[job_id] = {
-        "status": "pending",
-        "user_id": user_id,
-        "format": format,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "completed_at": None,
-        "error": None,
-    }
+    with export_jobs_lock:
+        export_jobs[job_id] = {
+            "status": "pending",
+            "user_id": user_id,
+            "format": format,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": None,
+            "error": None,
+        }
 
     background_tasks.add_task(_run_export_job, user_id, format, job_id)
     logger.info("Queued export job %s for user_id=%s", job_id, user_id)
@@ -469,17 +493,19 @@ async def get_export_status(
         )
         raise HTTPException(status_code=403, detail="Not authorized to check this export")
 
-    job = export_jobs.get(job_id)
-    if not job or job.get("user_id") != user_id:
-        raise HTTPException(status_code=404, detail="Export job not found")
+    with export_jobs_lock:
+        job = export_jobs.get(job_id)
+        if not job or job.get("user_id") != user_id:
+            raise HTTPException(status_code=404, detail="Export job not found")
+        job_copy = job.copy()
 
     return {
         "job_id": job_id,
-        "status": job["status"],
-        "format": job.get("format"),
-        "created_at": job.get("created_at"),
-        "completed_at": job.get("completed_at"),
-        "error": job.get("error"),
+        "status": job_copy["status"],
+        "format": job_copy.get("format"),
+        "created_at": job_copy.get("created_at"),
+        "completed_at": job_copy.get("completed_at"),
+        "error": job_copy.get("error"),
     }
 
 
@@ -491,7 +517,8 @@ def _cleanup_export_after_download(job_id: str, file_path: str) -> None:
             path_obj.unlink()
     except Exception:  # noqa: BLE001
         logger.exception("Failed to delete export file after download for job %s", job_id)
-    export_jobs.pop(job_id, None)
+    with export_jobs_lock:
+        export_jobs.pop(job_id, None)
 
 
 @router.get("/{user_id}/export/{job_id}/download")
@@ -514,21 +541,23 @@ async def download_user_export(
         )
         raise HTTPException(status_code=403, detail="Not authorized to download this export")
 
-    job = export_jobs.get(job_id)
-    if not job or job.get("user_id") != user_id:
-        raise HTTPException(status_code=404, detail="Export job not found")
+    with export_jobs_lock:
+        job = export_jobs.get(job_id)
+        if not job or job.get("user_id") != user_id:
+            raise HTTPException(status_code=404, detail="Export job not found")
+        job_copy = job.copy()
 
-    if job["status"] != "completed":
-        raise HTTPException(status_code=409, detail=f"Export job not completed: {job['status']}")
+    if job_copy["status"] != "completed":
+        raise HTTPException(status_code=409, detail=f"Export job not completed: {job_copy['status']}")
 
-    file_path = job.get("file_path")
+    file_path = job_copy.get("file_path")
     if not file_path or not Path(file_path).is_file():
         raise HTTPException(status_code=410, detail="Export file no longer available")
 
     response = FileResponse(
         path=file_path,
-        media_type=job.get("media_type") or "application/octet-stream",
-        filename=job.get("filename") or Path(file_path).name,
+        media_type=job_copy.get("media_type") or "application/octet-stream",
+        filename=job_copy.get("filename") or Path(file_path).name,
     )
 
     background_tasks.add_task(_cleanup_export_after_download, job_id, file_path)
