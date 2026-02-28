@@ -417,8 +417,8 @@ def _run_export_job(user_id: str, format: ExportFormat, job_id: str) -> None:
 @router.post("/{user_id}/export", status_code=status.HTTP_202_ACCEPTED)
 async def start_user_export(
     user_id: str,
+    background_tasks: BackgroundTasks,
     format: ExportFormat = ExportFormat.json,
-    background_tasks: BackgroundTasks = Depends(),
     current_user=Depends(get_current_user),
 ):
     """
