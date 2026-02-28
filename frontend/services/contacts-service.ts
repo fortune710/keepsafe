@@ -46,11 +46,13 @@ export class ContactsService {
                     // Safe phone number extraction
                     const phoneNumbers = this.extractPhoneNumbers(contact);
 
-                    return phoneNumbers.map(phoneNumber => ({
-                        name,
-                        email,
-                        phoneNumber
-                    }));
+                    return phoneNumbers
+                        .filter((phoneNumber: string) => phoneNumber && phoneNumber.trim() !== '')
+                        .map((phoneNumber: string) => ({
+                            name,
+                            email,
+                            phoneNumber
+                        }));
                 });
 
             return result;
@@ -66,13 +68,24 @@ export class ContactsService {
             return [];
         }
 
-        return contact.phoneNumbers.map(phone => {
-            if (!phone) return '';
-            const countryCode = phone.countryCode || '';
-            const digits = phone.digits || phone.number || '';
-            if (digits.startsWith("+")) return digits;
-            if (digits.startsWith("0")) return countryCode + digits.slice(1);
-            return countryCode + digits;
-        });
+        return contact.phoneNumbers
+            .map(phone => {
+                if (!phone) return '';
+                const countryCode = (phone.countryCode || '').trim();
+                const rawDigits = phone.digits || phone.number || '';
+
+                // Keep the leading "+" if present, otherwise stick to digits
+                const isPlus = rawDigits.trim().startsWith('+');
+                const digits = rawDigits.replace(/\D/g, '');
+
+                if (digits === '') return '';
+
+                if (isPlus) return '+' + digits;
+                if (rawDigits.trim().startsWith("0") && countryCode) {
+                    return countryCode + digits.slice(1);
+                }
+                return countryCode + digits;
+            })
+            .filter(pn => pn !== '');
     }
 }
