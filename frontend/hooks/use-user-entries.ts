@@ -236,7 +236,7 @@ export function useUserEntries(): UseUserEntriesResult {
       const uniqueUrls = Array.from(new Set(urlsToPreload));
 
       // Update tracking to avoid repeated work
-      uniqueUrls.forEach(url => prefetchedUrlsRef.current.add(url));
+      uniqueUrls.forEach(url => { prefetchedUrlsRef.current.add(url); });
 
       // Prevent unbounded memory growth by limiting set size (LRU-ish)
       if (prefetchedUrlsRef.current.size > 1000) {
