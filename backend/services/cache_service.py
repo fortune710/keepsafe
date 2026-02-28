@@ -45,9 +45,10 @@ class CacheService:
         elif env == 'production':
             return 'prod'
         else:
-            # Fallback to 'prod' if environment is not recognized
-            logger.warning(f"Unknown environment '{settings.ENVIRONMENT}', defaulting to 'prod'")
-            return 'prod'
+            # Raise an error if environment is not recognized to avoid accidental production usage
+            error_msg = f"Unknown environment '{settings.ENVIRONMENT}'. Must be 'development' or 'production'."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
     
     def get_notification_settings(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
