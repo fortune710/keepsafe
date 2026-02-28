@@ -1,9 +1,9 @@
 import { View, StyleSheet, TextInput, Text, TouchableOpacity, ScrollView, Platform, Keyboard, Dimensions, KeyboardAvoidingView } from "react-native";
 import ColorSlider from "./color-slider";
 import FontStyleSelector from "./font-style-selector";
-import { scale, verticalScale } from "react-native-size-matters";
+import { verticalScale } from "react-native-size-matters";
 import { useState, useRef, useEffect } from "react";
-import { Plus, Type, Palette, Square, AlignLeft } from "lucide-react-native";
+import { Type, Palette, Square, AlignLeft } from "lucide-react-native";
 
 type InternalTab = "text" | "textColor" | "backgroundColor" | "font";
 
@@ -18,7 +18,6 @@ interface TextTabProps {
     onBackgroundColorChange?: (color: string) => void;
 }
 
-const { height } = Dimensions.get("window");
 
 // Popular colors palette
 const POPULAR_COLORS = [
@@ -82,7 +81,7 @@ export default function TextTab({
 
     const renderTextTab = () => (
         <View style={styles.tabContent}>
-            <KeyboardAvoidingView style={styles.textInputSection}>
+            <View style={styles.textInputSection}>
                 <TextInput
                     ref={textInputRef}
                     value={textInput}
@@ -92,10 +91,8 @@ export default function TextTab({
                     style={styles.textInput}
                     autoFocus
                     multiline
-                //blurOnSubmit={true}
-                //onSubmitEditing={handleKeyboardDismiss}
                 />
-            </KeyboardAvoidingView>
+            </View>
         </View>
     );
 

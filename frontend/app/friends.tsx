@@ -21,8 +21,9 @@ import { ErrorState } from '@/components/friends/error-state';
 import { FriendsDefaultView } from '@/components/friends/friends-default-view';
 import { ContactSearchView } from '@/components/friends/contact-search-view';
 import { FriendsSearchView } from '@/components/friends/friends-search-view';
+import { SearchMode } from '@/types/friends';
 
-export type SearchMode = 'friends' | 'contacts' | null;
+
 
 /**
  * Main screen for managing friends and contacts.
@@ -129,11 +130,9 @@ export default function FriendsScreen() {
     setSearchQuery(query);
   };
 
-  const handleContactSearchToggle = () => {
-    setSearchMode(prev => (prev === 'contacts' ? null : 'contacts'));
-    if (searchMode !== 'contacts') {
-      setSearchQuery('');
-    }
+  const handleSearchToggle = (mode: Exclude<SearchMode, null>) => {
+    setSearchMode(prev => (prev === mode ? null : mode));
+    setSearchQuery('');
   };
 
   const handleRetry = () => {
@@ -182,7 +181,7 @@ export default function FriendsScreen() {
           <ContactSearchView
             searchQuery={searchQuery}
             onSearch={handleSearch}
-            onClose={() => setSearchMode(null)}
+            onClose={() => handleSearchToggle('contacts')}
             isContactSearchLoading={isContactSearchLoading}
             contactResults={contactResults}
             onAdd={handleAddKeepsafeFriend}
@@ -192,7 +191,7 @@ export default function FriendsScreen() {
           <FriendsSearchView
             searchQuery={searchQuery}
             onSearch={handleSearch}
-            onClose={() => setSearchMode(null)}
+            onClose={() => handleSearchToggle('friends')}
             allFriends={allFriends}
             handleRemoveFriend={handleRemoveFriend}
             handleAcceptRequest={handleAcceptRequest}
@@ -203,7 +202,7 @@ export default function FriendsScreen() {
           <FriendsDefaultView
             allFriends={allFriends}
             suggestedFriends={suggestedFriends}
-            onContactSearchToggle={handleContactSearchToggle}
+            onSearchToggle={handleSearchToggle}
             handleRemoveFriend={handleRemoveFriend}
             handleAcceptRequest={handleAcceptRequest}
             handleDeclineRequest={handleDeclineRequest}
@@ -214,6 +213,7 @@ export default function FriendsScreen() {
           />
         )}
       </View>
+
 
       <InvitePopover
         isVisible={showInvitePopover}
