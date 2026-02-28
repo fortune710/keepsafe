@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Plus, X } from 'lucide-react-native';
 import { FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { Colors } from '@/lib/constants';
-import { moderateScale, verticalScale } from 'react-native-size-matters';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 
 export interface Friend {
   id: string;
@@ -35,8 +35,8 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
       `Are you sure you want to remove ${friend.name} from your friends?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
+        {
+          text: 'Remove',
           style: 'destructive',
           onPress: () => onRemove(friend.id)
         },
@@ -50,8 +50,8 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
       `Are you sure you want to block ${friend.name}? They will no longer be able to interact with you.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Block', 
+        {
+          text: 'Block',
           style: 'destructive',
           onPress: () => onBlock?.(friend.id),
         },
@@ -113,31 +113,23 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
   };
 
   return (
-    <Animated.View 
+    <Animated.View
       entering={FadeInDown.delay(index * 50).duration(300).springify().damping(20).stiffness(90)}
     >
-      <View 
+      <View
         style={styles.container}
       >
         <View style={styles.avatarContainer}>
           <Image source={{ uri: friend.avatar }} style={styles.avatar} />
-          {friend.status === (FRIENDSHIP_STATUS.ACCEPTED as string) && (
-            <View 
-              style={[
-                styles.statusIndicator, 
-                { backgroundColor: friend.isOnline ? '#10B981' : '#6B7280' }
-              ]} 
-            />
-          )}
-          <View style={[styles.avatarBorder, { borderColor: getStatusColor() }]} />
+          <View style={[styles.avatarBorder, { borderColor: Colors.primary }]} />
         </View>
-        
+
         <View style={styles.friendInfo}>
           <Text style={styles.friendName}>{friend.name}</Text>
           <Text style={styles.friendEmail}>{friend.username}</Text>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.removeButton}
           onPress={handleRemove}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -155,12 +147,10 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
 
 const styles = StyleSheet.create({
   container: {
-    //backgroundColor: 'white',
-    paddingHorizontal: verticalScale(7),
     marginBottom: verticalScale(10),
+    paddingLeft: scale(2),
     flexDirection: 'row',
     alignItems: 'center',
-    //borderWidth: 1,
   },
   avatarContainer: {
     position: 'relative',

@@ -1,14 +1,18 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Database } from '@/types/database';
 import { EntryService, EntryServiceResult } from '@/services/entry-service';
+import { supabase } from '@/lib/supabase';
+import { TABLES } from '@/constants/supabase';
+import { deviceStorage } from '@/services/device-storage';
+import { EntryWithProfile } from '@/types/entries';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type EntryInsert = Database['public']['Tables']['entries']['Insert'];
 type EntryUpdate = Database['public']['Tables']['entries']['Update'];
 
 interface UseEntriesResult {
-  entries: Entry[];
+  entries: (Entry & { status?: string })[];
   isLoading: boolean;
   error: Error | null;
   createEntry: (entryData: EntryInsert) => Promise<{ success: boolean; entry?: Entry; error?: string }>;
@@ -34,6 +38,105 @@ export function useEntries(userId?: string): UseEntriesResult {
     },
     enabled: !!userId,
   });
+
+  // Listen for background processing status changes
+  useEffect(() => {
+    if (!userId) return;
+
+    const unsubscribe = deviceStorage.on('entryStatusChanged', ({
+      userId: storageUserId,
+      entryId,
+      status,
+      entry
+    }: {
+      userId: string;
+      entryId: string;
+      status: string;
+      entry?: EntryWithProfile;
+    }) => {
+      if (storageUserId !== userId) return;
+
+      // Update React Query cache directly
+      queryClient.setQueryData<EntryWithProfile[]>(
+        ['entries', userId],
+        (oldData) => {
+          if (!oldData) return undefined;
+
+          return oldData.map(item => {
+            if (item.id === entryId) {
+              if (status === 'completed' && entry) {
+                return { ...entry, status: 'completed' as const };
+              }
+              return { ...item, status: status as any };
+            }
+            return item;
+          });
+        }
+      );
+    });
+
+    return unsubscribe;
+  }, [userId, queryClient]);
+
+  // Realtime subscription for entries
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`entries-list-sync-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: TABLES.ENTRIES,
+          filter: `user_id=eq.${userId}`
+        },
+        async (payload) => {
+          try {
+            if (payload.eventType === 'DELETE') {
+              const oldEntry = payload.old as any;
+              queryClient.setQueryData<EntryWithProfile[]>(
+                ['entries', userId],
+                (oldData) => oldData ? oldData.filter(e => e.id !== oldEntry.id) : undefined
+              );
+              await deviceStorage.removeEntry(userId, oldEntry.id);
+              return;
+            }
+
+            const entryData = payload.new as any;
+            const typedEntry: EntryWithProfile = {
+              ...entryData,
+              status: 'completed'
+            };
+
+            queryClient.setQueryData<EntryWithProfile[]>(
+              ['entries', userId],
+              (oldData) => {
+                if (!oldData) return undefined;
+                const exists = oldData.some(e => e.id === typedEntry.id);
+                if (exists) {
+                  return oldData.map(e => e.id === typedEntry.id ? typedEntry : e);
+                } else if (payload.eventType === 'INSERT') {
+                  return [typedEntry, ...oldData];
+                }
+                return oldData;
+              }
+            );
+
+            // Update local storage
+            await deviceStorage.replaceEntry(userId, typedEntry.id, typedEntry);
+          } catch (error) {
+            console.error('Error handling realtime update in useEntries:', error);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [userId, queryClient]);
 
   const createEntryMutation = useMutation({
     mutationFn: async (entryData: EntryInsert) => {
@@ -78,9 +181,9 @@ export function useEntries(userId?: string): UseEntriesResult {
 
   const createEntry = useCallback(async (entryData: EntryInsert) => {
     if (!userId) {
-      return { 
-        success: false, 
-        error: 'User ID is required' 
+      return {
+        success: false,
+        error: 'User ID is required'
       };
     }
 
@@ -91,18 +194,18 @@ export function useEntries(userId?: string): UseEntriesResult {
       }
       return result;
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to create entry' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create entry'
       };
     }
   }, [userId, queryClient]);
 
   const updateEntry = useCallback(async (id: string, updates: EntryUpdate) => {
     if (!userId) {
-      return { 
-        success: false, 
-        error: 'User ID is required' 
+      return {
+        success: false,
+        error: 'User ID is required'
       };
     }
 
@@ -113,18 +216,18 @@ export function useEntries(userId?: string): UseEntriesResult {
       }
       return result;
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to update entry' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update entry'
       };
     }
   }, [userId, queryClient]);
 
   const deleteEntry = useCallback(async (id: string) => {
     if (!userId) {
-      return { 
-        success: false, 
-        error: 'User ID is required' 
+      return {
+        success: false,
+        error: 'User ID is required'
       };
     }
 
@@ -135,9 +238,9 @@ export function useEntries(userId?: string): UseEntriesResult {
       }
       return result;
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to delete entry' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete entry'
       };
     }
   }, [userId, queryClient]);
@@ -151,9 +254,9 @@ export function useEntries(userId?: string): UseEntriesResult {
         error: result.error
       };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to upload media' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to upload media'
       };
     }
   }, []);

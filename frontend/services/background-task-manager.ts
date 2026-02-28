@@ -6,6 +6,7 @@ import { convertToArrayBuffer, getContentType, getFileExtension, getTimefromTime
 import { RenderedMediaCanvasItem } from '@/types/capture';
 import { deviceStorage } from './device-storage';
 import { EntryService } from './entry-service';
+import { logger } from '@/lib/logger';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type EntryInsert = Database['public']['Tables']['entries']['Insert'];
@@ -21,6 +22,7 @@ interface EntryProcessingData {
   isEveryone: boolean;
   selectedFriends: string[];
   attachments: RenderedMediaCanvasItem[];
+  idempotencyKey: string;
 }
 
 // A lightweight foreground queue persisted to device storage.
@@ -58,16 +60,16 @@ const dequeueNext = async (): Promise<EntryProcessingData | undefined> => {
  * Uploads media to Supabase storage
  */
 const uploadMedia = async (
-  file: string, 
-  userId: string, 
+  file: string,
+  userId: string,
   fileName: string,
   contentType: string
 ): Promise<string | null> => {
   const filePath = UPLOAD_PATHS.MEDIA(userId, fileName);
-  
+
   try {
     const uploadData = await convertToArrayBuffer(file);
-    
+
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKETS.MEDIA)
       .upload(filePath, uploadData, {
@@ -86,7 +88,7 @@ const uploadMedia = async (
       .getPublicUrl(data.path);
 
     return publicUrl;
-    
+
   } catch (error) {
     console.error('Upload failed:', error);
     return null;
@@ -101,9 +103,14 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
     console.log('Processing entry in background:', data.entryId);
 
     // Update status to processing
-    await deviceStorage.updateEntry(data.userId, data.entryId, { 
+    await deviceStorage.updateEntry(data.userId, data.entryId, {
       status: 'processing',
       processingStartedAt: new Date().toISOString()
+    });
+    deviceStorage.emit('entryStatusChanged', {
+      userId: data.userId,
+      entryId: data.entryId,
+      status: 'processing'
     });
 
     // Prepare entry data
@@ -115,13 +122,13 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
       const fileExtension = getFileExtension(data.capture.type);
       const fileName = `${data.capture.type}_${timestamp}.${fileExtension}`;
       const contentType = getContentType(data.capture.type);
-      
+
       const uploadedUrl = await uploadMedia(data.capture.uri, data.userId, fileName, contentType);
-      
+
       if (!uploadedUrl) {
         throw new Error('Failed to upload media to storage');
       }
-      
+
       finalContentUrl = uploadedUrl;
     } catch (uploadError) {
       console.error('Media upload error:', uploadError);
@@ -153,7 +160,7 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
 
     // Use EntryService to create the entry
     const result = await EntryService.createEntry(data.userId, newEntry);
-    
+
     if (!result.success) {
       throw new Error(result.error || 'Failed to create entry');
     }
@@ -183,6 +190,12 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
       data.entryId,
       { ...entryWithProfile, status: 'completed', processingCompletedAt: new Date().toISOString() }
     );
+    deviceStorage.emit('entryStatusChanged', {
+      userId: data.userId,
+      entryId: data.entryId,
+      status: 'completed',
+      entry: entryWithProfile
+    });
 
     console.log('Entry processed successfully:', data.entryId);
     return { success: true, entry };
@@ -192,17 +205,23 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
 
   } catch (error) {
     console.error('Background processing error:', error);
-    
+
     // Update status to failed
-    await deviceStorage.updateEntry(data.userId, data.entryId, { 
+    await deviceStorage.updateEntry(data.userId, data.entryId, {
       status: 'failed',
       processingFailedAt: new Date().toISOString(),
       error: error instanceof Error ? error.message : 'Unknown error'
     });
+    deviceStorage.emit('entryStatusChanged', {
+      userId: data.userId,
+      entryId: data.entryId,
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
 
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 };
@@ -217,10 +236,10 @@ export async function startForegroundQueueProcessor(): Promise<void> {
     // eslint-disable-next-line no-constant-condition
     while ((next = await dequeueNext())) {
       try {
-        console.log('Processing entry in foreground:', next.entryId);
+        logger.info('Processing entry in foreground:', next.entryId);
         await processEntry(next);
       } catch (err) {
-        console.error('Queue item processing failed, leaving as-is for retry:', err);
+        logger.error('Queue item processing failed, leaving as-is for retry:', err);
       }
     }
   } finally {
@@ -233,14 +252,22 @@ export async function startForegroundQueueProcessor(): Promise<void> {
  */
 export async function scheduleEntryProcessing(data: EntryProcessingData): Promise<void> {
   try {
-    // Enqueue and kick off the foreground processor
+    // Check if entry with this idempotency key already exists in queue
     const queue = await loadQueue();
+    const existingEntry = queue.find(item => item.idempotencyKey === data.idempotencyKey);
+
+    if (existingEntry) {
+      console.log('Entry with idempotency key already in queue, skipping duplicate:', data.idempotencyKey);
+      return;
+    }
+
+    // Enqueue and kick off the foreground processor
     queue.push(data);
     await saveQueue(queue);
     console.log('Queued entry for processing:', data.entryId);
 
     // Mark entry as pending in storage immediately
-    await deviceStorage.updateEntry(data.userId, data.entryId, { 
+    await deviceStorage.updateEntry(data.userId, data.entryId, {
       status: 'pending',
       processingStartedAt: null,
       processingCompletedAt: null,
@@ -250,12 +277,12 @@ export async function scheduleEntryProcessing(data: EntryProcessingData): Promis
 
     // Kick the processor
     void startForegroundQueueProcessor();
-    
+
   } catch (err) {
     console.error('Failed to schedule background task:', err);
-    
+
     // Update status to failed if scheduling fails
-    await deviceStorage.updateEntry(data.userId, data.entryId, { 
+    await deviceStorage.updateEntry(data.userId, data.entryId, {
       status: 'failed',
       processingFailedAt: new Date().toISOString(),
       error: 'Failed to schedule background processing'
@@ -268,7 +295,7 @@ export async function scheduleEntryProcessing(data: EntryProcessingData): Promis
  */
 export async function retryEntryProcessing(data: EntryProcessingData): Promise<void> {
   // Reset status to pending
-  await deviceStorage.updateEntry(data.userId, data.entryId, { 
+  await deviceStorage.updateEntry(data.userId, data.entryId, {
     status: 'pending',
     processingStartedAt: null,
     processingCompletedAt: null,
@@ -276,9 +303,15 @@ export async function retryEntryProcessing(data: EntryProcessingData): Promise<v
     error: null
   });
 
-  // Re-enqueue the task
+  // Re-enqueue the task (check for duplicates)
   const queue = await loadQueue();
-  queue.push(data);
-  await saveQueue(queue);
-  void startForegroundQueueProcessor();
+  const existingEntry = queue.find(item => item.idempotencyKey === data.idempotencyKey);
+
+  if (!existingEntry) {
+    queue.push(data);
+    await saveQueue(queue);
+    void startForegroundQueueProcessor();
+  } else {
+    console.log('Entry with idempotency key already in queue, skipping retry:', data.idempotencyKey);
+  }
 }

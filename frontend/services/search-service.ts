@@ -1,8 +1,7 @@
 import { logger } from '@/lib/logger';
-import { fetch as expoFetch } from 'expo/fetch';
+import { apiFetchStream } from '@/lib/api-client';
 
 interface StreamSearchOptions {
-  userId: string;
   query: string;
   /**
    * Called for each text chunk received from the backend search stream.
@@ -38,9 +37,11 @@ export class SearchService {
    *
    * The backend uses Server-Sent Events (SSE) with lines like `data: <chunk>`.
    * We parse those lines and invoke the callback with the decoded text content.
+   * 
+   * The user ID is automatically extracted from the Supabase access token by the backend.
    */
   static async streamSearch(options: StreamSearchOptions): Promise<void> {
-    const { userId, query, onMessage, onFinish, onError, signal } = options;
+    const { query, onMessage, onFinish, onError, signal } = options;
 
     const url = `${this.BASE_URL}/search/stream`;
 
@@ -48,23 +49,12 @@ export class SearchService {
       logger.info('SearchService: starting search request', {
         url,
         method: 'POST',
-        body: { user_id: userId, query },
+        body: { query },
       });
 
-      // NOTE: Previous implementation using the global fetch has been kept here
-      // for reference but is no longer used. We now rely on expo/fetch so that
-      // streaming (body.getReader) works reliably in React Native.
-      //
-      // const response = await fetch(url, { ... });
-
-      const response = await expoFetch(url, {
+      const response = await apiFetchStream(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
         body: JSON.stringify({
-          user_id: userId,
           query,
         }),
         signal,

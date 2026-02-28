@@ -1,10 +1,14 @@
 import { Database } from "./database";
 
+export type SearchMode = 'friends' | 'contacts' | null;
+
 export interface SuggestedFriend {
   id: string;
   name: string;
   username: string;
   avatar: string | null;
+  email: string;
+  phone: string | null;
 }
 
 export interface Friend extends SuggestedFriend {

@@ -39,9 +39,9 @@ export function Input({ style, value, onChangeText, ...props }: InputProps) {
                 style={[styles.input, style]}
             />
             {inputValue.length > 0 && (
-                <TouchableOpacity 
-                    style={styles.cancelButton} 
-                    onPress={handleClear} 
+                <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handleClear}
                     accessibilityLabel="Clear text"
                 >
                     <X color="#64748B" size={18} />

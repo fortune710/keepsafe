@@ -50,7 +50,7 @@ export class FriendService {
     try {
       // Generate a unique invite code
       const inviteCode = await generateInviteCode();
-      
+
       // Create invite link
       const inviteLink: InviteLink = {
         url: `${this.BASE_INVITE_URL}/${inviteCode}`,
@@ -106,7 +106,7 @@ export class FriendService {
       }
     } catch (error) {
       console.error('Failed to share invite link:', error);
-      
+
       // Handle specific Web Share API errors
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
@@ -115,7 +115,7 @@ export class FriendService {
           throw new Error('SHARE_NOT_SUPPORTED');
         }
       }
-      
+
       throw new Error('SHARE_FAILED');
     }
   }
@@ -154,14 +154,14 @@ export class FriendService {
         };
 
       const friends: FriendWithProfile[] = data?.map(friend => {
-        const { 
-          user_profile: user, 
-          friend_profile: friend_, 
-          ...friend_record 
+        const {
+          user_profile: user,
+          friend_profile: friend_,
+          ...friend_record
         } = friend;
 
-        const profile = friend.friend_id === userId ? 
-        user : friend_;
+        const profile = friend.friend_id === userId ?
+          user : friend_;
 
         return {
           ...friend_record,
@@ -189,7 +189,7 @@ export class FriendService {
     }
   }
 
-  static async sendFriendRequest(userId: string, friendId: string): Promise<boolean> { 
+  static async sendFriendRequest(userId: string, friendId: string): Promise<boolean> {
     if (!userId || !friendId) {
       if (__DEV__) logger.error('User ID and friend ID are required to send a friend request', { userId, friendId });
       throw new Error('User ID and friend ID are required');
@@ -259,60 +259,71 @@ export class FriendService {
       }
 
       const contacts = await ContactsService.getDeviceContacts();
-      
-      // Validate and filter emails
-      const validEmails = (contacts
-        ?.map((contact) => contact.email)
-        .filter((email): email is string => Boolean(email) && typeof email === 'string')
-        .filter((email) => this.isValidEmail(email)) ?? []) as string[];
-      
-      // Validate and filter phone numbers
-      const validNumbers = (contacts
-        ?.map((contact) => contact.phoneNumber)
-        .filter((phone): phone is string => Boolean(phone) && typeof phone === 'string')
-        .filter((phone) => this.isValidPhoneNumber(phone)) ?? []) as string[];
-      
+
+      // Build a lookup map: email/phone → phoneNumber from device contacts.
+      // This lets us attach the local phone number to matched profiles without
+      // relying on Supabase having the phone stored.
+      // Using Map<string, string> for O(1) lookups during profile mapping.
+      const contactPhoneByEmail = new Map<string, string>();
+      const contactPhoneByPhone = new Map<string, string>();
+
+      const validEmails: string[] = [];
+      const validNumbers: string[] = [];
+
+      for (const contact of contacts ?? []) {
+        const email = contact.email;
+        const phone = contact.phoneNumber;
+
+        if (email && typeof email === 'string' && this.isValidEmail(email)) {
+          validEmails.push(email);
+          if (phone) contactPhoneByEmail.set(email.toLowerCase(), phone);
+        }
+
+        if (phone && typeof phone === 'string' && this.isValidPhoneNumber(phone)) {
+          validNumbers.push(phone);
+          contactPhoneByPhone.set(phone, phone);
+        }
+      }
+
       // Early return if no valid contact data
       if (validEmails.length === 0 && validNumbers.length === 0) {
         logger.info('No valid email or phone contacts found');
         return [];
       }
-    
-      // Query friendships table directly to get all friend IDs for the current user
-      // Use WHERE clauses with OR conditions instead of JOINs
-      const { data: friendships, error: friendshipsError } = await supabase
-        .from(TABLES.FRIENDSHIPS)
-        .select('user_id, friend_id')
-        .or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`) as {
-          data: Array<{ user_id: string; friend_id: string }> | null;
-          error: any;
-        };
-      
+
+      // Run friendships lookup and profile lookup in parallel
+      const [{ data: friendships, error: friendshipsError }] = await Promise.all([
+        supabase
+          .from(TABLES.FRIENDSHIPS)
+          .select('user_id, friend_id')
+          .or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`)
+      ]) as [{ data: Array<{ user_id: string; friend_id: string }> | null; error: any }];
+
       if (friendshipsError) {
         logger.error('Failed to fetch friendships:', friendshipsError);
         throw friendshipsError;
       }
-      
+
       // Extract friend IDs (the ones that are NOT the current user)
       const friendIds = (friendships ?? [])
-        .map((friendship) => 
-          friendship.user_id === session.user.id 
-            ? friendship.friend_id 
+        .map((friendship) =>
+          friendship.user_id === session.user.id
+            ? friendship.friend_id
             : friendship.user_id
         )
         .filter((id) => id && this.isValidUUID(id));
-      
+
       // Validate and filter excluded IDs (UUIDs)
       const validExcludedIds = [
         ...friendIds,
-        session.user.id
+        session.user.id,
       ].filter((id) => this.isValidUUID(id));
-      
+
       // Build query with validated data
       let query = supabase
         .from(TABLES.PROFILES)
-        .select('id,full_name,avatar_url,username');
-      
+        .select('id,full_name,avatar_url,username,email');
+
       // Only add .or() clause if we have valid contact data
       if (validEmails.length > 0 || validNumbers.length > 0) {
         const emailFilter = validEmails.length > 0 ? `email.in.(${validEmails.join(',')})` : '';
@@ -320,29 +331,41 @@ export class FriendService {
         const orClause = [emailFilter, phoneFilter].filter(Boolean).join(',');
         query = query.or(orClause);
       }
-      
+
       // Only add .not() clause if we have valid excluded IDs
       if (validExcludedIds.length > 0) {
         query = query.not('id', 'in', `(${validExcludedIds.join(',')})`);
       }
-      
-      const { data, error } = await query as { data: Profile[], error: any }
 
-        if (error) {
-          throw error;
-        }
-      
-        const profiles: SuggestedFriend[] = data?.map((profile) => ({
+      const { data, error } = await query as { data: Profile[], error: any };
+
+      if (error) {
+        throw error;
+      }
+
+      // Map profiles and attach local contact phone number.
+      // Prefer lookup by email first (more reliable), then fall back to phone_number
+      // stored in Supabase (if the column exists on the profile row).
+      const profiles: SuggestedFriend[] = data?.map((profile) => {
+        const localPhone =
+          (profile.email ? contactPhoneByEmail.get(profile.email.toLowerCase()) : undefined) ??
+          (profile.phone_number ? contactPhoneByPhone.get(profile.phone_number) : undefined) ??
+          null;
+
+        return {
           id: profile.id,
-          name: profile.full_name ?? "",
-          username: profile.username ?? "",
+          name: profile.full_name ?? '',
+          username: profile.username ?? '',
           avatar: profile.avatar_url,
-        }))
+          email: profile.email ?? '',
+          phone: localPhone,
+        };
+      });
 
-        // Note: Device storage sync is handled by React Query in useSuggestedFriends hook
-        // This keeps the service layer pure and allows React Query to manage state
+      // Note: Device storage sync is handled by React Query in useSuggestedFriends hook
+      // This keeps the service layer pure and allows React Query to manage state
 
-        return profiles;
+      return profiles;
 
     } catch (error) {
       console.error('Failed to get contacts:', error);

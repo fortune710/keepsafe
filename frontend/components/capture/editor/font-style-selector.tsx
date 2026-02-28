@@ -76,7 +76,7 @@ const FontStyleSelector: React.FC<FontStyleSelectorProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height: verticalScale(280), // 👈 Fixed height instead of flex: 1
+    height: verticalScale(380), // 👈 Fixed height instead of flex: 1
     width: "100%",
   },
   flatList: {

@@ -8,12 +8,13 @@ const reverseGeocodeCache = new Map<string, string>();
 // Utility function to sleep/delay
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
-interface LocationData {
+export interface LocationData {
   address: string;
   postalCode: string;
   city: string;
   region: string;
   country: string;
+  isoCountryCode: string;
   formattedAddress: string;
   latitude: number;
   longitude: number;
@@ -26,7 +27,7 @@ interface PlaceResult {
   longitude: number;
 }
 
-interface UseDeviceLocationResult {
+export interface UseDeviceLocationResult {
   location: LocationData | null;
   placesInState: PlaceResult[];
   isLoading: boolean;
@@ -53,31 +54,31 @@ export function useDeviceLocation(): UseDeviceLocationResult {
 
   const formatAddress = (address: Location.LocationGeocodedAddress): string => {
     const parts = [];
-    
+
     // Add street address
     if (address.streetNumber && address.street) {
       parts.push(`${address.streetNumber} ${address.street}`);
     } else if (address.street) {
       parts.push(address.street);
     }
-    
+
     // Add city
     if (address.city) {
       parts.push(address.city);
     } else if (address.subregion) {
       parts.push(address.subregion);
     }
-    
+
     // Add region/state
     if (address.region) {
       parts.push(address.region);
     }
-    
+
     // Add country (optional, usually not needed for local addresses)
     // if (address.country) {
     //   parts.push(address.country);
     // }
-    
+
     return parts.join(', ') || 'Unknown location';
   };
 
@@ -117,6 +118,7 @@ export function useDeviceLocation(): UseDeviceLocationResult {
           city: address.city || address.subregion || '',
           region: address.region || '',
           country: address.country || '',
+          isoCountryCode: address.isoCountryCode || '',
           formattedAddress: formatAddress(address),
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -169,7 +171,7 @@ export function useDeviceLocation(): UseDeviceLocationResult {
         // Search for places in the state using the region
         const searchQuery = data.region;
         const geocodedLocations = await Location.geocodeAsync(searchQuery);
-        
+
         if (geocodedLocations.length === 0) {
           return [];
         }
@@ -180,7 +182,7 @@ export function useDeviceLocation(): UseDeviceLocationResult {
           index: number
         ): Promise<PlaceResult> => {
           const cacheKey = `${location.latitude},${location.longitude}`;
-          
+
           // Check cache first
           const cachedAddress = reverseGeocodeCache.get(cacheKey);
           if (cachedAddress) {
@@ -201,33 +203,33 @@ export function useDeviceLocation(): UseDeviceLocationResult {
             if (reverseGeocode.length > 0) {
               const address = reverseGeocode[0];
               const parts: string[] = [];
-              
+
               // Build formatted address
               if (address.name) {
                 parts.push(address.name);
               }
-              
+
               if (address.streetNumber && address.street) {
                 parts.push(`${address.streetNumber} ${address.street}`);
               } else if (address.street) {
                 parts.push(address.street);
               }
-              
+
               if (address.city) {
                 parts.push(address.city);
               } else if (address.subregion) {
                 parts.push(address.subregion);
               }
-              
+
               if (address.region) {
                 parts.push(address.region);
               }
 
               const formattedAddress = parts.join(', ') || searchQuery;
-              
+
               // Cache the result
               reverseGeocodeCache.set(cacheKey, formattedAddress);
-              
+
               return {
                 id: `place-${index}-${location.latitude}-${location.longitude}`,
                 formattedAddress,
@@ -267,10 +269,10 @@ export function useDeviceLocation(): UseDeviceLocationResult {
 
         for (let i = 0; i < locationsToProcess.length; i += BATCH_SIZE) {
           const batch = locationsToProcess.slice(i, i + BATCH_SIZE);
-          
+
           // Process batch with Promise.allSettled to handle individual failures
           const batchResults = await Promise.allSettled(
-            batch.map((location, batchIndex) => 
+            batch.map((location, batchIndex) =>
               reverseGeocodeLocation(location, i + batchIndex)
             )
           );

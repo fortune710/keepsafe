@@ -1,9 +1,9 @@
-import { View, StyleSheet, TextInput, Text, TouchableOpacity, ScrollView, Platform, Keyboard, Dimensions } from "react-native";
+import { View, StyleSheet, TextInput, Text, TouchableOpacity, ScrollView, Platform, Keyboard, Dimensions, KeyboardAvoidingView } from "react-native";
 import ColorSlider from "./color-slider";
 import FontStyleSelector from "./font-style-selector";
-import { scale, verticalScale } from "react-native-size-matters";
+import { verticalScale } from "react-native-size-matters";
 import { useState, useRef, useEffect } from "react";
-import { Plus, Type, Palette, Square, AlignLeft } from "lucide-react-native";
+import { Type, Palette, Square, AlignLeft } from "lucide-react-native";
 
 type InternalTab = "text" | "textColor" | "backgroundColor" | "font";
 
@@ -18,7 +18,6 @@ interface TextTabProps {
     onBackgroundColorChange?: (color: string) => void;
 }
 
-const { height } = Dimensions.get("window");
 
 // Popular colors palette
 const POPULAR_COLORS = [
@@ -44,13 +43,13 @@ const POPULAR_COLORS = [
  * @param onBackgroundColorChange - Optional callback called with a hex color when the background color is changed
  * @returns A React element containing the internal tab bar and the active tab's content
  */
-export default function TextTab({ 
-    textInput, 
-    onTextChange, 
-    selectedColor, 
-    onColorChange, 
+export default function TextTab({
+    textInput,
+    onTextChange,
+    selectedColor,
+    onColorChange,
     selectedFont,
-    onFontChange,  
+    onFontChange,
     selectedBackgroundColor = "#000000",
     onBackgroundColorChange
 }: TextTabProps) {
@@ -61,7 +60,7 @@ export default function TextTab({
     // Auto-focus when text tab becomes active, but keep keyboard persistent when switching tabs
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | null = null;
-        
+
         if (activeInternalTab === "text") {
             // Small delay to ensure the component is rendered
             timer = setTimeout(() => {
@@ -70,7 +69,7 @@ export default function TextTab({
                 }
             }, 100);
         }
-        
+
         // Cleanup function to clear timeout if activeInternalTab changes or component unmounts
         return () => {
             if (timer !== null) {
@@ -90,22 +89,21 @@ export default function TextTab({
                     placeholder="Enter text..."
                     placeholderTextColor="#94A3B8"
                     style={styles.textInput}
+                    autoFocus
                     multiline
-                    //blurOnSubmit={true}
-                    //onSubmitEditing={handleKeyboardDismiss}
                 />
             </View>
         </View>
     );
 
     const renderTextColorTab = () => (
-        <ScrollView 
-            style={styles.tabContent} 
+        <ScrollView
+            style={styles.tabContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContentContainer}
         >
-            <View style={styles.colorSection}>
+            {/* <View style={styles.colorSection}>
                 <Text style={styles.sectionTitle}>Custom Color</Text>
                 <TouchableOpacity
                     key={`text-custom-${selectedColor}`}
@@ -114,8 +112,8 @@ export default function TextTab({
                 >
                     <Plus size={16} color={selectedColor} />
                 </TouchableOpacity>
-            </View>
-            
+            </View> */}
+
             <View style={styles.colorSection}>
                 <View style={styles.colorGrid}>
                     {POPULAR_COLORS.map((color) => (
@@ -138,6 +136,15 @@ export default function TextTab({
                     ))}
                 </View>
 
+                <TouchableOpacity
+                    style={styles.customColorButton}
+                    onPress={() => setShowCustomColor(!showCustomColor)}
+                >
+                    <Text style={styles.customColorButtonText}>
+                        {showCustomColor ? "Hide Custom Color" : "Custom Color"}
+                    </Text>
+                </TouchableOpacity>
+
 
                 {showCustomColor && (
                     <View style={styles.customColorSection}>
@@ -150,8 +157,8 @@ export default function TextTab({
     );
 
     const renderBackgroundColorTab = () => (
-        <ScrollView 
-            style={styles.tabContent} 
+        <ScrollView
+            style={styles.tabContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContentContainer}
@@ -189,9 +196,9 @@ export default function TextTab({
 
                 {showCustomColor && (
                     <View style={styles.customColorSection}>
-                        <ColorSlider 
-                            value={selectedBackgroundColor} 
-                            onChange={onBackgroundColorChange || (() => {})} 
+                        <ColorSlider
+                            value={selectedBackgroundColor}
+                            onChange={onBackgroundColorChange || (() => { })}
                         />
                         <Text style={styles.colorCode}>{selectedBackgroundColor.toUpperCase()}</Text>
                     </View>
@@ -214,8 +221,8 @@ export default function TextTab({
     return (
         <View style={styles.container}>
             {/* Internal Tabs */}
-            <ScrollView 
-                horizontal 
+            <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.tabBarScrollView}
                 contentContainerStyle={styles.tabBar}
@@ -225,9 +232,9 @@ export default function TextTab({
                     style={[styles.tab, activeInternalTab === "text" && styles.activeTab]}
                     onPress={() => setActiveInternalTab("text")}
                 >
-                    <Type 
-                        size={20} 
-                        color={activeInternalTab === "text" ? "#8B5CF6" : "#64748B"} 
+                    <Type
+                        size={20}
+                        color={activeInternalTab === "text" ? "#8B5CF6" : "#64748B"}
                     />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -237,9 +244,9 @@ export default function TextTab({
                         setShowCustomColor(false);
                     }}
                 >
-                    <Palette 
-                        size={20} 
-                        color={activeInternalTab === "textColor" ? "#8B5CF6" : "#64748B"} 
+                    <Palette
+                        size={20}
+                        color={activeInternalTab === "textColor" ? "#8B5CF6" : "#64748B"}
                     />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -249,18 +256,18 @@ export default function TextTab({
                         setShowCustomColor(false);
                     }}
                 >
-                    <Square 
-                        size={20} 
-                        color={activeInternalTab === "backgroundColor" ? "#8B5CF6" : "#64748B"} 
+                    <Square
+                        size={20}
+                        color={activeInternalTab === "backgroundColor" ? "#8B5CF6" : "#64748B"}
                     />
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.tab, activeInternalTab === "font" && styles.activeTab]}
                     onPress={() => setActiveInternalTab("font")}
                 >
-                    <AlignLeft 
-                        size={20} 
-                        color={activeInternalTab === "font" ? "#8B5CF6" : "#64748B"} 
+                    <AlignLeft
+                        size={20}
+                        color={activeInternalTab === "font" ? "#8B5CF6" : "#64748B"}
                     />
                 </TouchableOpacity>
             </ScrollView>
@@ -276,7 +283,7 @@ export default function TextTab({
 
 const styles = StyleSheet.create({
     container: {
-        height: verticalScale(350)
+        minHeight: verticalScale(420)
     },
     tabBarScrollView: {
         flexGrow: 0,
@@ -313,6 +320,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 14,
+        fontFamily: 'Outfit-SemiBold',
         fontWeight: '600',
         color: '#1E293B',
         marginBottom: 12,
@@ -381,6 +389,7 @@ const styles = StyleSheet.create({
     },
     customColorButtonText: {
         fontSize: 14,
+        fontFamily: 'Outfit-SemiBold',
         fontWeight: '600',
         color: '#8B5CF6',
     },
@@ -390,9 +399,9 @@ const styles = StyleSheet.create({
     },
     colorCode: {
         fontSize: 14,
+        fontFamily: 'Jost-Regular',
         fontWeight: '600',
         color: '#1E293B',
-        fontFamily: 'monospace',
         textAlign: 'center',
     },
 })

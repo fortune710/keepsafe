@@ -48,12 +48,12 @@ export default function VaultEntryCard({
   onRetry,
   onMusicPress,
 }: VaultEntryCardProps) {
-  
+
   const numberHash = useMemo(() => {
     return dateStringToNumber(entry.created_at);
   }, [])
-  
-  
+
+
 
   const { profile } = useAuthContext();
 
@@ -99,7 +99,7 @@ export default function VaultEntryCard({
             <AlertCircle color="#EF4444" size={16} />
             <Text style={[styles.statusText, styles.failedText]}>Failed</Text>
             {onRetry && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.retryButtonSmall}
                 onPress={() => onRetry(entry.id)}
               >
@@ -130,17 +130,18 @@ export default function VaultEntryCard({
 
   return (
     <View style={styles.container}>
-      <Animated.View    
+      <Animated.View
         style={includeRotation ? [styles.entryCard, rotateStyle] : styles.entryCard}
         entering={FadeIn.duration(200)}
         exiting={FadeOut.duration(150)}
       >
-        <VaultCanvas 
-          type={entry.type} 
+        <VaultCanvas
+          type={entry.type}
           items={entry.attachments}
-          uri={entry.content_url || ''} 
-          style={styles.entryImage}
+          uri={entry.content_url || ''}
+          style={styles.entryImage as any}
           onMusicPress={onMusicPress}
+          metadata={entry.metadata}
         />
 
         {/* Status indicator */}
@@ -148,23 +149,23 @@ export default function VaultEntryCard({
 
         {/* Author info at bottom */}
         <View style={styles.authorContainer}>
-            <Image 
-              source={{ 
-                uri: safeProfile?.avatar_url || getDefaultAvatarUrl(safeProfile?.full_name || '')
-              }}
-              style={styles.authorAvatar}
-            />
-            <View style={styles.authorNameContainer}>
-              <TextTicker loop duration={5000} style={styles.authorName}>
-                {safeProfile?.id === profile?.id ? 'You' : safeProfile?.full_name || 'Unknown User'}
-              </TextTicker>
-            </View>
+          <Image
+            source={{
+              uri: safeProfile?.avatar_url || getDefaultAvatarUrl(safeProfile?.full_name || '')
+            }}
+            style={styles.authorAvatar}
+          />
+          <View style={styles.authorNameContainer}>
+            <TextTicker loop duration={5000} style={styles.authorName}>
+              {safeProfile?.id === profile?.id ? 'You' : safeProfile?.full_name || 'Unknown User'}
+            </TextTicker>
+          </View>
 
           <Text style={styles.dateText}>{getRelativeDate(entry.created_at)}</Text>
         </View>
       </Animated.View>
 
-          {/* <View style={styles.actionsContainer}>
+      {/* <View style={styles.actionsContainer}>
             <TouchableOpacity 
               style={styles.actionButton} 
               onPress={handleEntryReactions}
@@ -331,8 +332,8 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: 0
   },
-  
-  
+
+
   entryContent: {
     flex: 1,
   },

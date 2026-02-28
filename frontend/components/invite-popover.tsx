@@ -1,11 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Copy, Share, X } from 'lucide-react-native';
 import { useFriendInvitation } from '@/hooks/use-friend-invitation';
 import { verticalScale } from 'react-native-size-matters';
-import { useAuthContext } from '@/providers/auth-provider';
 
 const { height } = Dimensions.get('window');
 
@@ -16,7 +15,6 @@ interface InvitePopoverProps {
 
 export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps) {
   const { inviteLink, copyInviteLink, shareInviteLink } = useFriendInvitation();
-  const { profile } = useAuthContext();
   
   const popoverHeight = useSharedValue(height * 0.6);
 
@@ -113,9 +111,6 @@ export default function InvitePopover({ isVisible, onClose }: InvitePopoverProps
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.linkInfo}>
-              {(profile?.max_uses || 0) - (profile?.current_uses || 0)} uses remaining
-            </Text>
           </View>
 
           <View style={styles.actions}>
@@ -251,11 +246,6 @@ const styles = StyleSheet.create({
   copyButton: {
     padding: 8,
     marginLeft: 8,
-  },
-  linkInfo: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
   },
   actions: {
     paddingHorizontal: 24,

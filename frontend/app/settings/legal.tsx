@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, FileText, ChevronRight } from 'lucide-react-native';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { logger } from '@/lib/logger';
@@ -9,7 +9,8 @@ import { logger } from '@/lib/logger';
 type LegalDocument = 'terms' | 'eula' | 'privacy';
 
 export default function LegalScreen() {
-  const [selectedDoc, setSelectedDoc] = useState<LegalDocument | null>(null);
+  const { doc } = useLocalSearchParams<{ doc: LegalDocument }>();
+  const [selectedDoc, setSelectedDoc] = useState<LegalDocument | null>(doc || null);
 
   const legalDocuments = [
     {

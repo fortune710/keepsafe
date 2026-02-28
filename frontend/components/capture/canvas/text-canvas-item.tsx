@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
+import { scale, verticalScale } from "react-native-size-matters";
 
 interface TextCanvasItemProps {
     text: string,
@@ -20,7 +21,7 @@ interface TextCanvasItemProps {
  */
 export function TextCanvasItem({ text, textStyle }: TextCanvasItemProps) {
     if (!text) return null;
-    
+
     console.log({ textStyle })
     return (
         <View style={[styles.textContainer, { backgroundColor: textStyle?.backgroundColor || "#000000" }]}>
@@ -33,12 +34,12 @@ export function TextCanvasItem({ text, textStyle }: TextCanvasItemProps) {
 
 const styles = StyleSheet.create({
     textContainer: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
+        paddingVertical: verticalScale(6),
+        paddingHorizontal: scale(14),
         borderRadius: 45
     },
     textStyle: {
-        fontSize: 12,
+        fontSize: scale(14),
         fontWeight: "500"
     },
 })

@@ -30,8 +30,8 @@ export default function EntryAttachmentList({ onSelectAttachment }: EntryAttachm
             </Text>
 
             <View style={styles.attachmentSection}>
-                <ScrollView 
-                    horizontal 
+                <ScrollView
+                    horizontal
                     showsHorizontalScrollIndicator={false}
                     style={styles.attachmentsScroll}
                     contentContainerStyle={styles.attachmentsScrollContent}
@@ -39,7 +39,7 @@ export default function EntryAttachmentList({ onSelectAttachment }: EntryAttachm
                     {attachmentTypes.map((attachment) => {
                         const IconComponent = attachment.icon;
                         return (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 key={attachment.type}
                                 style={styles.attachmentOption}
                                 onPress={() => onSelectAttachment(attachment.type)}
@@ -61,6 +61,7 @@ const styles = StyleSheet.create({
     attachmentText: {
         textAlign: "center",
         fontSize: scale(16),
+        fontFamily: 'Outfit-SemiBold',
         fontWeight: '500',
         marginVertical: verticalScale(8)
     },
@@ -90,6 +91,7 @@ const styles = StyleSheet.create({
     },
     attachmentName: {
         fontSize: 12,
+        fontFamily: 'Jost-SemiBold',
         color: '#64748B',
         fontWeight: '500',
         textAlign: 'center',

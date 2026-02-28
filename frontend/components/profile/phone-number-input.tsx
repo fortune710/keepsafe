@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react-native';
 import { CountryPickerModal } from '@/components/ui/country-picker-modal';
 import { countries } from '@/constants/countries';
 import { extractPhoneNumber, formatPhoneNumber } from '@/lib/utils';
+import { scale } from 'react-native-size-matters';
 
 export interface PhoneNumberInputChangePayload {
   /** Full phone number in E.164-like form (country code + digits). */
@@ -19,6 +20,8 @@ export interface PhoneNumberInputChangePayload {
 interface PhoneNumberInputProps {
   /** Full phone number (including country code) used to initialize the field. */
   initialValue?: string;
+  /** ISO 3166-1 alpha-2 country code to use as default if no initialValue is provided. */
+  defaultCountryIso?: string;
   /** Placeholder shown in the national number input. */
   placeholder?: string;
   /** Called whenever the phone value changes. */
@@ -33,6 +36,7 @@ interface PhoneNumberInputProps {
  */
 export function PhoneNumberInput({
   initialValue,
+  defaultCountryIso,
   placeholder = '(555) 123-4567',
   onChange,
 }: PhoneNumberInputProps) {
@@ -43,35 +47,53 @@ export function PhoneNumberInput({
   const [value, setValue] = useState('');
 
   useEffect(() => {
+    // Only apply defaults or initial values if the user hasn't started typing yet.
+    // This prevents background changes (like defaultCountryIso updating) from wiping user input.
+    const hasUserInput = value.length > 0;
+
     if (!initialValue) {
-      setCountryCode('');
-      setCountryIso('');
-      setValue('');
+      if (!hasUserInput) {
+        if (defaultCountryIso) {
+          const country = countries.find(c => c.iso.toUpperCase() === defaultCountryIso.toUpperCase());
+          if (country) {
+            setCountryCode(country.code);
+            setCountryIso(country.iso);
+            setValue('');
+            return;
+          }
+        }
+        setCountryCode('');
+        setCountryIso('');
+        setValue('');
+      }
       return;
     }
 
-    // Find all matching countries and sort by code length descending (longest match first).
-    const matchingCountries = countries.filter(c => initialValue.startsWith(c.code));
-    matchingCountries.sort((a, b) => b.code.length - a.code.length);
+    // Only sync initialValue if the user hasn't typed anything else.
+    if (!hasUserInput) {
+      // Find all matching countries and sort by code length descending (longest match first).
+      const matchingCountries = countries.filter(c => initialValue.startsWith(c.code));
+      matchingCountries.sort((a, b) => b.code.length - a.code.length);
 
-    const longestMatch = matchingCountries[0];
-    if (longestMatch) {
-      setCountryCode(longestMatch.code);
-      setCountryIso(longestMatch.iso);
-      setValue(formatPhoneNumber(initialValue.slice(longestMatch.code.length).trim()));
-      return;
-    }
+      const longestMatch = matchingCountries[0];
+      if (longestMatch) {
+        setCountryCode(longestMatch.code);
+        setCountryIso(longestMatch.iso);
+        setValue(formatPhoneNumber(initialValue.slice(longestMatch.code.length).trim()));
+        return;
+      }
 
-    // Fallback: preserve all digits except for US (+1) numbers
-    let digitsOnly = initialValue.replace(/\D/g, '');
-    if (initialValue.startsWith('+1') && digitsOnly.startsWith('1')) {
-      // US number: remove leading '1' and format remaining digits
-      setValue(formatPhoneNumber(digitsOnly.slice(1)));
-    } else {
-      // Non-US number: preserve all digits unformatted
-      setValue(digitsOnly);
+      // Fallback: preserve all digits except for US (+1) numbers
+      let digitsOnly = initialValue.replace(/\D/g, '');
+      if (initialValue.startsWith('+1') && digitsOnly.startsWith('1')) {
+        // US number: remove leading '1' and format remaining digits
+        setValue(formatPhoneNumber(digitsOnly.slice(1)));
+      } else {
+        // Non-US number: preserve all digits unformatted
+        setValue(digitsOnly);
+      }
     }
-  }, [initialValue]);
+  }, [initialValue, defaultCountryIso]);
 
   const phoneRegex = /^\d+$/;
 
@@ -79,14 +101,36 @@ export function PhoneNumberInput({
   const isValid = normalized.length > 0 && phoneRegex.test(normalized);
   const fullPhoneNumber = `${countryCode}${normalized}`;
 
-  useEffect(() => {
+  /**
+   * Emits phone state changes by merging partial payload with current state.
+   * Computes derived values (normalized, isValid, fullPhoneNumber) from the provided or current state.
+   * 
+   * @param options - Options object containing:
+   *   - currentValue: Optional value to use instead of current state value
+   *   - currentCountryCode: Optional country code to use instead of current state
+   *   - Additional fields from PhoneNumberInputChangePayload to override computed values
+   */
+  const emitPhoneState = (options?: {
+    currentValue?: string;
+    currentCountryCode?: string;
+  } & Partial<PhoneNumberInputChangePayload>) => {
+    const currentValue = options?.currentValue ?? value;
+    const currentCountryCode = options?.currentCountryCode ?? countryCode;
+    const currentNormalized = currentValue.replace(/[\s\-\(\)]/g, '');
+    const currentIsValid = currentNormalized.length > 0 && phoneRegex.test(currentNormalized);
+    const currentFullPhoneNumber = `${currentCountryCode}${currentNormalized}`;
+
+    // Extract only PhoneNumberInputChangePayload fields, excluding internal options
+    const { currentValue: _, currentCountryCode: __, ...payloadOverrides } = options ?? {};
+
     onChange?.({
-      fullPhoneNumber,
-      nationalNumber: normalized,
-      countryCode,
-      isValid,
+      fullPhoneNumber: currentFullPhoneNumber,
+      nationalNumber: currentNormalized,
+      countryCode: currentCountryCode,
+      isValid: currentIsValid,
+      ...payloadOverrides,
     });
-  }, [countryCode, fullPhoneNumber, isValid, normalized, onChange]);
+  };
 
   return (
     <View>
@@ -106,7 +150,11 @@ export function PhoneNumberInput({
           placeholder={placeholder}
           placeholderTextColor="#94A3B8"
           value={value}
-          onChangeText={setValue}
+          onChangeText={(newValue) => {
+            setValue(newValue);
+            // Emit state change with new value
+            emitPhoneState({ currentValue: newValue });
+          }}
           keyboardType="phone-pad"
           autoCapitalize="none"
         />
@@ -122,6 +170,8 @@ export function PhoneNumberInput({
         onSelect={(country) => {
           setCountryCode(country.code);
           setCountryIso(country.iso);
+          // Emit state change with new country code
+          emitPhoneState({ currentCountryCode: country.code });
         }}
         selectedCountryIso={countryIso}
       />
@@ -149,6 +199,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1E293B',
     fontWeight: '500',
+    minWidth: scale(35)
   },
   input: {
     flex: 1,

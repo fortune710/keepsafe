@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { runOnJS, SlideInDown, SlideOutDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { X } from 'lucide-react-native';
-import { verticalScale } from 'react-native-size-matters';
+import { scale, verticalScale } from 'react-native-size-matters';
 
 import { BACKEND_URL } from '@/lib/constants';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { usePhoneNumberUpdateRecord } from '@/hooks/use-phone-number-update-record';
+import { useProfileOperations } from '@/hooks/use-profile-operations';
+import { useDeviceLocation } from '@/hooks/use-device-location';
 import { PhoneNumberInput } from '@/components/profile/phone-number-input';
-import { OtpInput } from '@/components/ui/otp-input';
+//import { OtpInput } from '@/components/ui/otp-input';
 import {
   clearPhonePromptState,
   getPhonePromptState,
@@ -36,8 +38,25 @@ type Step = 'phone' | 'otp';
 export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumberBottomSheetProps) {
   const { user, session } = useAuthContext();
   const { toast } = useToast();
+  const { updateProfile, isLoading: isProfileUpdating } = useProfileOperations();
 
   const { record, loading: recordLoading, refresh } = usePhoneNumberUpdateRecord(user?.id);
+  const { location: deviceLocation } = useDeviceLocation();
+
+  // Move the bottom sheet up with the keyboard
+  const keyboard = useAnimatedKeyboard();
+  const keyboardAwareStyle = useAnimatedStyle(() => {
+    const kh = keyboard.height.get();
+    // Instead of paddingBottom (which triggers layout recalculation), 
+    // we use translateY for GPU-accelerated movement.
+    // We also use .get() for React Compiler compatibility.
+    return {
+      transform: [
+        { translateY: -kh },
+        { scale: 1 + (kh / height) * 0.05 }
+      ],
+    };
+  });
 
   const [step, setStep] = useState<Step>('phone');
   const [skipCount, setSkipCount] = useState(0);
@@ -53,9 +72,10 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   // Swipe down gesture to dismiss.
+  // We use runOnJS for callbacks to avoid threading crashes.
   const swipeDownGesture = Gesture.Pan().onEnd((event) => {
     if (event.translationY > 100 && event.velocityY > 500) {
-      handleSkip();
+      runOnJS(handleSkip)();
     }
   });
 
@@ -64,7 +84,7 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
 
     getPhonePromptState(user.id)
       .then((state) => setSkipCount(state.skipCount))
-      .catch(() => {});
+      .catch(() => { });
   }, [isVisible, user?.id]);
 
   useEffect(() => {
@@ -116,9 +136,9 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
     }
   };
 
-  const startOtp = async () => {
-    if (!user?.id || !session?.access_token) {
-      toast('You need to be signed in to verify your phone number.', 'error');
+  const handleUpdatePhoneNumber = async () => {
+    if (!user?.id) {
+      toast('You need to be signed in to update your phone number.', 'error');
       return;
     }
     if (!phoneValid) {
@@ -128,24 +148,18 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
 
     setIsSendingOtp(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/user/phone/otp/start`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phone_number: phoneNumber }),
-      });
+      const result = await updateProfile({ phone_number: phoneNumber });
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to send OTP');
+      if (!result.success) {
+        toast(result.message || 'Failed to update phone number', 'error');
+        return;
       }
 
-      await refresh();
-      setStep('otp');
+      toast('Phone number updated successfully', 'success');
+      await clearPhonePromptState(user.id);
+      onClose();
     } catch (e: any) {
-      toast(e?.message || 'Failed to send OTP', 'error');
+      toast(e?.message || 'Failed to update phone number', 'error');
     } finally {
       setIsSendingOtp(false);
     }
@@ -253,11 +267,14 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
 
       <GestureDetector gesture={swipeDownGesture}>
         <Animated.View
-          style={styles.popover}
+          style={[styles.popover, keyboardAwareStyle]}
           entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
           exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
         >
           <View style={styles.handle} />
+
+          {/* Bottom filler to prevent gap when sheet moves up with keyboard */}
+          <View style={styles.bottomFiller} />
 
           <View style={styles.header}>
             <Text style={styles.title}>Add Phone Number</Text>
@@ -266,46 +283,50 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
             </TouchableOpacity>
           </View>
 
-          {recordLoading ? (
+          <>
+            <Text style={styles.description}>
+              Add a phone number so your friends can find you and to help secure your account.
+            </Text>
+
+            <View style={styles.content}>
+              <PhoneNumberInput
+                defaultCountryIso={deviceLocation?.isoCountryCode}
+                onChange={(payload) => {
+                  setPhoneNumber(payload.fullPhoneNumber);
+                  setPhoneValid(payload.isValid);
+                }}
+              />
+            </View>
+
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.primaryButton, (!phoneValid || isSendingOtp || isProfileUpdating) && styles.buttonDisabled]}
+                onPress={handleUpdatePhoneNumber}
+                disabled={!phoneValid || isSendingOtp || isProfileUpdating}
+              >
+                {(isSendingOtp || isProfileUpdating) ? <ActivityIndicator color="white" /> : <Text style={styles.primaryButtonText}>Confirm Phone Number</Text>}
+              </TouchableOpacity>
+
+
+              {showDontAskAgain ? (
+                <TouchableOpacity style={styles.tertiaryButton} onPress={handleDontAskAgain}>
+                  <Text style={styles.tertiaryButtonText}>Don&apos;t Ask Again</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleSkip}>
+                  <Text style={styles.secondaryButtonText}>Skip</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+
+          {/* {recordLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator />
               <Text style={styles.loadingText}>Loading…</Text>
             </View>
           ) : step === 'phone' ? (
-            <>
-              <Text style={styles.description}>
-                Add a phone number so your friends can find you and to help secure your account.
-              </Text>
-
-              <View style={styles.content}>
-                <PhoneNumberInput
-                  onChange={(payload) => {
-                    setPhoneNumber(payload.fullPhoneNumber);
-                    setPhoneValid(payload.isValid);
-                  }}
-                />
-              </View>
-
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={[styles.primaryButton, (!phoneValid || isSendingOtp) && styles.buttonDisabled]}
-                  onPress={startOtp}
-                  disabled={!phoneValid || isSendingOtp}
-                >
-                  {isSendingOtp ? <ActivityIndicator color="white" /> : <Text style={styles.primaryButtonText}>Confirm Phone Number</Text>}
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.secondaryButton} onPress={handleSkip}>
-                  <Text style={styles.secondaryButtonText}>Skip</Text>
-                </TouchableOpacity>
-
-                {showDontAskAgain ? (
-                  <TouchableOpacity style={styles.tertiaryButton} onPress={handleDontAskAgain}>
-                    <Text style={styles.tertiaryButtonText}>Don&apos;t Ask Again</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </>
+            <></>
           ) : (
             <>
               <Text style={styles.description}>
@@ -344,7 +365,7 @@ export default function PhoneNumberBottomSheet({ isVisible, onClose }: PhoneNumb
                 ) : null}
               </View>
             </>
-          )}
+          )} */}
         </Animated.View>
       </GestureDetector>
     </Animated.View>
@@ -366,14 +387,24 @@ const styles = StyleSheet.create({
   },
   popover: {
     position: 'absolute',
-    bottom: verticalScale(-40),
+    bottom: verticalScale(0),
     left: 0,
     right: 0,
     backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: verticalScale(80),
-    maxHeight: height * 0.75,
+    borderCurve: 'continuous',
+    // paddingBottom is now constant; movement is handled by translateY
+    paddingBottom: verticalScale(20),
+    maxHeight: height * 0.85,
+  },
+  bottomFiller: {
+    position: 'absolute',
+    bottom: -1000,
+    left: 0,
+    right: 0,
+    height: 1000,
+    backgroundColor: 'white',
   },
   handle: {
     width: 40,
@@ -408,12 +439,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: scale(24),
+    paddingVertical: verticalScale(12),
     gap: 16,
   },
   actions: {
     paddingHorizontal: 24,
-    marginTop: 20,
+    marginTop: verticalScale(20),
     gap: 10,
   },
   loadingContainer: {

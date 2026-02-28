@@ -27,7 +27,7 @@ interface UseInviteAcceptanceResult {
   error: string | null;
   isProcessing: boolean;
   acceptInvite: (inviteeId: string, userId: string) => Promise<InviteResult>;
-  declineInvite: (inviteId: string) => Promise<InviteResult>;
+  declineInvite: (_inviteId: string) => Promise<InviteResult>;
 }
 
 export function useInviteAcceptance(inviteCode?: string): UseInviteAcceptanceResult {
@@ -111,7 +111,7 @@ export function useInviteAcceptance(inviteCode?: string): UseInviteAcceptanceRes
         id: inviterProfile.id,
         inviterName: inviterName,
         inviterEmail: inviterProfile?.email || '',
-        inviterAvatar: inviterProfile?.avatar_url || getDefaultAvatarUrl(inviterName),
+        inviterAvatar: inviterProfile?.avatar_url || getDefaultAvatarUrl(inviterName, 'svg'),
         message: "",
         isUsed: false,
       };
@@ -160,7 +160,7 @@ export function useInviteAcceptance(inviteCode?: string): UseInviteAcceptanceRes
     }
   }, [acceptInviteMutation]);
 
-  const declineInvite = useCallback(async (inviteId: string): Promise<InviteResult> => {
+  const declineInvite = useCallback(async (_inviteId: string): Promise<InviteResult> => {
     setIsProcessing(true);
 
     try {

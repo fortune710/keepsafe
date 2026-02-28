@@ -31,10 +31,8 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedQuery = useDebounce(searchQuery, 500);
     const [requestedCurrentLocation, setRequestedCurrentLocation] = useState(false);
-    
-    const { location: currentLocation, isLoading: isLoadingCurrent, placesInState, isLoadingPlaces } = useDeviceLocation();
 
-    console.log('currentLocation', currentLocation);
+    const { location: currentLocation, isLoading: isLoadingCurrent, placesInState, isLoadingPlaces } = useDeviceLocation();
 
     const coordinates =
         currentLocation?.latitude != null && currentLocation?.longitude != null
@@ -68,7 +66,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
             setRequestedCurrentLocation(true);
             return;
         }
-        
+
         if (currentLocation.formattedAddress) {
             onSelectLocation(currentLocation.address);
         }
@@ -81,7 +79,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
     // Build results list: current location + (Mapbox search results OR places in state)
     const allResults = useMemo(() => {
         const results: LocationSearchResult[] = [];
-        
+
         // Add current location if available
         if (currentLocation) {
             results.push({
@@ -91,10 +89,10 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
                 isCurrentLocation: true,
             });
         }
-        
+
         // Add Mapbox Places search results if query exists, otherwise add places in state
         results.push(...mapboxPlacesResults);
-        
+
         return results;
     }, [currentLocation, mapboxPlacesResults, debouncedQuery]);
 
@@ -107,8 +105,6 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
         if (currentLocation) return "Places Nearby";
         return "Places Nearby";
     };
-
-    console.log('allResults', allResults);
 
     return (
         <View style={styles.container}>
@@ -123,19 +119,19 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
 
             <View style={styles.resultsContainer}>
                 <Text style={styles.sectionTitle}>{getSectionTitle()}</Text>
-                
+
                 {showLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="small" color="#8B5CF6" />
                         <Text style={styles.loadingText}>
-                            {isLoadingCurrent && !currentLocation 
-                                ? "Getting your location..." 
+                            {isLoadingCurrent && !currentLocation
+                                ? "Getting your location..."
                                 : isLoadingPlaces && !hasQuery
-                                ? "Loading places..."
-                                : "Searching..."}
+                                    ? "Loading places..."
+                                    : "Searching..."}
                         </Text>
                     </View>
-                ): (
+                ) : (
                     <FlatList
                         data={allResults}
                         keyExtractor={(item) => item.id}
@@ -169,7 +165,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
                                         />
                                     )
                                 }
-                                 <View style={styles.textColumn}>
+                                <View style={styles.textColumn}>
                                     <Text style={[styles.locationName, item.isCurrentLocation && styles.currentLocationText]}>{item.name}</Text>
                                     <Text
                                         style={[
@@ -190,7 +186,7 @@ export default function LocationTab({ onSelectLocation }: LocationTabProps) {
 
                 )}
 
-            
+
 
             </View>
         </View>
@@ -209,16 +205,18 @@ const styles = StyleSheet.create({
     },
     resultsContainer: {
         //flex: 1,
+        marginTop: verticalScale(10)
     },
     list: {
         // Give the VirtualizedList a measurable viewport inside the popover
-        maxHeight: verticalScale(320),
+        height: verticalScale(420),
     },
     listContent: {
         paddingBottom: verticalScale(8),
     },
     sectionTitle: {
         fontSize: 14,
+        fontFamily: "Outfit-SemiBold",
         fontWeight: "600",
         color: "#64748B",
         marginVertical: 12,
@@ -226,8 +224,8 @@ const styles = StyleSheet.create({
     locationItem: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: verticalScale(16),
-        paddingHorizontal: 16,
+        paddingVertical: verticalScale(12),
+        paddingHorizontal: scale(14),
         backgroundColor: Colors.card,
         borderRadius: 12,
         marginBottom: 8,
@@ -238,6 +236,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: scale(12),
+        fontFamily: "Jost-Regular",
         fontWeight: "400",
         color: Colors.text,
     },
@@ -247,6 +246,7 @@ const styles = StyleSheet.create({
     },
     locationName: {
         fontSize: scale(14),
+        fontFamily: "Outfit-SemiBold",
         fontWeight: "600",
         color: Colors.text,
     },
@@ -255,6 +255,7 @@ const styles = StyleSheet.create({
     },
     badge: {
         fontSize: 11,
+        fontFamily: "Outfit-SemiBold",
         fontWeight: "600",
         color: "#8B5CF6",
         backgroundColor: "#EEF2FF",
@@ -272,10 +273,12 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         fontSize: 14,
+        fontFamily: "Jost-Regular",
         color: "#64748B",
     },
     emptyText: {
         fontSize: 14,
+        fontFamily: "Jost-Regular",
         color: "#94A3B8",
         textAlign: "center",
         paddingVertical: 20,
@@ -286,5 +289,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 12,
         fontSize: 16,
+        fontFamily: "Outfit-Regular",
     },
 });
