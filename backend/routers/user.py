@@ -437,8 +437,7 @@ async def start_user_export(
         )
         raise HTTPException(status_code=403, detail="Not authorized to export this user's data")
 
-    # Enforce per-user cap on pending jobs
-    pending_jobs_for_user = 0
+    # Enforce per-user cap on pending jobs and insert new job atomically
     with export_jobs_lock:
         pending_jobs_for_user = sum(
             1
@@ -446,19 +445,18 @@ async def start_user_export(
             if job.get("user_id") == user_id and job.get("status") == "pending"
         )
         
-    if pending_jobs_for_user >= MAX_PENDING_EXPORT_JOBS_PER_USER:
-        logger.warning(
-            "User %s has too many pending export jobs: %s",
-            user_id,
-            pending_jobs_for_user,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many pending export jobs. Please try again later.",
-        )
+        if pending_jobs_for_user >= MAX_PENDING_EXPORT_JOBS_PER_USER:
+            logger.warning(
+                "User %s has too many pending export jobs: %s",
+                user_id,
+                pending_jobs_for_user,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many pending export jobs. Please try again later.",
+            )
 
-    job_id = f"{user_id}-{uuid.uuid4()}"
-    with export_jobs_lock:
+        job_id = f"{user_id}-{uuid.uuid4()}"
         export_jobs[job_id] = {
             "status": "pending",
             "user_id": user_id,
