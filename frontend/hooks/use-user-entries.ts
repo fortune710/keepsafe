@@ -119,8 +119,9 @@ export function useUserEntries(): UseUserEntriesResult {
       if (!user) return [];
 
       // Try to get cached entries first for initial load
+      let cachedEntries: EntryWithProfile[] | null = null;
       if (!pageParam) {
-        const cachedEntries = await deviceStorage.getEntries(user.id);
+        cachedEntries = await deviceStorage.getEntries(user.id) as EntryWithProfile[];
         // Only return cached entries immediately if we have a full page.
         // This prevents getNextPageParam from prematurely returning undefined (no more pages).
         if (cachedEntries && cachedEntries.length >= DEFAULT_PAGE_SIZE) {
@@ -147,10 +148,19 @@ export function useUserEntries(): UseUserEntriesResult {
       const { data: entries, error: userEntriesError }: { data: EntryWithProfile[] | null, error: any } = await query;
 
       if (userEntriesError) {
+        // Fallback to cache for first page if network fails
+        if (!pageParam && cachedEntries && cachedEntries.length > 0) {
+          logger.warn('Vault: Network fetch failed, falling back to cache', userEntriesError);
+          return cachedEntries;
+        }
         throw new Error(userEntriesError.message || 'Error fetching entries');
       }
 
       if (entries === null) {
+        // Fallback to cache for first page if network returns null
+        if (!pageParam && cachedEntries && cachedEntries.length > 0) {
+          return cachedEntries;
+        }
         throw new Error('No entries returned from Supabase');
       }
 
