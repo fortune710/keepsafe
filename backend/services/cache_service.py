@@ -185,6 +185,9 @@ class CacheService:
             
             return token_list
             
+        except ValueError:
+            # Re-raise configuration errors (like unknown environment) so they aren't swallowed
+            raise
         except Exception as e:
             logger.error(f"Error fetching push tokens from Supabase for user {user_id}: {str(e)}")
             return []
@@ -253,6 +256,9 @@ class CacheService:
                     self._set_in_redis(cache_key, token_list, self.cache_ttl)
                     logger.debug(f"Cached push tokens: {user_id}")
                 
+            except ValueError:
+                # Re-raise configuration errors so they aren't swallowed
+                raise
             except Exception as e:
                 logger.error(f"Error batch fetching push tokens from Supabase: {str(e)}")
         
