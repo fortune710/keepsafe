@@ -21,9 +21,6 @@ import StickerTab from "./editor/sticker-tab";
 import MusicTab from "./editor/music-tab";
 import LocationTab from "./editor/location-tab";
 
-const { height } = Dimensions.get("window");
-const TEXT_TAB_HEIGHT = height * 0.72;
-const DEFAULT_TAB_HEIGHT = height * 0.95;
 
 interface EditorPopoverProps {
   isVisible: boolean;
@@ -32,7 +29,7 @@ interface EditorPopoverProps {
   addSticker: (uri: string) => void;
   addMusic: (music: MusicTag) => void;
   addLocation: (location: string) => void;
-  defaultTab?: MediaCanvasItemType;
+  activeTab?: MediaCanvasItemType;
   onTextChange?: (text: string) => void;
   onStyleChange?: (styleUpdates: { color?: string; fontFamily?: string; backgroundColor?: string }) => void;
   initialText?: string;
@@ -47,7 +44,7 @@ interface EditorPopoverProps {
  * @param addSticker - Adds a sticker given its URI
  * @param addMusic - Adds a music tag
  * @param addLocation - Adds a location string
- * @param defaultTab - Optional initial active tab (`"text" | "sticker" | "music" | "location"`)
+ * @param activeTab - Optional initial active tab (`"text" | "sticker" | "music" | "location"`)
  * @param onTextChange - Optional callback invoked as the text input changes
  * @param onStyleChange - Optional callback invoked when text style (color, fontFamily, backgroundColor) changes
  * @param initialText - Optional initial value for the text input
@@ -60,30 +57,23 @@ export default function EditorPopover({
   addSticker,
   addMusic,
   addLocation,
-  defaultTab,
+  activeTab,
   onTextChange,
   onStyleChange,
   initialText = "",
 }: EditorPopoverProps) {
-  const [activeTab, setActiveTab] = useState<MediaCanvasItemType>(defaultTab || "text");
+
   const [textInput, setTextInput] = useState(initialText);
   const [musicTag, setMusicTag] = useState("");
   const musicQuery = useDebounce(musicTag, 600);
-  
-  // Update activeTab when defaultTab changes
-  useEffect(() => {
-    if (defaultTab) {
-      setActiveTab(defaultTab);
-    }
-  }, [defaultTab]);
-  
+
   // Update textInput when initialText changes
   useEffect(() => {
     if (initialText !== undefined) {
       setTextInput(initialText);
     }
   }, [initialText]);
-  
+
   // Handle text input changes
   const handleTextChange = (text: string) => {
     setTextInput(text);
@@ -99,21 +89,6 @@ export default function EditorPopover({
     backgroundColor: "#000000",
   });
 
-  const popoverHeight = useSharedValue(
-    activeTab === "text" ? TEXT_TAB_HEIGHT : DEFAULT_TAB_HEIGHT
-  );
-
-  // Update height when activeTab changes
-  useEffect(() => {
-    const targetHeight = activeTab === "text" ? TEXT_TAB_HEIGHT : DEFAULT_TAB_HEIGHT;
-    popoverHeight.value = withTiming(targetHeight, { duration: 300 });
-  }, [activeTab]);
-
-  const animatedPopoverStyle = useAnimatedStyle(() => {
-    return {
-      height: popoverHeight.value,
-    };
-  });
 
   // Text is now updated in real-time, so we don't need a confirm function
   // This is kept for potential future use but not currently called
@@ -140,42 +115,42 @@ export default function EditorPopover({
     <Animated.View style={styles.overlay}>
       <TouchableOpacity style={styles.backdrop} onPress={() => onClose(textInput)} />
 
-      <Animated.View 
+      <Animated.View
         entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
         exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
-        style={[styles.popover, animatedPopoverStyle]}
+        style={[styles.popover]}
       >
         {/* Handle */}
         <View style={styles.handle} />
 
         {/* Content */}
         <View style={styles.tabContent}>
-            {activeTab === "text" ? (
-              <TextTab
-                textInput={textInput}
-                onTextChange={handleTextChange}
-                selectedColor={selectedStyle.color}
-                onColorChange={(color) => {
-                  setSelectedStyle({ ...selectedStyle, color });
-                  if (onStyleChange) {
-                    onStyleChange({ color });
-                  }
-                }}
-                selectedFont={selectedStyle.fontFamily}
-                onFontChange={(font) => {
-                  setSelectedStyle({ ...selectedStyle, fontFamily: font });
-                  if (onStyleChange) {
-                    onStyleChange({ fontFamily: font });
-                  }
-                }}
-                selectedBackgroundColor={selectedStyle.backgroundColor}
-                onBackgroundColorChange={(color) => {
-                  setSelectedStyle({ ...selectedStyle, backgroundColor: color });
-                  if (onStyleChange) {
-                    onStyleChange({ backgroundColor: color });
-                  }
-                }}
-              />
+          {activeTab === "text" ? (
+            <TextTab
+              textInput={textInput}
+              onTextChange={handleTextChange}
+              selectedColor={selectedStyle.color}
+              onColorChange={(color) => {
+                setSelectedStyle({ ...selectedStyle, color });
+                if (onStyleChange) {
+                  onStyleChange({ color });
+                }
+              }}
+              selectedFont={selectedStyle.fontFamily}
+              onFontChange={(font) => {
+                setSelectedStyle({ ...selectedStyle, fontFamily: font });
+                if (onStyleChange) {
+                  onStyleChange({ fontFamily: font });
+                }
+              }}
+              selectedBackgroundColor={selectedStyle.backgroundColor}
+              onBackgroundColorChange={(color) => {
+                setSelectedStyle({ ...selectedStyle, backgroundColor: color });
+                if (onStyleChange) {
+                  onStyleChange({ backgroundColor: color });
+                }
+              }}
+            />
           ) : activeTab === "sticker" ? (
             <StickerTab
               onSelectSticker={confirmStickerSelection}
@@ -279,7 +254,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0E7FF",
     borderColor: "#8B5CF6",
   },
-  
+
   stickerGrid: {
     marginTop: 20,
     gap: 12,

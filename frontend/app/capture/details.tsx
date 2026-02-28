@@ -51,7 +51,7 @@ interface Friend {
  */
 export default function DetailsScreen() {
   const params = useLocalSearchParams();
-  const { captureId, type, uri, duration } = params;
+  const { captureId, type, uri, duration, facing } = params;
 
   const capture: MediaCapture = {
     id: captureId as string,
@@ -59,6 +59,9 @@ export default function DetailsScreen() {
     uri: decodeURIComponent(uri as string),
     duration: duration ? Number(duration) : undefined,
     timestamp: new Date(),
+    metadata: {
+      facing: facing as any
+    }
   };
 
 
@@ -91,7 +94,7 @@ export default function DetailsScreen() {
         id,
         name: friendProfile?.full_name || 'Unknown User',
         username: friendProfile?.username ?? "",
-        avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? ""),
+        avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? "", 'svg'),
       };
     })
     .filter((friend): friend is Friend => friend !== null);
@@ -107,10 +110,10 @@ export default function DetailsScreen() {
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   const [showAttachmentList, setShowAttachmentList] = useState<boolean>(false);
-  const [editorDefaultTab, setEditorDefaultTab] = useState<MediaCanvasItemType | undefined>(undefined);
+  const [editorActiveTab, setEditorActiveTab] = useState<MediaCanvasItemType | undefined>(undefined);
   const [pendingTextItemId, setPendingTextItemId] = useState<number | null>(null);
   const [pendingTextValue, setPendingTextValue] = useState<string>("");
-  const [attachmentListStateBeforeEditor, setAttachmentListStateBeforeEditor] = useState<boolean>(false);
+
 
 
 
@@ -175,9 +178,6 @@ export default function DetailsScreen() {
 
   // Handle attachment type selection
   const handleAttachmentSelect = (type: MediaCanvasItemType) => {
-    // Save the current attachment list state before opening editor
-    setAttachmentListStateBeforeEditor(showAttachmentList);
-
     if (type === "text") {
       // Auto-add text with default value
       const defaultText = "Enter text";
@@ -190,14 +190,13 @@ export default function DetailsScreen() {
       setPendingTextItemId(tempId);
       setPendingTextValue(defaultText);
       // Open editor with text tab
-      setEditorDefaultTab("text");
+      setEditorActiveTab("text");
       setShowEditorPopover(true);
     } else {
       // For other types, just open the editor with the selected tab
-      setEditorDefaultTab(type);
+      setEditorActiveTab(type);
       setShowEditorPopover(true);
     }
-    setShowAttachmentList(false);
   };
 
   // Handle editor popover close
@@ -210,9 +209,7 @@ export default function DetailsScreen() {
       setPendingTextValue("");
     }
     setShowEditorPopover(false);
-    setEditorDefaultTab(undefined);
-    // Restore the attachment list state to what it was before opening the editor
-    setShowAttachmentList(attachmentListStateBeforeEditor);
+    setEditorActiveTab(undefined);
   };
 
   // Handle text changes in editor - update in real-time
@@ -422,6 +419,7 @@ export default function DetailsScreen() {
               items={items}
               transformsRef={transformsRef}
               removeElement={removeElement}
+              facing={capture.metadata?.facing}
             />
           ) :
             capture?.type === 'video' ? (
@@ -475,7 +473,7 @@ export default function DetailsScreen() {
         addSticker={addSticker}
         addMusic={addMusic}
         addLocation={addLocation}
-        defaultTab={editorDefaultTab}
+        activeTab={editorActiveTab}
         onTextChange={handleTextChange}
         onStyleChange={handleStyleChange}
         initialText={pendingTextItemId !== null ? pendingTextValue : undefined}

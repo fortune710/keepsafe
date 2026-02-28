@@ -11,6 +11,8 @@ import { generateIdempotencyKey } from '@/hooks/use-entry-operations';
 import { EntryWithProfile } from '@/types/entries';
 import { useTimezone } from '@/hooks/use-timezone';
 import { logger } from '@/lib/logger';
+import { Image } from 'expo-image';
+import { RenderedMediaCanvasItem } from '@/types/capture';
 
 
 
@@ -96,7 +98,6 @@ const DEFAULT_PAGE_SIZE = 20;
 export function useUserEntries(): UseUserEntriesResult {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
-  const [optimisticEntries, setOptimisticEntries] = useState<EntryWithProfile[]>([]);
   const [unseenEntryIds, setUnseenEntryIds] = useState<Set<string>>(new Set());
   const wasOfflineRef = useRef(false);
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -152,10 +153,20 @@ export function useUserEntries(): UseUserEntriesResult {
         throw new Error('No entries returned from Supabase');
       }
 
-      // Cache the first page data
-      if (!pageParam && entries?.length > 0) {
+      // Cache the data. DeviceStorage now handles merging local-only entries.
+      if (!pageParam && entries) {
         await deviceStorage.setEntries(user.id, entries);
+        // Get the merged set from storage to ensure local-only entries are visible
+        const mergedEntries = await deviceStorage.getEntries(user.id) || entries;
+
+        logger.info(`Vault Sync: Server returned ${entries.length}, local merged total ${mergedEntries.length}`);
+
+        // IMPORTANT: Return exactly the page size to maintain correct pagination offsets
+        // and avoid double-counting or skipped entries on next page fetch.
+        return mergedEntries.slice(0, DEFAULT_PAGE_SIZE);
       }
+
+
 
       return entries;
     },
@@ -171,7 +182,8 @@ export function useUserEntries(): UseUserEntriesResult {
   });
 
   const entries = data?.pages.flat() || [];
-  const nextCursor = data?.pages[data.pages.length - 1]?.slice(-1)[0]?.created_at || null;
+  const lastPage = data?.pages[data.pages.length - 1];
+  const nextCursor = lastPage ? lastPage.slice(-1)[0]?.created_at || null : null;
   const hasMore = !!hasNextPage;
 
   const loadMore = useCallback(() => {
@@ -190,6 +202,42 @@ export function useUserEntries(): UseUserEntriesResult {
     });
     return unsubscribe;
   }, [user, refetch]);
+
+  // Preload images for better UX
+  useEffect(() => {
+    if (!entries || entries.length === 0) return;
+
+    const urlsToPreload: string[] = [];
+
+    entries.forEach(entry => {
+      // Preload main content
+      if (entry.content_url && entry.type === 'image') {
+        urlsToPreload.push(entry.content_url);
+      }
+
+      // Preload profile avatar
+      if (entry.profile?.avatar_url) {
+        urlsToPreload.push(entry.profile.avatar_url);
+      }
+
+      // Preload stickers from attachments
+      if (Array.isArray(entry.attachments)) {
+        (entry.attachments as RenderedMediaCanvasItem[]).forEach(attachment => {
+          if (attachment.type === 'sticker' && attachment.sticker) {
+            urlsToPreload.push(attachment.sticker);
+          }
+        });
+      }
+    });
+
+    if (urlsToPreload.length > 0) {
+      // Unique URLs only
+      const uniqueUrls = Array.from(new Set(urlsToPreload));
+      // Preload in background
+      Image.prefetch(uniqueUrls);
+      logger.info(`Preloaded ${uniqueUrls.length} images for vault`);
+    }
+  }, [entries]);
 
   // Mark entries as seen
   const markEntriesAsSeen = useCallback((entryIds: string[]) => {
@@ -297,91 +345,108 @@ export function useUserEntries(): UseUserEntriesResult {
     logger.info(`Setting up realtime subscription for user: ${userId}`);
 
     // Subscribe to entries table changes
-    // Note: Supabase realtime doesn't support array contains filters directly,
-    // so we listen to all INSERTs and filter in the callback to check if user.id is in shared_with array
     const channel = supabase
-      .channel(`shared-entries-${userId}`)
+      .channel(`entries-sync-${userId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to INSERT, UPDATE, DELETE
           schema: 'public',
           table: TABLES.ENTRIES,
-          // No filter here - we filter in the callback to check if user.id is in shared_with array
         },
         async (payload) => {
           try {
-            const newEntryData = payload.new as any;
-
-            // Skip own entries
-            if (newEntryData.user_id === userId) return;
-
-            // Filter: Check if entry is shared with this user
-            const sharedWith = newEntryData.shared_with || [];
-            const sharedWithEveryone = newEntryData.shared_with_everyone || false;
-
-            // Skip if not shared with this user
-            if (!sharedWithEveryone && !sharedWith.includes(userId)) {
+            if (payload.eventType === 'DELETE') {
+              const oldEntry = payload.old as any;
+              queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
+                ['user-entries', userId],
+                (oldData) => {
+                  if (!oldData) return undefined;
+                  return {
+                    ...oldData,
+                    pages: oldData.pages.map(page => page.filter(e => e.id !== oldEntry.id)),
+                  };
+                }
+              );
+              await deviceStorage.removeEntry(userId, oldEntry.id);
               return;
             }
 
-            // Get the entry owner's profile using our helper function
-            const ownerProfile = await getEntryOwnerProfile(newEntryData.user_id, userId);
+            const entryData = payload.new as any;
+            const isOwnEntry = entryData.user_id === userId;
 
-            if (!ownerProfile) {
-              logger.error('Could not fetch entry owner profile');
-              return;
+            // Filter: Check if entry is shared with this user (if not own entry)
+            if (!isOwnEntry) {
+              const sharedWith = entryData.shared_with || [];
+              const sharedWithEveryone = entryData.shared_with_everyone || false;
+              if (!sharedWithEveryone && !sharedWith.includes(userId)) {
+                return;
+              }
             }
 
-            // Combine entry with profile
-            const typedNewEntry: EntryWithProfile = {
-              ...(newEntryData as any),
+            // Get profile
+            let ownerProfile: any;
+            if (isOwnEntry) {
+              // Try to get own profile from device storage first, fallback to Supabase
+              const profile = await deviceStorage.getItem<any>(`profile_${userId}`);
+              if (profile) {
+                ownerProfile = profile;
+              } else {
+                const { data: serverProfile } = await supabase.from(TABLES.PROFILES).select('*').eq('id', userId).single();
+                ownerProfile = serverProfile;
+              }
+            } else {
+              ownerProfile = await getEntryOwnerProfile(entryData.user_id, userId);
+            }
+
+            if (!ownerProfile) return;
+
+            const typedEntry: EntryWithProfile = {
+              ...entryData,
               profile: ownerProfile,
+              status: 'completed' // Server items are always 'completed'
             };
 
-            // deduplicate and update
-            const infiniteData = queryClient.getQueryData<InfiniteData<EntryWithProfile[]>>(['user-entries', userId]);
-            const allCurrentEntries = infiniteData?.pages.flat() || [];
+            logger.info(`Realtime ${payload.eventType} for entry:`, typedEntry.id);
 
-            if (allCurrentEntries.some(e => e.id === typedNewEntry.id)) {
-              logger.info('Entry already exists in cache, skipping:', typedNewEntry.id);
-              return;
-            }
-
-            logger.info('New entry received via realtime:', typedNewEntry.id);
-
-            // Update React Query cache optimistically adding to the first page
             queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
               ['user-entries', userId],
               (oldData) => {
                 if (!oldData) return undefined;
-                return {
-                  ...oldData,
-                  pages: [[typedNewEntry, ...oldData.pages[0]], ...oldData.pages.slice(1)],
-                };
+
+                const exists = oldData.pages.some(page => page.some(e => e.id === typedEntry.id));
+
+                if (exists) {
+                  // Replace existing entry
+                  return {
+                    ...oldData,
+                    pages: oldData.pages.map(page =>
+                      page.map(e => e.id === typedEntry.id ? typedEntry : e)
+                    ),
+                  };
+                } else if (payload.eventType === 'INSERT') {
+                  // Prepend new entry
+                  return {
+                    ...oldData,
+                    pages: [[typedEntry, ...oldData.pages[0]], ...oldData.pages.slice(1)],
+                  };
+                }
+                return oldData;
               }
             );
 
-            // Update device storage (with deduplication handled in addEntry)
-            try {
-              await deviceStorage.addEntry(userId, typedNewEntry);
-            } catch (storageError) {
-              logger.error('Error saving entry to device storage:', storageError);
-              // Don't block - continue even if storage fails
-            }
+            // Update local storage - always use replaceEntry to handle both new and existing (optimistic) items
+            await deviceStorage.replaceEntry(userId, typedEntry.id, typedEntry);
 
-            // Track as unseen
-            setUnseenEntryIds(prev => {
-              const updated = new Set(prev);
-              // Limit unseen entries to prevent memory issues
-              if (updated.size < 50) {
-                updated.add(typedNewEntry.id);
-              }
-              return updated;
-            });
+            if (payload.eventType === 'INSERT' && !isOwnEntry) {
+              setUnseenEntryIds(prev => {
+                const updated = new Set(prev);
+                if (updated.size < 50) updated.add(typedEntry.id);
+                return updated;
+              });
+            }
           } catch (error) {
             logger.error('Error handling realtime entry:', error);
-            // Graceful degradation - don't crash the app
           }
         }
       )
@@ -435,6 +500,57 @@ export function useUserEntries(): UseUserEntriesResult {
     }, delay) as unknown as number;
   }, [setupSubscription]);
 
+  // Listen for background processing status changes
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = deviceStorage.on('entryStatusChanged', ({
+      userId,
+      entryId,
+      status,
+      entry,
+      error
+    }: {
+      userId: string;
+      entryId: string;
+      status: string;
+      entry?: EntryWithProfile;
+      error?: string;
+    }) => {
+      if (userId !== user.id) return;
+
+      logger.info(`Vault: Entry status changed to ${status}`, { entryId });
+
+      // Update React Query cache directly instead of a full refetch
+      queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
+        ['user-entries', user.id],
+        (oldData) => {
+          if (!oldData) return undefined;
+
+          const newPages = oldData.pages.map(page =>
+            page.map(item => {
+              if (item.id === entryId) {
+                // Return updated item
+                if (status === 'completed' && entry) {
+                  return { ...entry, status: 'completed' as const };
+                }
+                return { ...item, status: status as any, error: error || item.error };
+              }
+              return item;
+            })
+          );
+
+          return {
+            ...oldData,
+            pages: newPages,
+          };
+        }
+      );
+    });
+
+    return unsubscribe;
+  }, [user, queryClient]);
+
   // Realtime subscription for new shared entries
   useEffect(() => {
     if (!user?.id) {
@@ -469,43 +585,37 @@ export function useUserEntries(): UseUserEntriesResult {
     };
   }, [user?.id, setupSubscription]);
 
-  const addOptimisticEntry = useCallback((entry: EntryWithProfile) => {
+  const addOptimisticEntry = useCallback(async (entry: EntryWithProfile) => {
     const optimisticEntry = {
       ...entry,
       status: 'pending' as const,
     };
 
-    setOptimisticEntries(prev => [optimisticEntry, ...prev]);
+    logger.info('Vault: Adding optimistic entry', { id: entry.id });
 
-    // Also add to device storage
+    // Single source of truth: Device Storage
     if (user) {
-      deviceStorage.addEntry(user.id, optimisticEntry);
+      await deviceStorage.addEntry(user.id, optimisticEntry);
+      // Invalidate to let storage sync with UI
+      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id] });
     }
-  }, [user]);
+  }, [user, queryClient]);
 
-  const replaceOptimisticEntry = useCallback((tempId: string, realEntry?: EntryWithProfile) => {
-    setOptimisticEntries(prev => {
-      if (realEntry) {
-        // Replace optimistic entry with real entry
-        return prev.map(entry => entry.id === tempId ? { ...realEntry, status: 'completed' } : entry);
-      } else {
-        // Remove optimistic entry (failed save)
-        return prev.filter(entry => entry.id !== tempId);
-      }
-    });
+  const replaceOptimisticEntry = useCallback(async (tempId: string, realEntry?: EntryWithProfile) => {
+    logger.info('Vault: Replacing optimistic entry', { tempId, action: realEntry ? 'with real' : 'removing' });
 
     // Update device storage
     if (user) {
       if (realEntry) {
-        deviceStorage.replaceEntry(user.id, tempId, { ...realEntry, status: 'completed' });
+        await deviceStorage.replaceEntry(user.id, tempId, { ...realEntry, status: 'completed' });
       } else {
-        deviceStorage.removeEntry(user.id, tempId);
+        await deviceStorage.removeEntry(user.id, tempId);
       }
-    }
 
-    // Invalidate query to refetch real data
-    refetch();
-  }, [user, refetch]);
+      // Thoroughly invalidate to ensure 'completed' state reflects immediately
+      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id] });
+    }
+  }, [user, queryClient]);
 
   const retryEntry = useCallback(async (entryId: string) => {
     if (!user) return;
@@ -566,7 +676,7 @@ export function useUserEntries(): UseUserEntriesResult {
   const { getLocalDateString, isUTC } = useTimezone();
 
   // Combine real entries with optimistic entries
-  const allEntries = [...optimisticEntries, ...(entries || [])];
+  const allEntries = entries || [];
 
   // Ensure entriesByDate is always an object, never undefined
   const entriesByDate = allEntries.length > 0

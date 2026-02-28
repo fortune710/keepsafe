@@ -10,6 +10,7 @@ export interface MediaCapture {
     width?: number;
     height?: number;
     size?: number;
+    facing?: 'front' | 'back';
   };
 }
 

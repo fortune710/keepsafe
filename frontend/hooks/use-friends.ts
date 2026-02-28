@@ -32,6 +32,12 @@ interface UseFriendsResult {
   refreshFriends: () => Promise<void>;
 }
 
+/**
+ * Custom hook to manage friends, friend requests, and blocking.
+ * 
+ * @param userId - The ID of the current user.
+ * @returns An object containing friends lists, status checks, and friendship actions.
+ */
 export function useFriends(userId?: string): UseFriendsResult {
   const queryClient = useQueryClient();
   const { profile } = useAuthContext();
@@ -50,10 +56,10 @@ export function useFriends(userId?: string): UseFriendsResult {
   });
 
   const friends = friendships.filter(f => f.status === FRIENDSHIP_STATUS.ACCEPTED);
-  const pendingRequests = friendships.filter(f => 
+  const pendingRequests = friendships.filter(f =>
     f.status === FRIENDSHIP_STATUS.PENDING && f.friend_id === userId
   );
-  const blockedFriends = friendships.filter(f => 
+  const blockedFriends = friendships.filter(f =>
     f.status === FRIENDSHIP_STATUS.BLOCKED && f.blocked_by === userId
   );
 
@@ -97,7 +103,7 @@ export function useFriends(userId?: string): UseFriendsResult {
         .from(TABLES.FRIENDSHIPS)
         .update(updateData as never)
         .eq('id', id);
-        
+
       if (error) {
         logger.error('Error updating friendship:', error);
         throw new Error(error.message);
@@ -133,9 +139,9 @@ export function useFriends(userId?: string): UseFriendsResult {
       await sendFriendRequestMutation.mutateAsync(friendId);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to send friend request' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send friend request'
       };
     }
   }, [sendFriendRequestMutation]);
@@ -145,9 +151,9 @@ export function useFriends(userId?: string): UseFriendsResult {
       await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.ACCEPTED });
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to accept friend request' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to accept friend request'
       };
     }
   }, [updateFriendshipMutation]);
@@ -157,9 +163,9 @@ export function useFriends(userId?: string): UseFriendsResult {
       await updateFriendshipMutation.mutateAsync({ id: friendshipId, status: FRIENDSHIP_STATUS.DECLINED });
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to decline friend request' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to decline friend request'
       };
     }
   }, [updateFriendshipMutation]);
@@ -174,8 +180,8 @@ export function useFriends(userId?: string): UseFriendsResult {
     }
 
     try {
-      await updateFriendshipMutation.mutateAsync({ 
-        id: friendshipId, 
+      await updateFriendshipMutation.mutateAsync({
+        id: friendshipId,
         status: FRIENDSHIP_STATUS.BLOCKED,
         blocked_by: userId
       });
@@ -196,8 +202,8 @@ export function useFriends(userId?: string): UseFriendsResult {
 
   const unblockFriend = useCallback(async (friendshipId: string) => {
     try {
-      await updateFriendshipMutation.mutateAsync({ 
-        id: friendshipId, 
+      await updateFriendshipMutation.mutateAsync({
+        id: friendshipId,
         status: FRIENDSHIP_STATUS.ACCEPTED,
         blocked_by: null
       });
@@ -215,9 +221,9 @@ export function useFriends(userId?: string): UseFriendsResult {
       await deleteFriendshipMutation.mutateAsync(friendshipId);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to remove friend' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to remove friend'
       };
     }
   }, [deleteFriendshipMutation]);
@@ -237,15 +243,15 @@ export function useFriends(userId?: string): UseFriendsResult {
           // Always fetch fresh data from API
           const contacts = await FriendService.getSuggestedFriendsFromContacts();
           const filteredContacts = contacts.filter(contact => contact.id !== profile.id);
-          
+
           // Sync device storage after successful fetch (consistent with useSuggestedFriends)
           try {
-            await deviceStorage.setSuggestedFriends(filteredContacts);
+            await deviceStorage.setSuggestedFriends(profile.id, filteredContacts);
           } catch (storageError) {
             logger.warn('Failed to sync suggested friends to device storage during prefetch:', storageError);
             // Don't throw - storage sync failure shouldn't break the prefetch
           }
-          
+
           logger.debug('Prefetched suggested friends:', { contacts: filteredContacts });
           return filteredContacts;
         },

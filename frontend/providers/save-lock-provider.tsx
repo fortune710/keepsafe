@@ -31,8 +31,8 @@ export function useSaveLock() {
 export function SaveLockProvider({ children }: { children: React.ReactNode }) {
     const [isSaveLocked, setIsSaveLocked] = useState(false);
 
-    const lockSave = useCallback(() => setIsSaveLocked(true), []);
-    const unlockSave = useCallback(() => setIsSaveLocked(false), []);
+    const lockSave = () => setIsSaveLocked(true);
+    const unlockSave = () => setIsSaveLocked(false);
 
     return (
         <SaveLockContext.Provider value={{ isSaveLocked, lockSave, unlockSave }}>

@@ -1,6 +1,7 @@
 import { MusicTag } from "@/types/capture"
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
+import { scale, verticalScale } from "react-native-size-matters";
 
 interface MusicCanvasItemProps {
     music: MusicTag;
@@ -19,8 +20,8 @@ export function MusicCanvasItem({ music, onPress }: MusicCanvasItemProps) {
 
 const styles = StyleSheet.create({
     musicContainer: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
+        paddingVertical: verticalScale(6),
+        paddingHorizontal: scale(14),
         backgroundColor: "black",
         borderRadius: 45,
         display: "flex",
@@ -28,14 +29,14 @@ const styles = StyleSheet.create({
         alignItems: "center"
     },
     musicImage: {
-        width: 30,
-        height: 30,
-        borderRadius: 8
+        width: scale(22),
+        height: verticalScale(20),
+        borderRadius: 4
     },
     textStyle: {
-        fontSize: 12,
+        fontSize: scale(12),
         color: "white",
         fontWeight: "500",
-        marginLeft: 7
+        marginLeft: scale(7)
     },
 })

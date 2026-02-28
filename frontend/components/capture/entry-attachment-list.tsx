@@ -30,8 +30,8 @@ export default function EntryAttachmentList({ onSelectAttachment }: EntryAttachm
             </Text>
 
             <View style={styles.attachmentSection}>
-                <ScrollView 
-                    horizontal 
+                <ScrollView
+                    horizontal
                     showsHorizontalScrollIndicator={false}
                     style={styles.attachmentsScroll}
                     contentContainerStyle={styles.attachmentsScrollContent}
@@ -39,7 +39,7 @@ export default function EntryAttachmentList({ onSelectAttachment }: EntryAttachm
                     {attachmentTypes.map((attachment) => {
                         const IconComponent = attachment.icon;
                         return (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 key={attachment.type}
                                 style={styles.attachmentOption}
                                 onPress={() => onSelectAttachment(attachment.type)}

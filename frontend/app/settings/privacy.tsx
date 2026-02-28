@@ -350,7 +350,7 @@ export default function PrivacyScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
@@ -371,12 +371,12 @@ export default function PrivacyScreen() {
                   <View style={[styles.iconContainer, { backgroundColor: `${setting.color}15` }]}>
                     <IconComponent color={setting.color} size={20} />
                   </View>
-                  
+
                   <View style={styles.settingContent}>
                     <Text style={styles.settingTitle}>{setting.title}</Text>
                     <Text style={styles.settingDescription}>{setting.description}</Text>
                   </View>
-                  
+
                   <Switch
                     disabled={isSaving || isLoading}
                     value={setting.enabled}
@@ -389,7 +389,7 @@ export default function PrivacyScreen() {
             })}
 
             <Pressable
-              accessibilityRole='button' 
+              accessibilityRole='button'
               accessibilityLabel='Blocked Users'
               accessibilityHint='Manage users you have blocked'
               testID='blocked-users-button'
@@ -399,7 +399,7 @@ export default function PrivacyScreen() {
               <View style={[styles.iconContainer, { backgroundColor: `#DC262615` }]}>
                 <Trash2 color="#DC2626" size={20} />
               </View>
-              
+
               <View style={styles.settingContent}>
                 <Text style={styles.settingTitle}>Blocked Users</Text>
                 <Text style={styles.settingDescription}>Manage users you have blocked</Text>
@@ -411,7 +411,7 @@ export default function PrivacyScreen() {
 
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>Data Management</Text>
-          
+
           <TouchableOpacity
             style={[styles.actionButton, isExporting && { opacity: 0.5 }]}
             onPress={handleExportData}

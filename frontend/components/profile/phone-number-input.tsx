@@ -20,6 +20,8 @@ export interface PhoneNumberInputChangePayload {
 interface PhoneNumberInputProps {
   /** Full phone number (including country code) used to initialize the field. */
   initialValue?: string;
+  /** ISO 3166-1 alpha-2 country code to use as default if no initialValue is provided. */
+  defaultCountryIso?: string;
   /** Placeholder shown in the national number input. */
   placeholder?: string;
   /** Called whenever the phone value changes. */
@@ -34,6 +36,7 @@ interface PhoneNumberInputProps {
  */
 export function PhoneNumberInput({
   initialValue,
+  defaultCountryIso,
   placeholder = '(555) 123-4567',
   onChange,
 }: PhoneNumberInputProps) {
@@ -45,9 +48,18 @@ export function PhoneNumberInput({
 
   useEffect(() => {
     if (!initialValue) {
+      if (defaultCountryIso) {
+        const country = countries.find(c => c.iso.toUpperCase() === defaultCountryIso.toUpperCase());
+        if (country) {
+          setCountryCode(country.code);
+          setCountryIso(country.iso);
+          if (!value) setValue('');
+          return;
+        }
+      }
       setCountryCode('');
       setCountryIso('');
-      setValue('');
+      if (!value) setValue('');
       return;
     }
 
@@ -72,7 +84,7 @@ export function PhoneNumberInput({
       // Non-US number: preserve all digits unformatted
       setValue(digitsOnly);
     }
-  }, [initialValue]);
+  }, [initialValue, defaultCountryIso]);
 
   const phoneRegex = /^\d+$/;
 

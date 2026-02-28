@@ -12,11 +12,11 @@ interface FriendSearchBarProps {
   placeholder?: string;
 }
 
-export default function FriendSearchBar({ 
-  isVisible, 
-  onClose, 
-  onSearch, 
-  placeholder = "Search friends by name or email..." 
+export default function FriendSearchBar({
+  isVisible,
+  onClose,
+  onSearch,
+  placeholder = "Search friends by name or email..."
 }: FriendSearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const inputOpacity = useSharedValue(0);
@@ -50,8 +50,8 @@ export default function FriendSearchBar({
   if (!isVisible) return null;
 
   return (
-    <Animated.View 
-      entering={FadeInDown.duration(300).springify().damping(20).stiffness(90)} 
+    <Animated.View
+      entering={FadeInDown.duration(300).springify().damping(20).stiffness(90)}
       exiting={FadeOutUp.duration(200)}
       style={styles.container}
     >
@@ -85,11 +85,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   searchIcon: {
     marginRight: 12,
