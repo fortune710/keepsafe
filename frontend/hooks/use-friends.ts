@@ -246,7 +246,7 @@ export function useFriends(userId?: string): UseFriendsResult {
 
           // Sync device storage after successful fetch (consistent with useSuggestedFriends)
           try {
-            await deviceStorage.setSuggestedFriends(filteredContacts);
+            await deviceStorage.setSuggestedFriends(profile.id, filteredContacts);
           } catch (storageError) {
             logger.warn('Failed to sync suggested friends to device storage during prefetch:', storageError);
             // Don't throw - storage sync failure shouldn't break the prefetch

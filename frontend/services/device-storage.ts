@@ -213,13 +213,13 @@ class DeviceStorage {
   }
 
 
-  async getSuggestedFriends(): Promise<SuggestedFriend[]> {
-    return await this.getItem('suggested_friends') ?? []
+  async getSuggestedFriends(userId: string): Promise<SuggestedFriend[]> {
+    return await this.getItem(`suggested_friends_${userId}`) ?? []
   }
 
-  async setSuggestedFriends(data: SuggestedFriend[]): Promise<void> {
+  async setSuggestedFriends(userId: string, data: SuggestedFriend[]): Promise<void> {
     const cacheDurationMinutes = 60 * 24 * 7; // 7 days
-    await this.setItem('suggested_friends', data, cacheDurationMinutes);
+    await this.setItem(`suggested_friends_${userId}`, data, cacheDurationMinutes);
   }
 }
 

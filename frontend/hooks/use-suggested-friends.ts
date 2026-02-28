@@ -28,7 +28,7 @@ export function useSuggestedFriends(): UseSuggestedFriendsResult {
     queryFn: async () => {
       if (!profile?.id) return [];
       try {
-        const storedFriends = await deviceStorage.getSuggestedFriends();
+        const storedFriends = await deviceStorage.getSuggestedFriends(profile.id);
         return storedFriends.filter(contact => contact.id !== profile.id);
       } catch (error) {
         logger.warn('Failed to load initial suggested friends from storage:', error);
@@ -52,7 +52,7 @@ export function useSuggestedFriends(): UseSuggestedFriendsResult {
 
       // Sync device storage after successful fetch
       try {
-        await deviceStorage.setSuggestedFriends(filteredContacts);
+        await deviceStorage.setSuggestedFriends(profile!.id, filteredContacts);
       } catch (storageError) {
         logger.warn('Failed to sync suggested friends to device storage:', storageError);
       }
@@ -73,7 +73,7 @@ export function useSuggestedFriends(): UseSuggestedFriendsResult {
       const updated = oldData.filter(contact => contact.id !== friendId);
 
       // Sync device storage optimistically
-      deviceStorage.setSuggestedFriends(updated).catch((error) => {
+      deviceStorage.setSuggestedFriends(profile!.id, updated).catch((error) => {
         logger.warn('Failed to update device storage optimistically:', error);
       });
 
