@@ -1,5 +1,7 @@
 import { Database } from "./database";
 
+export type SearchMode = 'friends' | 'contacts' | null;
+
 export interface SuggestedFriend {
   id: string;
   name: string;

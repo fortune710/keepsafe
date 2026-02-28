@@ -5,12 +5,12 @@ import { scale, verticalScale } from 'react-native-size-matters';
 import FriendsSection from '@/components/friends-section';
 import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
 import AddFriendsSection from '@/components/friends/add-friends-section';
-import { SuggestedFriend } from '@/types/friends';
+import { SearchMode, SuggestedFriend } from '@/types/friends';
 
 interface FriendsDefaultViewProps {
     allFriends: any[];
     suggestedFriends: SuggestedFriend[];
-    onContactSearchToggle: () => void;
+    onSearchToggle: (mode: Exclude<SearchMode, null>) => void;
     handleRemoveFriend: (id: string) => void;
     handleAcceptRequest: (id: string) => void;
     handleDeclineRequest: (id: string) => void;
@@ -26,7 +26,7 @@ interface FriendsDefaultViewProps {
 export function FriendsDefaultView({
     allFriends,
     suggestedFriends,
-    onContactSearchToggle,
+    onSearchToggle,
     handleRemoveFriend,
     handleAcceptRequest,
     handleDeclineRequest,
@@ -35,6 +35,13 @@ export function FriendsDefaultView({
     refreshing,
     handleRefresh
 }: FriendsDefaultViewProps) {
+
+    const openSearchView = () => {
+        if (allFriends.length === 0) {
+            return onSearchToggle('contacts');
+        }
+        return onSearchToggle('friends');
+    }
 
 
     return (
@@ -52,7 +59,7 @@ export function FriendsDefaultView({
             <View style={styles.content}>
                 <TouchableOpacity
                     style={styles.searchBox}
-                    onPress={onContactSearchToggle}
+                    onPress={openSearchView}
                     activeOpacity={0.7}
                 >
                     <Search color="#94A3B8" strokeWidth={3} size={20} />
