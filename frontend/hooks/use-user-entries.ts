@@ -34,7 +34,7 @@ interface UseUserEntriesResult {
   markEntriesAsSeen: (entryIds: string[]) => void;
 }
 
-const MIN_ENTRIES_TO_CACHE = 10;
+
 
 /**
  * Gets the profile of an entry owner.
@@ -103,6 +103,7 @@ export function useUserEntries(): UseUserEntriesResult {
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const prefetchedUrlsRef = useRef<Set<string>>(new Set());
 
   const {
     data,
@@ -120,9 +121,9 @@ export function useUserEntries(): UseUserEntriesResult {
       // Try to get cached entries first for initial load
       if (!pageParam) {
         const cachedEntries = await deviceStorage.getEntries(user.id);
-        if (cachedEntries && cachedEntries.length > MIN_ENTRIES_TO_CACHE) {
-          // If we have cached data, we use it. 
-          // Note: This might overlap with first page fetch but gives instant UI.
+        // Only return cached entries immediately if we have a full page.
+        // This prevents getNextPageParam from prematurely returning undefined (no more pages).
+        if (cachedEntries && cachedEntries.length >= DEFAULT_PAGE_SIZE) {
           return cachedEntries;
         }
       }
@@ -211,19 +212,19 @@ export function useUserEntries(): UseUserEntriesResult {
 
     entries.forEach(entry => {
       // Preload main content
-      if (entry.content_url && entry.type === 'image') {
+      if (entry.content_url && entry.type === 'image' && !prefetchedUrlsRef.current.has(entry.content_url)) {
         urlsToPreload.push(entry.content_url);
       }
 
       // Preload profile avatar
-      if (entry.profile?.avatar_url) {
+      if (entry.profile?.avatar_url && !prefetchedUrlsRef.current.has(entry.profile.avatar_url)) {
         urlsToPreload.push(entry.profile.avatar_url);
       }
 
       // Preload stickers from attachments
       if (Array.isArray(entry.attachments)) {
         (entry.attachments as RenderedMediaCanvasItem[]).forEach(attachment => {
-          if (attachment.type === 'sticker' && attachment.sticker) {
+          if (attachment.type === 'sticker' && attachment.sticker && !prefetchedUrlsRef.current.has(attachment.sticker)) {
             urlsToPreload.push(attachment.sticker);
           }
         });
@@ -233,9 +234,19 @@ export function useUserEntries(): UseUserEntriesResult {
     if (urlsToPreload.length > 0) {
       // Unique URLs only
       const uniqueUrls = Array.from(new Set(urlsToPreload));
+
+      // Update tracking to avoid repeated work
+      uniqueUrls.forEach(url => prefetchedUrlsRef.current.add(url));
+
+      // Prevent unbounded memory growth by limiting set size (LRU-ish)
+      if (prefetchedUrlsRef.current.size > 1000) {
+        const urlArray = Array.from(prefetchedUrlsRef.current);
+        prefetchedUrlsRef.current = new Set(urlArray.slice(-800));
+      }
+
       // Preload in background
       Image.prefetch(uniqueUrls);
-      logger.info(`Preloaded ${uniqueUrls.length} images for vault`);
+      logger.info(`Preloaded ${uniqueUrls.length} new images for vault`);
     }
   }, [entries]);
 
@@ -582,6 +593,7 @@ export function useUserEntries(): UseUserEntriesResult {
         reconnectTimeoutRef.current = null;
       }
       reconnectAttemptsRef.current = 0;
+      prefetchedUrlsRef.current.clear();
     };
   }, [user?.id, setupSubscription]);
 
