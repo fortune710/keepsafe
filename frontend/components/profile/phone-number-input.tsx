@@ -47,42 +47,51 @@ export function PhoneNumberInput({
   const [value, setValue] = useState('');
 
   useEffect(() => {
+    // Only apply defaults or initial values if the user hasn't started typing yet.
+    // This prevents background changes (like defaultCountryIso updating) from wiping user input.
+    const hasUserInput = value.length > 0;
+
     if (!initialValue) {
-      if (defaultCountryIso) {
-        const country = countries.find(c => c.iso.toUpperCase() === defaultCountryIso.toUpperCase());
-        if (country) {
-          setCountryCode(country.code);
-          setCountryIso(country.iso);
-          if (!value) setValue('');
-          return;
+      if (!hasUserInput) {
+        if (defaultCountryIso) {
+          const country = countries.find(c => c.iso.toUpperCase() === defaultCountryIso.toUpperCase());
+          if (country) {
+            setCountryCode(country.code);
+            setCountryIso(country.iso);
+            setValue('');
+            return;
+          }
         }
+        setCountryCode('');
+        setCountryIso('');
+        setValue('');
       }
-      setCountryCode('');
-      setCountryIso('');
-      if (!value) setValue('');
       return;
     }
 
-    // Find all matching countries and sort by code length descending (longest match first).
-    const matchingCountries = countries.filter(c => initialValue.startsWith(c.code));
-    matchingCountries.sort((a, b) => b.code.length - a.code.length);
+    // Only sync initialValue if the user hasn't typed anything else.
+    if (!hasUserInput) {
+      // Find all matching countries and sort by code length descending (longest match first).
+      const matchingCountries = countries.filter(c => initialValue.startsWith(c.code));
+      matchingCountries.sort((a, b) => b.code.length - a.code.length);
 
-    const longestMatch = matchingCountries[0];
-    if (longestMatch) {
-      setCountryCode(longestMatch.code);
-      setCountryIso(longestMatch.iso);
-      setValue(formatPhoneNumber(initialValue.slice(longestMatch.code.length).trim()));
-      return;
-    }
+      const longestMatch = matchingCountries[0];
+      if (longestMatch) {
+        setCountryCode(longestMatch.code);
+        setCountryIso(longestMatch.iso);
+        setValue(formatPhoneNumber(initialValue.slice(longestMatch.code.length).trim()));
+        return;
+      }
 
-    // Fallback: preserve all digits except for US (+1) numbers
-    let digitsOnly = initialValue.replace(/\D/g, '');
-    if (initialValue.startsWith('+1') && digitsOnly.startsWith('1')) {
-      // US number: remove leading '1' and format remaining digits
-      setValue(formatPhoneNumber(digitsOnly.slice(1)));
-    } else {
-      // Non-US number: preserve all digits unformatted
-      setValue(digitsOnly);
+      // Fallback: preserve all digits except for US (+1) numbers
+      let digitsOnly = initialValue.replace(/\D/g, '');
+      if (initialValue.startsWith('+1') && digitsOnly.startsWith('1')) {
+        // US number: remove leading '1' and format remaining digits
+        setValue(formatPhoneNumber(digitsOnly.slice(1)));
+      } else {
+        // Non-US number: preserve all digits unformatted
+        setValue(digitsOnly);
+      }
     }
   }, [initialValue, defaultCountryIso]);
 
