@@ -63,6 +63,13 @@ class Settings:
     REDIS_DB: int = _get_int_env("REDIS_DB", 0)
     REDIS_CACHE_TTL: int = _get_int_env("REDIS_CACHE_TTL", 3600)
 
+
+    # SendGrid
+    SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
+    SENDGRID_FROM_EMAIL: str = os.getenv("SENDGRID_FROM_EMAIL", "contact@fortunealebiosu.dev")
+    SENDGRID_FROM_NAME: str = os.getenv("SENDGRID_FROM_NAME", "Fortune from Keepsafe")
+    ENTRY_REPORT_NOTIFICATION_TO_EMAIL: str = os.getenv("ENTRY_REPORT_NOTIFICATION_TO_EMAIL", "fortunealebiosu710@gmail.com")
+
     # Twilio (SMS OTP)
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
