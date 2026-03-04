@@ -5,7 +5,11 @@ from services.ingestion_service import IngestionService
 from services.notification_enqueue_service import NotificationEnqueueService
 from services.friend_service import FriendService
 from services.email_service import EmailService
+from config import settings
+from starlette.concurrency import run_in_threadpool
 import logging
+import hmac
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +331,25 @@ async def entry_report_webhook(
 ):
     """Process entry report Supabase webhooks and send email notifications."""
     try:
+        webhook_secret = settings.SUPABASE_WEBHOOK_SECRET
+        if not webhook_secret:
+            logger.error("SUPABASE_WEBHOOK_SECRET is not configured")
+            raise HTTPException(status_code=500, detail="Webhook signature verification is not configured")
+
+        if not x_supabase_signature:
+            raise HTTPException(status_code=401, detail="Missing webhook signature")
+
+        raw_body = await request.body()
+        expected_signature = hmac.new(
+            webhook_secret.encode("utf-8"),
+            raw_body,
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected_signature, x_supabase_signature):
+            logger.warning("Invalid webhook signature for entry report webhook")
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
         if payload.table != "entry_reports":
             logger.warning(f"Received webhook for unexpected table: {payload.table}")
             return {"status": "ignored", "message": f"Table {payload.table} not handled"}
@@ -351,7 +374,7 @@ async def entry_report_webhook(
             },
         )
 
-        send_success = email_service.send_entry_report_email(report_payload)
+        send_success = await run_in_threadpool(email_service.send_entry_report_email, report_payload)
         if not send_success:
             logger.error(
                 "Entry report email dispatch failed",

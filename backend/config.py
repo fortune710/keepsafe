@@ -68,11 +68,29 @@ class Settings:
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
     SENDGRID_FROM_EMAIL: str = os.getenv("SENDGRID_FROM_EMAIL", "contact@fortunealebiosu.dev")
     SENDGRID_FROM_NAME: str = os.getenv("SENDGRID_FROM_NAME", "Fortune from Keepsafe")
-    ENTRY_REPORT_NOTIFICATION_TO_EMAIL: str = os.getenv("ENTRY_REPORT_NOTIFICATION_TO_EMAIL", "fortunealebiosu710@gmail.com")
+    ENTRY_REPORT_NOTIFICATION_TO_EMAIL: str = os.getenv("ENTRY_REPORT_NOTIFICATION_TO_EMAIL", "")
+    SUPABASE_WEBHOOK_SECRET: str = os.getenv("SUPABASE_WEBHOOK_SECRET", "")
 
     # Twilio (SMS OTP)
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "")
+
+
+    def validate_entry_report_email_config(self) -> None:
+        """Fail fast when required SendGrid settings for entry report emails are missing."""
+        required_fields = {
+            "SENDGRID_API_KEY": self.SENDGRID_API_KEY,
+            "SENDGRID_FROM_EMAIL": self.SENDGRID_FROM_EMAIL,
+            "SENDGRID_FROM_NAME": self.SENDGRID_FROM_NAME,
+            "ENTRY_REPORT_NOTIFICATION_TO_EMAIL": self.ENTRY_REPORT_NOTIFICATION_TO_EMAIL,
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+        if missing_fields:
+            raise ValueError(
+                "Missing required SendGrid entry report configuration: "
+                + ", ".join(missing_fields)
+            )
 
 settings = Settings()
