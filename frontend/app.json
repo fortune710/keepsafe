@@ -97,8 +97,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Keepsafe to access your camera",
-          "microphonePermission": "Allow Keepsafe to access your microphone",
+          "cameraPermission": "Allow Keepsafe access your camera for photo and video entries",
+          "microphonePermission": "Allow Keepsafe access your microphone for audio entries",
           "recordAudioAndroid": true
         }
       ],
@@ -111,7 +111,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow Keepsafe to access your contacts."
+          "contactsPermission": "Allow Keepsafe to access your contacts to help you find friends"
         }
       ],
       [
@@ -124,7 +124,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow Keepsafe to access your microphone."
+          "microphonePermission": "Allow Keepsafe access your microphone for audio entries"
         }
       ],
       "expo-background-task",
@@ -132,8 +132,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysPermission": "Allow Keepsafe to use your location at all times.",
-          "locationWhenInUsePermission": "Allow Keepsafe to use your location while you are using the app.",
+          "locationAlwaysPermission": "Allow Keepsafe to access your location to let friends know your location",
+          "locationWhenInUsePermission": "Allow Keepsafe to access your location to let friends know your location",
           "isIosBackgroundLocationEnabled": false
         }
       ]
