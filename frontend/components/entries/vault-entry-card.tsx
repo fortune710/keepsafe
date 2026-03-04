@@ -1,40 +1,24 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle } from 'react-native-reanimated';
-import { Heart, MessageCircle, Play, Pause, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react-native';
-import { Audio } from 'expo-av';
-import { Database } from '@/types/database';
+import { RotateCcw, AlertCircle } from 'lucide-react-native';
 import { dateStringToNumber, getDefaultAvatarUrl, getRelativeDate } from '@/lib/utils';
 import { useAuthContext } from '@/providers/auth-provider';
 import { Image } from 'expo-image'
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEvent } from 'expo';
 import VaultCanvas from '../capture/canvas/vault-canvas';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
 import TextTicker from 'react-native-text-ticker';
 import { MusicTag } from '@/types/capture';
 
-type Entry = Database['public']['Tables']['entries']['Row'];
-type Profile = Database['public']['Tables']['profiles']['Row'];
-
-interface EntryWithProfile extends Entry {
-  profile: Omit<Profile, "invite_code" | "max_uses" | "current_uses" | "is_active">;
-  status?: 'pending' | 'processing' | 'completed' | 'failed';
-  processingStartedAt?: string;
-  processingCompletedAt?: string;
-  processingFailedAt?: string;
-  error?: string;
-}
+import { EntryWithProfile } from '@/types/entries';
 
 interface VaultEntryCardProps {
   entry: EntryWithProfile;
   includeRotation?: boolean;
-  onPress?: (entry: EntryWithProfile) => void;
-  onReactions?: (entryId: string) => void;
-  onComments?: (entryId: string) => void;
   onRetry?: (entryId: string) => void;
   onMusicPress?: (music: MusicTag) => void;
+  onLongPress?: (entry: EntryWithProfile) => void;
 }
 
 const { height } = Dimensions.get('window');
@@ -42,34 +26,18 @@ const { height } = Dimensions.get('window');
 export default function VaultEntryCard({
   entry,
   includeRotation = true,
-  onPress,
-  onReactions,
-  onComments,
   onRetry,
   onMusicPress,
+  onLongPress,
 }: VaultEntryCardProps) {
-
   const numberHash = useMemo(() => {
     return dateStringToNumber(entry.created_at);
-  }, [])
-
-
+  }, [entry.created_at]);
 
   const { profile } = useAuthContext();
 
-  const handleEntryReactions = (e: any) => {
-    e.stopPropagation();
-    onReactions?.(entry.id);
-  };
-
-  const handleEntryComments = (e: any) => {
-    e.stopPropagation();
-    onComments?.(entry.id);
-  };
-
   const rotateStyle = useAnimatedStyle(() => {
-    // Generate a random angle between -6 and 6 degrees
-    const angle = numberHash * 12 - 6; // (-6 to 6)
+    const angle = numberHash * 12 - 6;
     return {
       transform: [{ rotate: `${angle}deg` }]
     };
@@ -114,7 +82,6 @@ export default function VaultEntryCard({
     }
   };
 
-  // Derive a safe profile for display to avoid undefined access during async swaps
   const safeProfile = useMemo(() => {
     if (entry?.profile) return entry.profile as any;
     if (profile && entry?.user_id === profile.id) {
@@ -127,67 +94,45 @@ export default function VaultEntryCard({
     } as any;
   }, [entry?.profile, entry?.user_id, profile]);
 
-
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={includeRotation ? [styles.entryCard, rotateStyle] : styles.entryCard}
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(150)}
-      >
-        <VaultCanvas
-          type={entry.type}
-          items={entry.attachments}
-          uri={entry.content_url || ''}
-          style={styles.entryImage as any}
-          onMusicPress={onMusicPress}
-          metadata={entry.metadata}
-        />
-
-        {/* Status indicator */}
-        {getStatusIndicator()}
-
-        {/* Author info at bottom */}
-        <View style={styles.authorContainer}>
-          <Image
-            source={{
-              uri: safeProfile?.avatar_url || getDefaultAvatarUrl(safeProfile?.full_name || '')
-            }}
-            style={styles.authorAvatar}
+      <Pressable onLongPress={() => onLongPress?.(entry)} delayLongPress={350}>
+        <Animated.View
+          style={includeRotation ? [styles.entryCard, rotateStyle] : styles.entryCard}
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+        >
+          <VaultCanvas
+            type={entry.type}
+            items={entry.attachments}
+            uri={entry.content_url || ''}
+            style={styles.entryImage as any}
+            onMusicPress={onMusicPress}
+            metadata={entry.metadata}
           />
-          <View style={styles.authorNameContainer}>
-            <TextTicker loop duration={5000} style={styles.authorName}>
-              {safeProfile?.id === profile?.id ? 'You' : safeProfile?.full_name || 'Unknown User'}
-            </TextTicker>
+
+          {getStatusIndicator()}
+
+          <View style={styles.authorContainer}>
+            <Image
+              source={{
+                uri: safeProfile?.avatar_url || getDefaultAvatarUrl(safeProfile?.full_name || '')
+              }}
+              style={styles.authorAvatar}
+            />
+            <View style={styles.authorNameContainer}>
+              <TextTicker loop duration={5000} style={styles.authorName}>
+                {safeProfile?.id === profile?.id ? 'You' : safeProfile?.full_name || 'Unknown User'}
+              </TextTicker>
+            </View>
+
+            <Text style={styles.dateText}>{getRelativeDate(entry.created_at)}</Text>
           </View>
-
-          <Text style={styles.dateText}>{getRelativeDate(entry.created_at)}</Text>
-        </View>
-      </Animated.View>
-
-      {/* <View style={styles.actionsContainer}>
-            <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={handleEntryReactions}
-            >
-              <Heart color="#64748B" size={20} />
-              <Text style={styles.actionText}>React</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={handleEntryComments}
-            >
-              <MessageCircle color="#64748B" size={20} />
-              <Text style={styles.actionText}>Comment</Text>
-            </TouchableOpacity>
-          </View>
-       */}
-
+        </Animated.View>
+      </Pressable>
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -196,115 +141,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     paddingVertical: 18
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#F0F9FF',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  content: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#64748B',
-    marginTop: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  captureButton: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  captureButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  entryContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  dateContainer: {
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   dateText: {
     fontSize: scale(12),
@@ -331,54 +167,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 300,
     borderRadius: 0
-  },
-
-
-  entryContent: {
-    flex: 1,
-  },
-  entryText: {
-    fontSize: 18,
-    color: '#1E293B',
-    lineHeight: 26,
-    marginBottom: 16,
-  },
-  entryMeta: {
-    marginBottom: 20,
-    gap: 8,
-  },
-  musicTag: {
-    fontSize: 16,
-    color: '#8B5CF6',
-    fontWeight: '500',
-  },
-  locationTag: {
-    fontSize: 16,
-    color: '#059669',
-    fontWeight: '500',
-  },
-  privateTag: {
-    fontSize: 16,
-    color: '#DC2626',
-    fontWeight: '500',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    gap: 32,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionText: {
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '500',
   },
   authorContainer: {
     flexDirection: 'row',
