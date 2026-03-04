@@ -114,22 +114,27 @@ export default function LegalScreen() {
               Keepsafe may provide updates, patches, or modifications to the application. You agree to install such updates to continue using the service. We reserve the right to modify or discontinue features at any time.
             </Text>
 
-            <Text style={styles.sectionTitle}>5. Termination</Text>
+            <Text style={styles.sectionTitle}>5. Content and Conduct Requirements</Text>
+            <Text style={styles.sectionText}>
+              You must not post, upload, share, or otherwise distribute harmful, toxic, discriminatory, or sexual content on Keepsafe. If you fail to comply with this requirement, we may take enforcement action, including temporary account suspension or permanent account bans.
+            </Text>
+
+            <Text style={styles.sectionTitle}>6. Termination</Text>
             <Text style={styles.sectionText}>
               This license is effective until terminated. Your rights under this license will terminate automatically without notice if you fail to comply with any term of this Agreement. Upon termination, you must cease all use of the application and delete all copies.
             </Text>
 
-            <Text style={styles.sectionTitle}>6. Disclaimer of Warranties</Text>
+            <Text style={styles.sectionTitle}>7. Disclaimer of Warranties</Text>
             <Text style={styles.sectionText}>
               THE APPLICATION IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
             </Text>
 
-            <Text style={styles.sectionTitle}>7. Limitation of Liability</Text>
+            <Text style={styles.sectionTitle}>8. Limitation of Liability</Text>
             <Text style={styles.sectionText}>
               TO THE MAXIMUM EXTENT PERMITTED BY LAW, KEEPSAFE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY.
             </Text>
 
-            <Text style={styles.sectionTitle}>8. Governing Law</Text>
+            <Text style={styles.sectionTitle}>9. Governing Law</Text>
             <Text style={styles.sectionText}>
               This Agreement shall be governed by and construed in accordance with the laws of the jurisdiction in which Keepsafe operates, without regard to its conflict of law provisions.
             </Text>
