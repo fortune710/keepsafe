@@ -73,10 +73,12 @@ async def startup_event():
     """
     logger.info("Starting up application...")
     try:
+        settings.validate_entry_report_email_config()
         notification_scheduler.start()
         logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}", exc_info=True)
+        raise
 
 @app.on_event("shutdown")
 async def shutdown_event():

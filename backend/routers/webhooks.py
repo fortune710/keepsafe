@@ -4,7 +4,9 @@ from typing import Optional, Dict, Any
 from services.ingestion_service import IngestionService
 from services.notification_enqueue_service import NotificationEnqueueService
 from services.friend_service import FriendService
-from services.supabase_client import get_supabase_client
+from services.email_service import EmailService
+from config import settings
+from starlette.concurrency import run_in_threadpool
 import logging
 import hmac
 import hashlib
@@ -16,6 +18,7 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 ingestion_service = IngestionService()
 notification_enqueue_service = NotificationEnqueueService()
 friend_service = FriendService()
+email_service = EmailService()
 
 class EntryWebhookPayload(BaseModel):
     """Payload structure for entry webhook."""
@@ -29,6 +32,21 @@ class FriendWebhookPayload(BaseModel):
     type: str  # 'INSERT', 'UPDATE', 'DELETE'
     table: str
     record: Optional[Dict[str, Any]] = None
+    old_record: Optional[Dict[str, Any]] = None
+
+class EntryReportRecord(BaseModel):
+    """Entry report record payload from Supabase webhook."""
+    id: str
+    user_id: str
+    entry_id: str
+    reason: str
+
+
+class EntryReportWebhookPayload(BaseModel):
+    """Payload structure for entry report webhook."""
+    type: str  # 'INSERT', 'UPDATE', 'DELETE'
+    table: str
+    record: Optional[EntryReportRecord] = None
     old_record: Optional[Dict[str, Any]] = None
 
 @router.post("/entries")
@@ -304,6 +322,81 @@ async def friend_webhook(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+
+@router.post("/entry-reports")
+async def entry_report_webhook(
+    payload: EntryReportWebhookPayload,
+    request: Request,
+    x_supabase_signature: Optional[str] = Header(None, alias="x-supabase-signature")
+):
+    """Process entry report Supabase webhooks and send email notifications."""
+    try:
+        webhook_secret = settings.SUPABASE_WEBHOOK_SECRET
+        if not webhook_secret:
+            logger.error("SUPABASE_WEBHOOK_SECRET is not configured")
+            raise HTTPException(status_code=500, detail="Webhook signature verification is not configured")
+
+        if not x_supabase_signature:
+            raise HTTPException(status_code=401, detail="Missing webhook signature")
+
+        raw_body = await request.body()
+        expected_signature = hmac.new(
+            webhook_secret.encode("utf-8"),
+            raw_body,
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected_signature, x_supabase_signature):
+            logger.warning("Invalid webhook signature for entry report webhook")
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+        if payload.table != "entry_reports":
+            logger.warning(f"Received webhook for unexpected table: {payload.table}")
+            return {"status": "ignored", "message": f"Table {payload.table} not handled"}
+
+        if payload.type != "INSERT":
+            logger.info(f"Ignoring entry report webhook type: {payload.type}")
+            return {
+                "status": "ignored",
+                "message": f"Webhook type {payload.type} does not require email dispatch"
+            }
+
+        if not payload.record:
+            raise HTTPException(status_code=400, detail="Record missing in INSERT payload")
+
+        report_payload = payload.record.model_dump()
+        logger.info(
+            "Processing INSERT webhook for entry report",
+            extra={
+                "report_id": report_payload.get("id"),
+                "entry_id": report_payload.get("entry_id"),
+                "user_id": report_payload.get("user_id"),
+            },
+        )
+
+        send_success = await run_in_threadpool(email_service.send_entry_report_email, report_payload)
+        if not send_success:
+            logger.error(
+                "Entry report email dispatch failed",
+                extra={
+                    "report_id": report_payload.get("id"),
+                    "entry_id": report_payload.get("entry_id"),
+                    "user_id": report_payload.get("user_id"),
+                },
+            )
+            raise HTTPException(status_code=502, detail="Failed to dispatch entry report email")
+
+        return {
+            "status": "success",
+            "message": f"Entry report {report_payload.get('id')} processed successfully",
+            "entry_report_id": report_payload.get("id"),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Unexpected error while handling entry report webhook: %s", str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
+
 
 @router.get("/health")
 async def health_check():
