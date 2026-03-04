@@ -112,7 +112,17 @@ export default function VaultScreen() {
         throw new Error('This entry has no media to save.');
       }
 
-      const extension = entry.type === 'video' ? 'mp4' : 'jpg';
+      const typeToExtension: Record<string, string> = {
+        video: 'mp4',
+        audio: 'mp3',
+        photo: 'jpg',
+        image: 'jpg',
+      };
+
+      const parsedUrl = entry.content_url.split('?')[0] || '';
+      const derivedExtension = parsedUrl.includes('.') ? parsedUrl.split('.').pop()?.toLowerCase() : '';
+      const safeExtension = derivedExtension && /^[a-z0-9]+$/.test(derivedExtension) ? derivedExtension : '';
+      const extension = typeToExtension[entry.type] || safeExtension || 'bin';
       const fileName = `${entry.id}.${extension}`;
       const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
       const downloadResult = await FileSystem.downloadAsync(entry.content_url, fileUri);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { runOnJS, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
@@ -23,7 +23,7 @@ export default function VaultEntryActionPopover({
   const swipeDownGesture = Gesture.Pan()
     .onEnd((event) => {
       if (event.translationY > 100 && event.velocityY > 500) {
-        onClose();
+        runOnJS(onClose)();
       }
     });
 
