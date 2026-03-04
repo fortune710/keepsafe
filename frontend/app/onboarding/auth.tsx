@@ -345,7 +345,14 @@ export default function AuthScreen() {
                 >
                   Terms of Service
                 </Text>
-                {' '}and{' '}
+                {', '}
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => router.push('/settings/legal?doc=eula')}
+                >
+                  EULA
+                </Text>
+                {' and '}
                 <Text
                   style={styles.termsLink}
                   onPress={() => router.push('/settings/legal?doc=privacy')}
