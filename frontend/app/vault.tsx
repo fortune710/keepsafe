@@ -22,6 +22,7 @@ import { EntryWithProfile } from '@/types/entries';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useMutation } from '@tanstack/react-query';
+import { logger } from '@/lib/logger';
 import VaultEntryActionPopover from '@/components/vault/vault-entry-action-popover';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
@@ -125,17 +126,26 @@ export default function VaultScreen() {
       const extension = typeToExtension[entry.type] || safeExtension || 'bin';
       const fileName = `${entry.id}.${extension}`;
       const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-      const downloadResult = await FileSystem.downloadAsync(entry.content_url, fileUri);
 
-      if (downloadResult.status !== 200) {
-        throw new Error('Failed to download this entry.');
+      try {
+        const downloadResult = await FileSystem.downloadAsync(entry.content_url, fileUri);
+
+        if (downloadResult.status !== 200) {
+          throw new Error('Failed to download this entry.');
+        }
+
+        if (!await Sharing.isAvailableAsync()) {
+          throw new Error('Sharing is not available on this device.');
+        }
+
+        await Sharing.shareAsync(downloadResult.uri, { dialogTitle: 'Save to Photos' });
+      } finally {
+        try {
+          await FileSystem.deleteAsync(fileUri, { idempotent: true });
+        } catch (cleanupError) {
+          logger.warn('Unable to clean temporary entry media file', cleanupError);
+        }
       }
-
-      if (!await Sharing.isAvailableAsync()) {
-        throw new Error('Sharing is not available on this device.');
-      }
-
-      await Sharing.shareAsync(downloadResult.uri, { dialogTitle: 'Save to Photos' });
     },
     onSuccess: () => {
       toast('Use Save Image/Video from the share sheet to add this entry to your library.');
@@ -219,12 +229,16 @@ export default function VaultScreen() {
           <Pressable
             style={styles.backButton}
             onPress={() => router.back()}
+            accessibilityLabel="Go back"
+            accessibilityHint="Returns to the previous screen"
           >
             <ChevronLeft color="#64748B" size={24} />
           </Pressable>
           <Pressable
             style={styles.sparklesButton}
             onPress={() => router.push('/search')}
+            accessibilityLabel="Open search"
+            accessibilityHint="Navigates to the search screen"
           >
             <Sparkles color="#64748B" size={24} />
           </Pressable>
