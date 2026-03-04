@@ -155,7 +155,6 @@ export default function VaultScreen() {
   const handleReportEntry = () => {
     if (!actionEntry?.id) {
       setActionEntry(null);
-      router.replace('/vault');
       return;
     }
 
