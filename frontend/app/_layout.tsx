@@ -84,6 +84,13 @@ export default function RootLayout() {
                       <Stack.Screen name="friends" />
                       <Stack.Screen name="dreamscape" />
                       <Stack.Screen name="search" />
+                      <Stack.Screen
+                        name="report-entry"
+                        options={{
+                          animationDuration: 350,
+                          animation: "fade_from_bottom"
+                        }}
+                      />
                       <Stack.Screen name="capture/details" />
                       <Stack.Screen name="+not-found" />
                     </Stack>
