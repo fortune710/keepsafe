@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 18
+    paddingVertical: 18,
   },
   dateText: {
     fontSize: scale(12),
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 16,
     elevation: 8,
-    width: '80%',
+    width: '100%',
     height: height * 0.45,
     borderWidth: 1,
     borderColor: Colors.border
