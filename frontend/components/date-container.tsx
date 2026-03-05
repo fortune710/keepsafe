@@ -9,12 +9,12 @@ interface DateContainerProps {
 
 const getCurrentDate = (date: Date, timeZone?: string) => {
     const timezone = timeZone ?? getDeviceTimezone();
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric',
-      timeZone: timezone,
+    const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: timezone,
     };
     return date.toLocaleDateString('en-US', options);
 };

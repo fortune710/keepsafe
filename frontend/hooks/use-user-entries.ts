@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useInfiniteQuery, useQueryClient, InfiniteData } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TABLES } from '@/constants/supabase';
