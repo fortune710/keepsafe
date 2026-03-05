@@ -331,6 +331,7 @@ async def entry_report_webhook(
 ):
     """Process entry report Supabase webhooks and send email notifications."""
     try:
+        logger.info("Entry report webhook request received")
         webhook_secret = settings.SUPABASE_WEBHOOK_SECRET
         if not webhook_secret:
             logger.error("SUPABASE_WEBHOOK_SECRET is not configured")
@@ -374,6 +375,7 @@ async def entry_report_webhook(
             },
         )
 
+        logger.info("Attempting entry report email dispatch")
         send_success = await run_in_threadpool(email_service.send_entry_report_email, report_payload)
         if not send_success:
             logger.error(
@@ -384,7 +386,9 @@ async def entry_report_webhook(
                     "user_id": report_payload.get("user_id"),
                 },
             )
-            raise HTTPException(status_code=502, detail="Failed to dispatch entry report email")
+            raise HTTPException(status_code=500, detail="Failed to dispatch entry report email")
+
+        logger.info("Entry report email dispatch succeeded")
 
         return {
             "status": "success",
