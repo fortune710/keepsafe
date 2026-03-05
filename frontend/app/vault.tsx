@@ -123,6 +123,9 @@ export default function VaultScreen() {
   }));
 
   const selectedFriend = friendOptions.find((friend) => friend.id === selectedFriendId);
+  const friendFilterAccessibilityLabel = selectedFriend
+    ? `Open friend filter. Currently filtering by ${selectedFriend.label}`
+    : 'Open friend filter';
 
   const handleFriendFilterSelect = (friendId?: string) => {
     router.setParams({ friendId: friendId || undefined });
@@ -263,11 +266,23 @@ export default function VaultScreen() {
           >
             <Sparkles color="#64748B" size={24} />
           </Pressable>
-          <Pressable style={styles.friendFilterFab} onPress={() => setIsFriendFilterVisible(true)}>
+          <Pressable
+            style={styles.friendFilterFab}
+            onPress={() => setIsFriendFilterVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel={friendFilterAccessibilityLabel}
+            accessibilityHint="Opens the friend filter menu"
+          >
             {selectedFriend?.avatarUrl ? (
-              <Image source={{ uri: selectedFriend.avatarUrl }} style={styles.friendAvatar} />
+              <Image
+                source={{ uri: selectedFriend.avatarUrl }}
+                style={styles.friendAvatar}
+                accessible={false}
+              />
             ) : (
-              <Users color="#64748B" size={24} />
+              <View accessible={false}>
+                <Users color="#64748B" size={24} />
+              </View>
             )}
           </Pressable>
           <FlashList

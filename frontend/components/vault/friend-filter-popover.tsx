@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions } from 'react-native';
-import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { SlideInDown, SlideOutDown, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Check, X } from 'lucide-react-native';
 import { verticalScale } from 'react-native-size-matters';
@@ -29,7 +29,7 @@ export default function FriendFilterPopover({
 }: FriendFilterPopoverProps) {
   const swipeDownGesture = Gesture.Pan().onEnd((event) => {
     if (event.translationY > 100 && event.velocityY > 500) {
-      onClose();
+      runOnJS(onClose)();
     }
   });
 
@@ -52,7 +52,14 @@ export default function FriendFilterPopover({
           <View style={styles.handle} />
           <View style={styles.header}>
             <Text style={styles.title}>Filter by friend</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              accessibilityHint="Closes the filter popover"
+            >
               <X color="#64748B" size={20} />
             </TouchableOpacity>
           </View>

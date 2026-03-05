@@ -174,18 +174,28 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
 
       // Cache the data. DeviceStorage now handles merging local-only entries.
       if (!pageParam && entries) {
-        await deviceStorage.setEntries(user.id, entries);
-        // Get the merged set from storage to ensure local-only entries are visible
-        const mergedEntries = await deviceStorage.getEntries(user.id) || entries;
-        const filteredMergedEntries = friendId
-          ? mergedEntries.filter((entry) => entry.user_id === friendId)
-          : mergedEntries;
+        if (!friendId) {
+          await deviceStorage.setEntries(user.id, entries);
+          // Get the merged set from storage to ensure local-only entries are visible
+          const mergedEntries = await deviceStorage.getEntries(user.id) || entries;
 
-        logger.info(`Vault Sync: Server returned ${entries.length}, local merged total ${filteredMergedEntries.length}`);
+          logger.info(`Vault Sync: Server returned ${entries.length}, local merged total ${mergedEntries.length}`);
+
+          // IMPORTANT: Return exactly the page size to maintain correct pagination offsets
+          // and avoid double-counting or skipped entries on next page fetch.
+          return mergedEntries.slice(0, DEFAULT_PAGE_SIZE);
+        }
+
+        const filteredCachedEntries = cachedEntries || [];
+        const mergedFilteredEntries = [...entries, ...filteredCachedEntries]
+          .filter((entry, index, self) => self.findIndex((item) => item.id === entry.id) === index)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        logger.info(`Vault Sync (friend filter): Server returned ${entries.length}, local merged total ${mergedFilteredEntries.length}`);
 
         // IMPORTANT: Return exactly the page size to maintain correct pagination offsets
         // and avoid double-counting or skipped entries on next page fetch.
-        return filteredMergedEntries.slice(0, DEFAULT_PAGE_SIZE);
+        return mergedFilteredEntries.slice(0, DEFAULT_PAGE_SIZE);
       }
 
 
