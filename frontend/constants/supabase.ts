@@ -14,6 +14,7 @@ export const TABLES = {
   PRIVACY_SETTINGS: 'privacy_settings',
   USER_STREAKS: 'user_streaks',
   PHONE_NUMBER_UPDATES: 'phone_number_updates',
+  ENTRY_REPORTS: 'entry_reports',
 } as const;
 
 // Storage Bucket Names
