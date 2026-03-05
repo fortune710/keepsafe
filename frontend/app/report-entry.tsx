@@ -4,10 +4,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
 import { useAuthContext } from '@/providers/auth-provider';
-import { useMutation } from '@tanstack/react-query';
 import { deviceStorage } from '@/services/device-storage';
 import { useToast } from '@/hooks/use-toast';
 import PageHeader from '@/components/page-header';
+import { useReportedEntries } from '@/hooks/use-reported-entries';
 
 const REPORT_REASONS = [
   'Harassment or bullying',
@@ -22,29 +22,13 @@ export default function ReportEntryScreen() {
   const { entryId } = useLocalSearchParams<{ entryId?: string }>();
   const { user } = useAuthContext();
   const { toast } = useToast();
+  const { createReportAsync, isCreatingReport } = useReportedEntries();
   const [selectedReason, setSelectedReason] = useState<string>('');
 
   const safeEntryId = useMemo(() => {
     if (!entryId || typeof entryId !== 'string') return '';
     return entryId;
   }, [entryId]);
-
-  const reportMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.id || !safeEntryId) {
-        throw new Error('Missing entry data for this report.');
-      }
-
-      await deviceStorage.removeEntry(user.id, safeEntryId);
-    },
-    onSuccess: () => {
-      toast('Entry reported. It has been removed from this device.');
-      router.replace('/vault');
-    },
-    onError: (error: Error) => {
-      toast(error.message || 'Unable to report this entry.', 'error');
-    }
-  });
 
   useEffect(() => {
     if (safeEntryId) return;
@@ -53,13 +37,26 @@ export default function ReportEntryScreen() {
 
   if (!safeEntryId) return null;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedReason) {
       Alert.alert('Reason required', 'Please pick a reason before submitting your report.');
       return;
     }
 
-    reportMutation.mutate();
+    if (!user?.id || !safeEntryId) {
+      toast('Missing entry data for this report.', 'error');
+      return;
+    }
+
+    try {
+      await createReportAsync({ entryId: safeEntryId, reason: selectedReason });
+      await deviceStorage.removeEntry(user.id, safeEntryId);
+      toast('Entry reported. It has been removed from this device.');
+      router.replace('/vault');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unable to report this entry.';
+      toast(errorMessage, 'error');
+    }
   };
 
   return (
@@ -83,11 +80,11 @@ export default function ReportEntryScreen() {
       </View>
 
       <TouchableOpacity
-        style={[styles.confirmButton, reportMutation.isPending && styles.confirmButtonDisabled]}
-        disabled={reportMutation.isPending}
+        style={[styles.confirmButton, isCreatingReport && styles.confirmButtonDisabled]}
+        disabled={isCreatingReport}
         onPress={handleConfirm}
       >
-        <Text style={styles.confirmButtonText}>{reportMutation.isPending ? 'Submitting...' : 'Confirm Report'}</Text>
+        <Text style={styles.confirmButtonText}>{isCreatingReport ? 'Submitting...' : 'Confirm Report'}</Text>
       </TouchableOpacity>
     </View>
   );
