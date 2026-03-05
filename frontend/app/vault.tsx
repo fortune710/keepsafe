@@ -24,6 +24,7 @@ import * as Sharing from 'expo-sharing';
 import { useMutation } from '@tanstack/react-query';
 import { logger } from '@/lib/logger';
 import VaultEntryActionPopover from '@/components/vault/vault-entry-action-popover';
+import { useReportedEntries } from '@/hooks/use-reported-entries';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
@@ -31,6 +32,7 @@ const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 export default function VaultScreen() {
   const responsive = useResponsive();
   const { toast } = useToast();
+  const { reportedPostIds } = useReportedEntries();
   const {
     entries,
     entriesByDate,
@@ -44,6 +46,14 @@ export default function VaultScreen() {
     loadMore,
   } = useUserEntries();
   const { selectedEntryId, popupType, isPopupVisible, hidePopup } = usePopupParams();
+  const reportedPostIdSet = new Set(reportedPostIds);
+  const filteredEntriesByDate: Record<string, EntryWithProfile[]> = Object.fromEntries(
+    Object.entries(entriesByDate || {}).map(([date, dateEntries]) => {
+      const visibleDateEntries = (dateEntries as EntryWithProfile[]).filter((entry) => !reportedPostIdSet.has(entry.id));
+      return [date, visibleDateEntries];
+    }).filter(([, dateEntries]) => dateEntries.length > 0)
+  ) as Record<string, EntryWithProfile[]>;
+  const visibleEntriesCount = Object.values(filteredEntriesByDate).reduce((count, dateEntries) => count + dateEntries.length, 0);
 
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
   const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(false);
@@ -92,7 +102,7 @@ export default function VaultScreen() {
 
     viewableItems.forEach(item => {
       const dateKey = item.item;
-      const dateEntries = entriesByDate?.[dateKey] || [];
+      const dateEntries = filteredEntriesByDate[dateKey] || [];
       dateEntries.forEach((entry: any) => {
         if (!unseenEntryIds.has(entry.id)) return;
         visibleEntryIds.push(entry.id);
@@ -101,7 +111,7 @@ export default function VaultScreen() {
 
     if (!visibleEntryIds.length) return;
     markEntriesAsSeen(visibleEntryIds);
-  }, [entriesByDate, unseenEntryIds, markEntriesAsSeen]);
+  }, [filteredEntriesByDate, unseenEntryIds, markEntriesAsSeen]);
 
   const scrollToTop = () => {
     flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -207,7 +217,7 @@ export default function VaultScreen() {
     );
   }
 
-  if (!entries || entries.length === 0) {
+  if (!entries || visibleEntriesCount === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No entries yet</Text>
@@ -244,7 +254,7 @@ export default function VaultScreen() {
           </Pressable>
           <FlashList
             ref={flashListRef}
-            data={entriesByDate ? Object.keys(entriesByDate) : []}
+            data={Object.keys(filteredEntriesByDate)}
             contentContainerStyle={{
               ...styles.contentContainer,
               ...(responsive.isTablet && {
@@ -268,7 +278,7 @@ export default function VaultScreen() {
               ) : null
             )}
             renderItem={({ item }) => {
-              const dateEntries = entriesByDate?.[item];
+              const dateEntries = filteredEntriesByDate[item];
               if (!dateEntries || dateEntries.length === 0) {
                 return null;
               }
