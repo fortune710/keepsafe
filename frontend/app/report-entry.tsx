@@ -8,6 +8,7 @@ import { deviceStorage } from '@/services/device-storage';
 import { useToast } from '@/hooks/use-toast';
 import PageHeader from '@/components/page-header';
 import { useReportedEntries } from '@/hooks/use-reported-entries';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const REPORT_REASONS = [
   'Harassment or bullying',
@@ -25,15 +26,7 @@ export default function ReportEntryScreen() {
   const { createReportAsync, isCreatingReport } = useReportedEntries();
   const [selectedReason, setSelectedReason] = useState<string>('');
 
-  const safeEntryId = useMemo(() => {
-    if (!entryId || typeof entryId !== 'string') return '';
-    return entryId;
-  }, [entryId]);
-
-  useEffect(() => {
-    if (safeEntryId) return;
-    router.replace('/vault');
-  }, [safeEntryId]);
+  const safeEntryId = (!entryId || typeof entryId !== 'string') ? '' : entryId;
 
   if (!safeEntryId) return null;
 
@@ -52,7 +45,8 @@ export default function ReportEntryScreen() {
       await createReportAsync({ entryId: safeEntryId, reason: selectedReason });
       await deviceStorage.removeEntry(user.id, safeEntryId);
       toast('Entry reported. It has been removed from this device.');
-      router.replace('/vault');
+      if (router.canGoBack()) return router.back();
+      return router.replace('/vault');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to report this entry.';
       toast(errorMessage, 'error');
@@ -60,33 +54,38 @@ export default function ReportEntryScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <PageHeader title="Report Entry" backButtonPlacement="left" />
-      <Text style={styles.subtitle}>Why are you reporting this diary entry?</Text>
 
-      <View style={styles.reasonsContainer}>
-        {REPORT_REASONS.map(reason => {
-          const isSelected = selectedReason === reason;
-          return (
-            <Pressable
-              key={reason}
-              style={[styles.reasonItem, isSelected && styles.reasonItemSelected]}
-              onPress={() => setSelectedReason(reason)}
-            >
-              <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>{reason}</Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.content}>
+        <Text style={styles.subtitle}>Why are you reporting this diary entry?</Text>
+
+        <View style={styles.reasonsContainer}>
+          {REPORT_REASONS.map(reason => {
+            const isSelected = selectedReason === reason;
+            return (
+              <Pressable
+                key={reason}
+                style={[styles.reasonItem, isSelected && styles.reasonItemSelected]}
+                onPress={() => setSelectedReason(reason)}
+              >
+                <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>{reason}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.confirmButton, isCreatingReport && styles.confirmButtonDisabled]}
+          disabled={isCreatingReport}
+          onPress={handleConfirm}
+        >
+          <Text style={styles.confirmButtonText}>{isCreatingReport ? 'Submitting...' : 'Confirm Report'}</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.confirmButton, isCreatingReport && styles.confirmButtonDisabled]}
-        disabled={isCreatingReport}
-        onPress={handleConfirm}
-      >
-        <Text style={styles.confirmButtonText}>{isCreatingReport ? 'Submitting...' : 'Confirm Report'}</Text>
-      </TouchableOpacity>
-    </View>
+
+    </SafeAreaView>
   );
 }
 
@@ -94,9 +93,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F0F9FF',
+  },
+  content: {
     paddingHorizontal: scale(20),
-    paddingTop: verticalScale(20),
-    paddingBottom: verticalScale(30),
   },
   subtitle: {
     marginTop: verticalScale(10),
@@ -104,18 +103,18 @@ const styles = StyleSheet.create({
     fontSize: scale(15),
     color: '#475569',
     fontFamily: 'Jost-Regular',
+    textAlign: 'center',
   },
   reasonsContainer: {
     gap: verticalScale(10),
-    flex: 1,
   },
   reasonItem: {
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.white,
     borderRadius: 12,
-    paddingVertical: verticalScale(14),
-    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(16),
   },
   reasonItemSelected: {
     borderColor: '#DC2626',
@@ -133,8 +132,9 @@ const styles = StyleSheet.create({
   confirmButton: {
     backgroundColor: '#DC2626',
     borderRadius: 12,
-    paddingVertical: verticalScale(16),
+    paddingVertical: verticalScale(12),
     alignItems: 'center',
+    marginTop: verticalScale(24),
   },
   confirmButtonDisabled: {
     opacity: 0.7,
