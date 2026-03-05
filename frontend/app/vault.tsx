@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { router } from 'expo-router';
 import Animated from 'react-native-reanimated';
@@ -23,7 +23,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useMutation } from '@tanstack/react-query';
 import { logger } from '@/lib/logger';
-import VaultEntryActionPopover from '@/components/vault/vault-entry-action-popover';
 import { useReportedEntries } from '@/hooks/use-reported-entries';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
@@ -57,7 +56,6 @@ export default function VaultScreen() {
 
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
   const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(false);
-  const [actionEntry, setActionEntry] = useState<EntryWithProfile | null>(null);
 
   const musicPlayerCleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashListRef = useRef<FlashListRef<string>>(null);
@@ -165,34 +163,41 @@ export default function VaultScreen() {
     },
   });
 
-  const handleSaveEntry = () => {
-    if (!actionEntry) return;
-
-    saveEntryMutation.mutate(actionEntry);
-    setActionEntry(null);
-  };
-
-  const handleReportEntry = () => {
-    if (!actionEntry?.id) {
-      setActionEntry(null);
-      return;
-    }
-
+  const handleEntryActions = (entry: EntryWithProfile) => {
     Alert.alert(
-      'Report this entry?',
-      'Are you sure you want to report this diary entry?',
+      'Entry Actions',
+      `What do you want to do with this diary entry from ${entry.profile?.full_name || 'Unknown User'}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: () => saveEntryMutation.mutate(entry),
+        },
         {
           text: 'Report',
           style: 'destructive',
           onPress: () => {
-            const entryId = actionEntry.id;
-            setActionEntry(null);
-            router.push({ pathname: '/report-entry', params: { entryId } });
+            Alert.alert(
+              'Report this entry?',
+              'Are you sure you want to report this diary entry?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Report',
+                  style: 'destructive',
+                  onPress: () => {
+                    router.push({ pathname: '/report-entry', params: { entryId: entry.id } });
+                  }
+                }
+              ]
+            );
           }
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
         }
-      ]
+      ],
+      { cancelable: true }
     );
   };
 
@@ -301,7 +306,7 @@ export default function VaultScreen() {
                         key={entry.id}
                         onRetry={retryEntry}
                         onMusicPress={handleMusicPress}
-                        onLongPress={setActionEntry}
+                        onLongPress={handleEntryActions}
                       />
                     );
                   })}
@@ -346,14 +351,6 @@ export default function VaultScreen() {
           onClose={closeMusicPlayer}
         />
       )}
-
-      <VaultEntryActionPopover
-        isVisible={!!actionEntry}
-        creatorName={actionEntry?.profile?.full_name || 'Unknown User'}
-        onClose={() => setActionEntry(null)}
-        onSave={handleSaveEntry}
-        onReport={handleReportEntry}
-      />
     </Animated.View>
   );
 }
