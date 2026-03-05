@@ -20,7 +20,6 @@ const getCurrentDate = (date: Date, timeZone?: string) => {
 };
 
 export function DateContainer({ date, timezone }: DateContainerProps) {
-    console.log({ date })
     return (
         <View style={styles.dateContainer}>
             <Text style={styles.dateText}>{getCurrentDate(date, timezone)}</Text>
