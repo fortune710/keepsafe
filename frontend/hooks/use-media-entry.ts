@@ -66,7 +66,13 @@ export function useMediaEntry(): UseMediaEntryResult {
   const updateSharing = useCallback((sharing: Partial<MediaEntry['sharing']>) => {
     setEntry(prev => ({
       ...prev,
-      sharing: { ...prev.sharing, ...sharing },
+      sharing: {
+        isPrivate: false,
+        isEveryone: false,
+        selectedFriends: [],
+        ...prev.sharing,
+        ...sharing
+      },
       updatedAt: new Date(),
     }));
   }, []);
@@ -75,7 +81,7 @@ export function useMediaEntry(): UseMediaEntryResult {
     setEntry(prev => {
       const currentFriends = prev.sharing?.selectedFriends || [];
       const isSelected = currentFriends.includes(friendId);
-      
+
       return {
         ...prev,
         sharing: {
@@ -139,17 +145,17 @@ export function useMediaEntry(): UseMediaEntryResult {
     try {
       // Here you would save to your backend/storage
       console.log('Saving entry:', completeEntry);
-      
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       const shareText = completeEntry.sharing.isPrivate
         ? 'Your entry has been saved privately.'
         : completeEntry.sharing.isEveryone
-        ? 'Your entry has been shared with everyone.'
-        : completeEntry.sharing.selectedFriends.length > 0
-        ? `Your entry has been shared with ${completeEntry.sharing.selectedFriends.length} friend${completeEntry.sharing.selectedFriends.length > 1 ? 's' : ''}.`
-        : 'Your entry has been saved but not shared with anyone.';
+          ? 'Your entry has been shared with everyone.'
+          : completeEntry.sharing.selectedFriends.length > 0
+            ? `Your entry has been shared with ${completeEntry.sharing.selectedFriends.length} friend${completeEntry.sharing.selectedFriends.length > 1 ? 's' : ''}.`
+            : 'Your entry has been saved but not shared with anyone.';
 
       return {
         success: true,
