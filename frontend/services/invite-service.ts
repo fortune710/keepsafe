@@ -12,11 +12,11 @@ export class InviteService {
     }
 
     static async getInvite(userId: string): Promise<Invite> {
-        const { data: profile, error } = await (supabase
+        const { data: profile, error } = await (supabase as any)
             .from('profiles')
             .select('id, invite_code')
             .eq('id', userId)
-            .single() as any);
+            .single();
 
         if (error) {
             throw new Error(error.message);
@@ -40,10 +40,10 @@ export class InviteService {
     }
 
     static async updateInvite(inviteCode: string, updates: Partial<Invite>): Promise<void> {
-        const { error } = await (supabase
+        const { error } = await (supabase as any)
             .from('profiles')
-            .update({ invite_code: updates.invite_code } as any)
-            .eq('invite_code', inviteCode) as any);
+            .update({ invite_code: updates.invite_code || null })
+            .eq('invite_code', inviteCode);
         if (error) {
             throw new Error(error.message);
         }

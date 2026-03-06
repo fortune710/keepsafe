@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -8,6 +8,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { logger } from '@/lib/logger';
+import { BACKEND_URL } from '@/lib/constants';
 
 interface SettingsItem {
   id: string;
@@ -62,8 +66,10 @@ const settingsItems: SettingsItem[] = [
 ];
 
 export default function SettingsScreen() {
-  const { profile } = useAuthContext();
-  
+  const { profile, session } = useAuthContext();
+  const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const { height: screenHeight } = Dimensions.get('window');
   const SWIPE_THRESHOLD = screenHeight * 0.15; // 15% of screen height
   const startY = useRef(0);
@@ -75,7 +81,7 @@ export default function SettingsScreen() {
       startY.current = event.absoluteY;
     })
     .onUpdate((event) => {
-       // Optional: Add visual feedback logic here if needed
+      // Optional: Add visual feedback logic here if needed
     })
     .onEnd((event) => {
       // Check if swipe started at the top area and moved down rapidly
@@ -120,7 +126,7 @@ export default function SettingsScreen() {
 
     try {
       setIsExporting(true);
-      
+
       const extension = format === 'html' ? 'html' : 'json';
       const fileUri = `${FileSystem.documentDirectory}keepsafe_export_${profile.id}.${extension}`;
       const downloadUrl = `${BACKEND_URL}/user/${profile.id}/export?format=${format}`;
@@ -187,7 +193,7 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             if (!profile?.id) return;
-            
+
             // Guard clause for missing session/token
             if (!session?.access_token) {
               Alert.alert('Error', 'You need to be signed in to delete your account.');
@@ -196,7 +202,7 @@ export default function SettingsScreen() {
 
             try {
               setIsDeleting(true);
-              
+
               // 1. Call backend to delete user data (Pinecone, etc.)
               const response = await fetch(`${BACKEND_URL}/user/${profile.id}`, {
                 method: 'DELETE',
@@ -210,7 +216,7 @@ export default function SettingsScreen() {
                 const errorData = await response.json();
                 throw new Error(errorData.detail || 'Failed to delete account data');
               }
-              
+
               // 2. Sign out (Supabase auth session)
               // Attempt sign out in its own try/catch so failure doesn't block navigation
               try {
@@ -248,79 +254,119 @@ export default function SettingsScreen() {
     >
       <GestureDetector gesture={swipeDownGesture}>
         <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => router.back()}
-          >
-            <ChevronRight color="#64748B" size={24} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <TouchableOpacity 
-            style={styles.profileSection}
-            onPress={() => router.push('/settings/profile')}
-          >
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>
-                {profile?.full_name || 'Add your name'}
-              </Text>
-              <Text style={styles.profileUsername}>
-                @{profile?.username || 'username'}
-              </Text>
-            </View>
-            <Image 
-              source={{ 
-                uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || 'Unknown User')
-              }}
-              style={styles.profileImage}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.settingsSection}>
-            {settingsItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.settingsItem}
-                  onPress={() => router.push(item.route as any)}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
-                    <IconComponent color={item.color} size={20} />
-                  </View>
-                  
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemTitle}>{item.title}</Text>
-                    {item.subtitle && (
-                      <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
-                    )}
-                  </View>
-                  
-                  <ChevronRight color="#CBD5E1" size={20} />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.settingsSection}>
-            <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
-              <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
-                <LogOut color="#64748B" size={20} />
-              </View>
-              
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle}>Sign Out</Text>
-                <Text style={styles.itemSubtitle}>Sign out of your account</Text>
-              </View>
-              
-              <View style={{ width: 20 }} />
+          <View style={styles.header}>
+            <Text style={styles.title}>Settings</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => router.back()}
+            >
+              <ChevronRight color="#64748B" size={24} />
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </View>
+
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              style={styles.profileSection}
+              onPress={() => router.push('/settings/profile')}
+            >
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName}>
+                  {profile?.full_name || 'Add your name'}
+                </Text>
+                <Text style={styles.profileUsername}>
+                  @{profile?.username || 'username'}
+                </Text>
+              </View>
+              <Image
+                source={{
+                  uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || 'Unknown User')
+                }}
+                style={styles.profileImage}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.settingsSection}>
+              {settingsItems.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.settingsItem}
+                    onPress={() => router.push(item.route as any)}
+                  >
+                    <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
+                      <IconComponent color={item.color} size={20} />
+                    </View>
+
+                    <View style={styles.itemContent}>
+                      <Text style={styles.itemTitle}>{item.title}</Text>
+                      {item.subtitle && (
+                        <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
+                      )}
+                    </View>
+
+                    <ChevronRight color="#CBD5E1" size={20} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.settingsSection}>
+              <TouchableOpacity
+                style={styles.settingsItem}
+                onPress={handleExportData}
+                disabled={isExporting}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: '#0EA5E915' }]}>
+                  <HardDrive color="#0EA5E9" size={20} />
+                </View>
+                <View style={styles.itemContent}>
+                  <Text style={styles.itemTitle}>Export Data</Text>
+                  <Text style={styles.itemSubtitle}>Download all your account data</Text>
+                </View>
+                {isExporting ? (
+                  <ActivityIndicator size="small" color="#0EA5E9" />
+                ) : (
+                  <ChevronRight color="#CBD5E1" size={20} />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: '#EF444415' }]}>
+                  <Shield color="#EF4444" size={20} />
+                </View>
+                <View style={styles.itemContent}>
+                  <Text style={styles.itemTitle}>Delete Account</Text>
+                  <Text style={styles.itemSubtitle}>Permanently delete your account</Text>
+                </View>
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <ChevronRight color="#CBD5E1" size={20} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
+                <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
+                  <LogOut color="#64748B" size={20} />
+                </View>
+
+                <View style={styles.itemContent}>
+                  <Text style={styles.itemTitle}>Sign Out</Text>
+                  <Text style={styles.itemSubtitle}>Sign out of your account</Text>
+                </View>
+
+                <View style={{ width: 20 }} />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
       </GestureDetector>
     </SafeAreaView>
   );

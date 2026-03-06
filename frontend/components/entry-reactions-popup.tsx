@@ -43,8 +43,8 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
     }
   };
 
-  const filteredReactions = selectedTab === 'all' 
-    ? reactions 
+  const filteredReactions = selectedTab === 'all'
+    ? reactions
     : reactions.filter(r => r.reaction_type === selectedTab);
 
   const totalReactions = Object.values(reactionSummary).reduce((sum, count) => sum + count, 0);
@@ -68,14 +68,14 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
   return (
     <View style={styles.overlay}>
       <TouchableOpacity style={styles.backdrop} onPress={onClose} />
-      
-      <Animated.View 
-        entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)} 
+
+      <Animated.View
+        entering={SlideInDown.duration(300).springify().damping(20).stiffness(90)}
         exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
         style={styles.popup}
       >
         <View style={styles.handle} />
-        
+
         <View style={styles.header}>
           <Text style={styles.title}>Reactions</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -89,7 +89,7 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
             const reactionType = type as ReactionType;
             const isSelected = userReaction?.reaction_type === reactionType;
             const count = reactionSummary[reactionType] || 0;
-            
+
             return (
               <TouchableOpacity
                 key={type}
@@ -117,12 +117,12 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
               All {totalReactions > 0 && `(${totalReactions})`}
             </Text>
           </TouchableOpacity>
-          
+
           {Object.entries(reactionSummary).map(([type, count]) => {
             if (count === 0) return null;
             const reactionType = type as ReactionType;
             const emoji = reactionEmojis[reactionType];
-            
+
             return (
               <TouchableOpacity
                 key={type}
@@ -156,9 +156,9 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
               const emoji = reactionEmojis[reaction.reaction_type];
               return (
                 <View key={reaction.id} style={styles.reactionItem}>
-                  <Image 
-                    source={{ 
-                      uri: reaction.user_profile.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100' 
+                  <Image
+                    source={{
+                      uri: reaction.user_profile.avatar_url || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100'
                     }}
                     style={styles.userAvatar}
                   />
@@ -185,7 +185,7 @@ export default function EntryReactionsPopup({ isVisible, entryId, onClose }: Ent
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'fixed',
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
