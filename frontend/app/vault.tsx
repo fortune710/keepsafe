@@ -27,6 +27,8 @@ import FriendFilterPopover from '@/components/vault/friend-filter-popover';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useReportedEntries } from '@/hooks/use-reported-entries';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import EmptyFriendVault from '@/components/vault/empty-friend-vault';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
@@ -128,7 +130,17 @@ export default function VaultScreen() {
   const friendOptions = friends.map((friend) => ({
     id: friend.friend_profile.id,
     label: friend.friend_profile.full_name || friend.friend_profile.username || 'Unknown User',
-    avatarUrl: friend.friend_profile.avatar_url,
+    avatar: friend.friend_profile.avatar_url ? (
+      <Image
+        source={{ uri: friend.friend_profile.avatar_url }}
+        style={styles.friendAvatar}
+      />
+    ) : (
+      <Image
+        source={{ uri: getDefaultAvatarUrl(friend.friend_profile.full_name || friend.friend_profile.username || 'Unknown User') }}
+        style={styles.friendAvatar}
+      />
+    ),
   }));
 
   const selectedFriend = friendOptions.find((friend) => friend.id === selectedFriendId);
@@ -247,7 +259,7 @@ export default function VaultScreen() {
     );
   }
 
-  if (!entries || visibleEntriesCount === 0) {
+  if ((!entries || visibleEntriesCount === 0) && !params.friendId) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No entries yet</Text>
@@ -289,18 +301,16 @@ export default function VaultScreen() {
             accessibilityLabel={friendFilterAccessibilityLabel}
             accessibilityHint="Opens the friend filter menu"
           >
-            {selectedFriend?.avatarUrl ? (
-              <Image
-                source={{ uri: selectedFriend.avatarUrl }}
-                style={styles.friendAvatar}
-                accessible={false}
-              />
+            {selectedFriend ? (
+              <>{selectedFriend.avatar}</>
             ) : (
               <View accessible={false}>
                 <Users color="#64748B" size={24} />
               </View>
             )}
           </Pressable>
+
+
           <FlashList
             ref={flashListRef}
             data={Object.keys(filteredEntriesByDate)}
@@ -325,6 +335,15 @@ export default function VaultScreen() {
                   <ActivityIndicator size="small" color="#8B5CF6" />
                 </View>
               ) : null
+            )}
+            ListEmptyComponent={() => (
+              selectedFriend ? (
+                <EmptyFriendVault friendName={selectedFriend.label} />
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No entries found</Text>
+                </View>
+              )
             )}
             renderItem={({ item }) => {
               const dateEntries = filteredEntriesByDate[item];
