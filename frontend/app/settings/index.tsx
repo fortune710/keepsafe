@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
+import { logger } from '@/lib/logger';
 
 interface SettingsItem {
   id: string;
@@ -63,7 +64,7 @@ const settingsItems: SettingsItem[] = [
 
 export default function SettingsScreen() {
   const { profile } = useAuthContext();
-  
+
   const { height: screenHeight } = Dimensions.get('window');
   const SWIPE_THRESHOLD = screenHeight * 0.15; // 15% of screen height
   const startY = useRef(0);
@@ -75,7 +76,7 @@ export default function SettingsScreen() {
       startY.current = event.absoluteY;
     })
     .onUpdate((event) => {
-       // Optional: Add visual feedback logic here if needed
+      // Optional: Add visual feedback logic here if needed
     })
     .onEnd((event) => {
       // Check if swipe started at the top area and moved down rapidly
@@ -94,153 +95,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleExportData = async () => {
-    Alert.alert(
-      "Export Data",
-      "Choose a format for your data export:",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "JSON (Raw Data)",
-          onPress: () => performExport('json'),
-        },
-        {
-          text: "HTML (Readable)",
-          onPress: () => performExport('html'),
-        },
-      ]
-    );
-  };
 
-  const performExport = async (format: 'json' | 'html') => {
-    if (!profile?.id || !session?.access_token) {
-      Alert.alert('Error', 'Authentication token missing. Please sign in again.');
-      return;
-    }
-
-    try {
-      setIsExporting(true);
-      
-      const extension = format === 'html' ? 'html' : 'json';
-      const fileUri = `${FileSystem.documentDirectory}keepsafe_export_${profile.id}.${extension}`;
-      const downloadUrl = `${BACKEND_URL}/user/${profile.id}/export?format=${format}`;
-
-      logger.info(`Exporting ${format} data for user: ${profile.id}`);
-
-      const result = await FileSystem.downloadAsync(
-        downloadUrl,
-        fileUri,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      logger.info('Download result:', result);
-
-      if (result.status !== 200) {
-        throw new Error('Failed to download export file');
-      }
-
-      // Success Alert
-      Alert.alert(
-        'Export Complete',
-        'Your data has been successfully exported.',
-        [
-          {
-            text: 'Share / Save',
-            onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(result.uri, {
-                  mimeType: format === 'html' ? 'text/html' : 'application/json',
-                  dialogTitle: 'Export User Data'
-                });
-              } else {
-                Alert.alert('Success', 'File downloaded to: ' + result.uri);
-              }
-            }
-          },
-          { text: 'Close', style: 'cancel' }
-        ]
-      );
-
-    } catch (error: any) {
-      logger.error('Export Data Error', error);
-      Alert.alert('Error', error.message || 'Failed to export account data');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            if (!profile?.id) return;
-            
-            // Guard clause for missing session/token
-            if (!session?.access_token) {
-              Alert.alert('Error', 'You need to be signed in to delete your account.');
-              return;
-            }
-
-            try {
-              setIsDeleting(true);
-              
-              // 1. Call backend to delete user data (Pinecone, etc.)
-              const response = await fetch(`${BACKEND_URL}/user/${profile.id}`, {
-                method: 'DELETE',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-              });
-
-              if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to delete account data');
-              }
-              
-              // 2. Sign out (Supabase auth session)
-              // Attempt sign out in its own try/catch so failure doesn't block navigation
-              try {
-                await supabase.auth.signOut();
-              } catch (signOutError: any) {
-                logger.error('Error signing out after successful account deletion', signOutError);
-                // Continue to success flow despite sign out error
-              }
-
-              Alert.alert(
-                'Account Deleted',
-                'Account deleted successfully, we hate to see you go',
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => router.replace('/onboarding')
-                  }
-                ]
-              );
-            } catch (error: any) {
-              console.error('❌ Delete Account Error:', error);
-              Alert.alert('Error', error.message || 'Failed to delete account');
-            } finally {
-              setIsDeleting(false);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   return (
     <SafeAreaView
@@ -248,79 +103,83 @@ export default function SettingsScreen() {
     >
       <GestureDetector gesture={swipeDownGesture}>
         <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => router.back()}
-          >
-            <ChevronRight color="#64748B" size={24} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <TouchableOpacity 
-            style={styles.profileSection}
-            onPress={() => router.push('/settings/profile')}
-          >
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>
-                {profile?.full_name || 'Add your name'}
-              </Text>
-              <Text style={styles.profileUsername}>
-                @{profile?.username || 'username'}
-              </Text>
-            </View>
-            <Image 
-              source={{ 
-                uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || 'Unknown User')
-              }}
-              style={styles.profileImage}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.settingsSection}>
-            {settingsItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.settingsItem}
-                  onPress={() => router.push(item.route as any)}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
-                    <IconComponent color={item.color} size={20} />
-                  </View>
-                  
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemTitle}>{item.title}</Text>
-                    {item.subtitle && (
-                      <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
-                    )}
-                  </View>
-                  
-                  <ChevronRight color="#CBD5E1" size={20} />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.settingsSection}>
-            <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
-              <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
-                <LogOut color="#64748B" size={20} />
-              </View>
-              
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle}>Sign Out</Text>
-                <Text style={styles.itemSubtitle}>Sign out of your account</Text>
-              </View>
-              
-              <View style={{ width: 20 }} />
+          <View style={styles.header}>
+            <Text style={styles.title}>Settings</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Close settings"
+              accessibilityHint="Returns to the previous screen"
+            >
+              <ChevronRight color="#64748B" size={24} />
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </View>
+
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              style={styles.profileSection}
+              onPress={() => router.push('/settings/profile')}
+            >
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName}>
+                  {profile?.full_name || 'Add your name'}
+                </Text>
+                <Text style={styles.profileUsername}>
+                  @{profile?.username || 'username'}
+                </Text>
+              </View>
+              <Image
+                source={{
+                  uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || 'Unknown User')
+                }}
+                style={styles.profileImage}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.settingsSection}>
+              {settingsItems.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.settingsItem}
+                    onPress={() => router.push(item.route as any)}
+                  >
+                    <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
+                      <IconComponent color={item.color} size={20} />
+                    </View>
+
+                    <View style={styles.itemContent}>
+                      <Text style={styles.itemTitle}>{item.title}</Text>
+                      {item.subtitle && (
+                        <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
+                      )}
+                    </View>
+
+                    <ChevronRight color="#CBD5E1" size={20} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
+                <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
+                  <LogOut color="#64748B" size={20} />
+                </View>
+
+                <View style={styles.itemContent}>
+                  <Text style={styles.itemTitle}>Sign Out</Text>
+                  <Text style={styles.itemSubtitle}>Sign out of your account</Text>
+                </View>
+
+                <View style={{ width: 20 }} />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
       </GestureDetector>
     </SafeAreaView>
   );

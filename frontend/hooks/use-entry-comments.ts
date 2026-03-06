@@ -46,7 +46,7 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
         return cachedComments;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('entry_comments')
         .select(`
           *,
@@ -77,7 +77,7 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
     mutationFn: async (content: string) => {
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('entry_comments')
         .insert({
           entry_id: entryId,
@@ -112,7 +112,7 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
     mutationFn: async ({ commentId, content }: { commentId: string; content: string }) => {
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('entry_comments')
         .update({ content: content.trim() })
         .eq('id', commentId)
@@ -135,7 +135,7 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
     },
     onSuccess: async (updatedComment) => {
       // Optimistic update to cache
-      const updatedComments = comments.map(c => 
+      const updatedComments = comments.map(c =>
         c.id === updatedComment.id ? updatedComment : c
       );
       await deviceStorage.setItem(`comments_${entryId}`, updatedComments, 30);
@@ -147,7 +147,7 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
     mutationFn: async (commentId: string) => {
       if (!user) throw new Error('User not authenticated');
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('entry_comments')
         .delete()
         .eq('id', commentId)
@@ -176,9 +176,9 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
       await addCommentMutation.mutateAsync(content);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to add comment' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add comment'
       };
     }
   }, [addCommentMutation]);
@@ -192,9 +192,9 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
       await updateCommentMutation.mutateAsync({ commentId, content });
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to update comment' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update comment'
       };
     }
   }, [updateCommentMutation]);
@@ -204,9 +204,9 @@ export function useEntryComments(entryId: string): UseEntryCommentsResult {
       await deleteCommentMutation.mutateAsync(commentId);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to delete comment' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete comment'
       };
     }
   }, [deleteCommentMutation]);

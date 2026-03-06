@@ -95,7 +95,7 @@ async function getEntryOwnerProfile(
 
 const DEFAULT_PAGE_SIZE = 20;
 
-export function useUserEntries(): UseUserEntriesResult {
+export function useUserEntries(friendId?: string): UseUserEntriesResult {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
   const [unseenEntryIds, setUnseenEntryIds] = useState<Set<string>>(new Set());
@@ -114,7 +114,7 @@ export function useUserEntries(): UseUserEntriesResult {
     fetchNextPage,
     hasNextPage,
   } = useInfiniteQuery({
-    queryKey: ['user-entries', user?.id],
+    queryKey: ['user-entries', user?.id, friendId || 'all'],
     queryFn: async ({ pageParam }) => {
       if (!user) return [];
 
@@ -122,6 +122,10 @@ export function useUserEntries(): UseUserEntriesResult {
       let cachedEntries: EntryWithProfile[] | null = null;
       if (!pageParam) {
         cachedEntries = await deviceStorage.getEntries(user.id) as EntryWithProfile[];
+        if (friendId) {
+          cachedEntries = cachedEntries?.filter((entry) => entry.user_id === friendId) || null;
+        }
+
         // Only return cached entries immediately if we have a full page.
         // This prevents getNextPageParam from prematurely returning undefined (no more pages).
         if (cachedEntries && cachedEntries.length >= DEFAULT_PAGE_SIZE) {
@@ -140,6 +144,10 @@ export function useUserEntries(): UseUserEntriesResult {
         .contains('shared_with', [user.id])
         .order('created_at', { ascending: false })
         .limit(DEFAULT_PAGE_SIZE);
+
+      if (friendId) {
+        query = query.eq('user_id', friendId);
+      }
 
       if (pageParam) {
         query = query.lt('created_at', pageParam);
@@ -166,15 +174,28 @@ export function useUserEntries(): UseUserEntriesResult {
 
       // Cache the data. DeviceStorage now handles merging local-only entries.
       if (!pageParam && entries) {
-        await deviceStorage.setEntries(user.id, entries);
-        // Get the merged set from storage to ensure local-only entries are visible
-        const mergedEntries = await deviceStorage.getEntries(user.id) || entries;
+        if (!friendId) {
+          await deviceStorage.setEntries(user.id, entries);
+          // Get the merged set from storage to ensure local-only entries are visible
+          const mergedEntries = await deviceStorage.getEntries(user.id) || entries;
 
-        logger.info(`Vault Sync: Server returned ${entries.length}, local merged total ${mergedEntries.length}`);
+          logger.info(`Vault Sync: Server returned ${entries.length}, local merged total ${mergedEntries.length}`);
+
+          // IMPORTANT: Return exactly the page size to maintain correct pagination offsets
+          // and avoid double-counting or skipped entries on next page fetch.
+          return mergedEntries.slice(0, DEFAULT_PAGE_SIZE);
+        }
+
+        const filteredCachedEntries = cachedEntries || [];
+        const mergedFilteredEntries = [...entries, ...filteredCachedEntries]
+          .filter((entry, index, self) => self.findIndex((item) => item.id === entry.id) === index)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        logger.info(`Vault Sync (friend filter): Server returned ${entries.length}, local merged total ${mergedFilteredEntries.length}`);
 
         // IMPORTANT: Return exactly the page size to maintain correct pagination offsets
         // and avoid double-counting or skipped entries on next page fetch.
-        return mergedEntries.slice(0, DEFAULT_PAGE_SIZE);
+        return mergedFilteredEntries.slice(0, DEFAULT_PAGE_SIZE);
       }
 
 
@@ -275,19 +296,25 @@ export function useUserEntries(): UseUserEntriesResult {
       // Fetch entries created in the last 10 minutes
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
-      const { data: recentEntries, error: fetchError } = await supabase
+      let recentEntriesQuery = supabase
         .from(TABLES.ENTRIES)
         .select(`*, profile:${TABLES.PROFILES}(*)`)
         .contains('shared_with', [userId])
         .gte('created_at', tenMinutesAgo)
         .order('created_at', { ascending: false });
 
+      if (friendId) {
+        recentEntriesQuery = recentEntriesQuery.eq('user_id', friendId);
+      }
+
+      const { data: recentEntries, error: fetchError } = await recentEntriesQuery;
+
       if (fetchError || !recentEntries) {
         logger.error('Error fetching missed entries:', fetchError);
         return;
       }
 
-      const infiniteData = queryClient.getQueryData<InfiniteData<EntryWithProfile[]>>(['user-entries', userId]);
+      const infiniteData = queryClient.getQueryData<InfiniteData<EntryWithProfile[]>>(['user-entries', userId, friendId || 'all']);
       const currentEntries = infiniteData?.pages.flat() || [];
       const currentEntryIds = new Set(currentEntries.map(e => e.id));
 
@@ -303,7 +330,7 @@ export function useUserEntries(): UseUserEntriesResult {
         // Sort only the new entries if we want to prepend, or merge all and sort
         // For simplicity and correct visual order, we prepend them to the first page
         queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-          ['user-entries', userId],
+          ['user-entries', userId, friendId || 'all'],
           (oldData) => {
             if (!oldData) return undefined;
 
@@ -347,7 +374,7 @@ export function useUserEntries(): UseUserEntriesResult {
     } catch (error) {
       logger.error('Error in fetchMissedEntries:', error);
     }
-  }, [queryClient]);
+  }, [queryClient, friendId]);
 
   // Helper function to setup subscription
   const setupSubscription = useCallback((userId: string) => {
@@ -380,7 +407,7 @@ export function useUserEntries(): UseUserEntriesResult {
             if (payload.eventType === 'DELETE') {
               const oldEntry = payload.old as any;
               queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-                ['user-entries', userId],
+                ['user-entries', userId, friendId || 'all'],
                 (oldData) => {
                   if (!oldData) return undefined;
                   return {
@@ -395,6 +422,10 @@ export function useUserEntries(): UseUserEntriesResult {
 
             const entryData = payload.new as any;
             const isOwnEntry = entryData.user_id === userId;
+
+            if (friendId && entryData.user_id !== friendId) {
+              return;
+            }
 
             // Filter: Check if entry is shared with this user (if not own entry)
             if (!isOwnEntry) {
@@ -431,7 +462,7 @@ export function useUserEntries(): UseUserEntriesResult {
             logger.info(`Realtime ${payload.eventType} for entry:`, typedEntry.id);
 
             queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-              ['user-entries', userId],
+              ['user-entries', userId, friendId || 'all'],
               (oldData) => {
                 if (!oldData) return undefined;
 
@@ -500,7 +531,7 @@ export function useUserEntries(): UseUserEntriesResult {
       });
 
     subscriptionRef.current = channel;
-  }, [queryClient, fetchMissedEntries]);
+  }, [queryClient, fetchMissedEntries, friendId]);
 
   // Helper function to schedule reconnection with exponential backoff
   const scheduleReconnect = useCallback((userId: string) => {
@@ -544,7 +575,7 @@ export function useUserEntries(): UseUserEntriesResult {
 
       // Update React Query cache directly instead of a full refetch
       queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-        ['user-entries', user.id],
+        ['user-entries', user.id, friendId || 'all'],
         (oldData) => {
           if (!oldData) return undefined;
 
@@ -570,7 +601,7 @@ export function useUserEntries(): UseUserEntriesResult {
     });
 
     return unsubscribe;
-  }, [user, queryClient]);
+  }, [user, queryClient, friendId]);
 
   // Realtime subscription for new shared entries
   useEffect(() => {
@@ -619,9 +650,9 @@ export function useUserEntries(): UseUserEntriesResult {
     if (user) {
       await deviceStorage.addEntry(user.id, optimisticEntry);
       // Invalidate to let storage sync with UI
-      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id, friendId || 'all'] });
     }
-  }, [user, queryClient]);
+  }, [user, queryClient, friendId]);
 
   const replaceOptimisticEntry = useCallback(async (tempId: string, realEntry?: EntryWithProfile) => {
     logger.info('Vault: Replacing optimistic entry', { tempId, action: realEntry ? 'with real' : 'removing' });
@@ -635,9 +666,9 @@ export function useUserEntries(): UseUserEntriesResult {
       }
 
       // Thoroughly invalidate to ensure 'completed' state reflects immediately
-      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id, friendId || 'all'] });
     }
-  }, [user, queryClient]);
+  }, [user, queryClient, friendId]);
 
   const retryEntry = useCallback(async (entryId: string) => {
     if (!user) return;
@@ -692,7 +723,7 @@ export function useUserEntries(): UseUserEntriesResult {
     } catch (error) {
       console.error('Failed to retry entry:', error);
     }
-  }, [user]);
+  }, [user, friendId]);
 
   // Get timezone utilities for date grouping
   const { getLocalDateString, isUTC } = useTimezone();

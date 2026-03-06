@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/auth-provider';
 import { deviceStorage } from '@/services/device-storage';
+import { TABLES } from '@/constants/supabase';
 
 export type ReactionType = 'like' | 'love' | 'laugh' | 'wow' | 'sad' | 'angry';
 
@@ -19,9 +20,9 @@ export interface EntryReaction {
   };
 }
 
-export interface ReactionSummary {
+export type ReactionSummary = {
   [key in ReactionType]: number;
-}
+};
 
 interface UseEntryReactionsResult {
   reactions: EntryReaction[];
@@ -53,7 +54,7 @@ export function useEntryReactions(entryId: string): UseEntryReactionsResult {
         return cachedReactions;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('entry_reactions')
         .select(`
           *,
@@ -84,13 +85,13 @@ export function useEntryReactions(entryId: string): UseEntryReactionsResult {
     mutationFn: async (reactionType: ReactionType) => {
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('entry_reactions')
+      const { data, error } = await (supabase as any)
+        .from(TABLES.ENTRY_REACTIONS)
         .insert({
           entry_id: entryId,
           user_id: user.id,
           reaction_type: reactionType,
-        })
+        } as any)
         .select(`
           *,
           user_profile:profiles (
@@ -119,7 +120,7 @@ export function useEntryReactions(entryId: string): UseEntryReactionsResult {
     mutationFn: async () => {
       if (!user) throw new Error('User not authenticated');
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('entry_reactions')
         .delete()
         .eq('entry_id', entryId)
@@ -141,7 +142,14 @@ export function useEntryReactions(entryId: string): UseEntryReactionsResult {
   const reactionSummary: ReactionSummary = reactions.reduce((summary, reaction) => {
     summary[reaction.reaction_type] = (summary[reaction.reaction_type] || 0) + 1;
     return summary;
-  }, {} as ReactionSummary);
+  }, {
+    like: 0,
+    love: 0,
+    laugh: 0,
+    wow: 0,
+    sad: 0,
+    angry: 0,
+  } as ReactionSummary);
 
   // Find user's current reaction
   const userReaction = reactions.find(r => r.user_id === user?.id) || null;
@@ -151,9 +159,9 @@ export function useEntryReactions(entryId: string): UseEntryReactionsResult {
       await addReactionMutation.mutateAsync(reactionType);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to add reaction' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to add reaction'
       };
     }
   }, [addReactionMutation]);
@@ -163,9 +171,9 @@ export function useEntryReactions(entryId: string): UseEntryReactionsResult {
       await removeReactionMutation.mutateAsync();
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to remove reaction' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to remove reaction'
       };
     }
   }, [removeReactionMutation]);

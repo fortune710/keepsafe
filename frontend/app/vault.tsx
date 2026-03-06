@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Pressable, Alert } from 'react-native';
-import { router } from 'expo-router';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Pressable, Alert, Image } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useUserEntries } from '@/hooks/use-user-entries';
 import { usePopupParams } from '@/hooks/use-popup-params';
@@ -14,7 +14,7 @@ import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
 import { useResponsive } from '@/hooks/use-responsive';
-import { ChevronLeft, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Sparkles, Users } from 'lucide-react-native';
 import { Colors } from '@/lib/constants';
 import NewEntriesIndicator from '@/components/new-entries-indicator';
 import { useToast } from '@/hooks/use-toast';
@@ -23,14 +23,24 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useMutation } from '@tanstack/react-query';
 import { logger } from '@/lib/logger';
+import FriendFilterPopover from '@/components/vault/friend-filter-popover';
+import { useAuthContext } from '@/providers/auth-provider';
+import { useFriends } from '@/hooks/use-friends';
 import { useReportedEntries } from '@/hooks/use-reported-entries';
+import { getDefaultAvatarUrl } from '@/lib/utils';
+import EmptyFriendVault from '@/components/vault/empty-friend-vault';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 
 export default function VaultScreen() {
+  const { profile } = useAuthContext();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ friendId?: string | string[] }>();
+  const selectedFriendId = Array.isArray(params.friendId) ? params.friendId[0] : params.friendId;
   const responsive = useResponsive();
   const { toast } = useToast();
+  const { friends } = useFriends(profile?.id);
   const { reportedPostIds } = useReportedEntries();
   const {
     entries,
@@ -43,7 +53,7 @@ export default function VaultScreen() {
     unseenEntryIds,
     markEntriesAsSeen,
     loadMore,
-  } = useUserEntries();
+  } = useUserEntries(selectedFriendId);
   const { selectedEntryId, popupType, isPopupVisible, hidePopup } = usePopupParams();
   const reportedPostIdSet = new Set(reportedPostIds);
   const filteredEntriesByDate: Record<string, EntryWithProfile[]> = Object.fromEntries(
@@ -56,6 +66,8 @@ export default function VaultScreen() {
 
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
   const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(false);
+  const [actionEntry, setActionEntry] = useState<EntryWithProfile | null>(null);
+  const [isFriendFilterVisible, setIsFriendFilterVisible] = useState(false);
 
   const musicPlayerCleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashListRef = useRef<FlashListRef<string>>(null);
@@ -113,6 +125,31 @@ export default function VaultScreen() {
 
   const scrollToTop = () => {
     flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  const friendOptions = friends.map((friend) => ({
+    id: friend.friend_profile.id,
+    label: friend.friend_profile.full_name || friend.friend_profile.username || 'Unknown User',
+    avatar: friend.friend_profile.avatar_url ? (
+      <Image
+        source={{ uri: friend.friend_profile.avatar_url }}
+        style={styles.friendAvatar}
+      />
+    ) : (
+      <Image
+        source={{ uri: getDefaultAvatarUrl(friend.friend_profile.full_name || friend.friend_profile.username || 'Unknown User') }}
+        style={styles.friendAvatar}
+      />
+    ),
+  }));
+
+  const selectedFriend = friendOptions.find((friend) => friend.id === selectedFriendId);
+  const friendFilterAccessibilityLabel = selectedFriend
+    ? `Open friend filter. Currently filtering by ${selectedFriend.label}`
+    : 'Open friend filter';
+
+  const handleFriendFilterSelect = (friendId?: string) => {
+    router.setParams({ friendId: friendId || undefined });
   };
 
   const saveEntryMutation = useMutation({
@@ -222,7 +259,7 @@ export default function VaultScreen() {
     );
   }
 
-  if (!entries || visibleEntriesCount === 0) {
+  if ((!entries || visibleEntriesCount === 0) && !params.friendId) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No entries yet</Text>
@@ -257,6 +294,23 @@ export default function VaultScreen() {
           >
             <Sparkles color="#64748B" size={24} />
           </Pressable>
+          <Pressable
+            style={styles.friendFilterFab}
+            onPress={() => setIsFriendFilterVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel={friendFilterAccessibilityLabel}
+            accessibilityHint="Opens the friend filter menu"
+          >
+            {selectedFriend ? (
+              <>{selectedFriend.avatar}</>
+            ) : (
+              <View accessible={false}>
+                <Users color="#64748B" size={24} />
+              </View>
+            )}
+          </Pressable>
+
+
           <FlashList
             ref={flashListRef}
             data={Object.keys(filteredEntriesByDate)}
@@ -281,6 +335,15 @@ export default function VaultScreen() {
                   <ActivityIndicator size="small" color="#8B5CF6" />
                 </View>
               ) : null
+            )}
+            ListEmptyComponent={() => (
+              selectedFriend ? (
+                <EmptyFriendVault friendName={selectedFriend.label} />
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No entries found</Text>
+                </View>
+              )
             )}
             renderItem={({ item }) => {
               const dateEntries = filteredEntriesByDate[item];
@@ -351,6 +414,14 @@ export default function VaultScreen() {
           onClose={closeMusicPlayer}
         />
       )}
+
+      <FriendFilterPopover
+        isVisible={isFriendFilterVisible}
+        onClose={() => setIsFriendFilterVisible(false)}
+        options={friendOptions}
+        selectedFriendId={selectedFriendId}
+        onSelect={handleFriendFilterSelect}
+      />
     </Animated.View>
   );
 }
@@ -390,6 +461,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 100,
     zIndex: 9999,
+  },
+  friendFilterFab: {
+    padding: scale(10),
+    position: 'absolute',
+    bottom: verticalScale(30),
+    right: scale(20),
+    backgroundColor: Colors.white,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: 100,
+    zIndex: 9999,
+  },
+  friendAvatar: {
+    width: scale(24),
+    height: scale(24),
+    borderRadius: scale(12),
   },
   content: {
     flex: 1,
