@@ -30,6 +30,7 @@ import { useReportedEntries } from '@/hooks/use-reported-entries';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import EmptyFriendVault from '@/components/vault/empty-friend-vault';
 import { deviceStorage } from '@/services/device-storage';
+import { posthog } from '@/constants/posthog';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
@@ -212,7 +213,26 @@ export default function VaultScreen() {
       .map((vaultEntry) => vaultEntry.id);
 
     if (!blockedUserEntryIds.length) return;
-    await Promise.all(blockedUserEntryIds.map((entryId) => deviceStorage.removeEntry(user.id, entryId)));
+
+    const removalResults = await Promise.allSettled(
+      blockedUserEntryIds.map((entryId) => deviceStorage.removeEntry(user.id, entryId))
+    );
+    const failedRemovals = removalResults.filter((result) => result.status === 'rejected');
+    if (!failedRemovals.length) return;
+
+    logger.warn('Failed to remove one or more blocked user entries from local storage', {
+      blockedUserEntryCount: blockedUserEntryIds.length,
+      failedRemovalCount: failedRemovals.length,
+    });
+
+    try {
+      posthog.capture('vault_block_storage_cleanup_failed', {
+        blocked_user_entry_count: blockedUserEntryIds.length,
+        failed_removal_count: failedRemovals.length,
+      });
+    } catch (error) {
+      logger.warn('Analytics capture failed for vault storage cleanup error', error);
+    }
   }, [entries, user?.id]);
 
   const handleBlockUser = useCallback((entry: EntryWithProfile) => {
