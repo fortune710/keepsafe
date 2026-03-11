@@ -457,7 +457,7 @@ export default function CaptureScreen() {
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>We need camera permission to continue</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            <Text style={styles.permissionButtonText}>Continue</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
