@@ -29,18 +29,20 @@ import { useFriends } from '@/hooks/use-friends';
 import { useReportedEntries } from '@/hooks/use-reported-entries';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import EmptyFriendVault from '@/components/vault/empty-friend-vault';
+import { deviceStorage } from '@/services/device-storage';
+import { posthog } from '@/constants/posthog';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 
 export default function VaultScreen() {
-  const { profile } = useAuthContext();
+  const { profile, user } = useAuthContext();
   const router = useRouter();
   const params = useLocalSearchParams<{ friendId?: string | string[] }>();
   const selectedFriendId = Array.isArray(params.friendId) ? params.friendId[0] : params.friendId;
   const responsive = useResponsive();
   const { toast } = useToast();
-  const { friends } = useFriends(profile?.id);
+  const { friends, blockFriend: blockFriendAction } = useFriends(profile?.id);
   const { reportedPostIds } = useReportedEntries();
   const {
     entries,
@@ -56,9 +58,12 @@ export default function VaultScreen() {
   } = useUserEntries(selectedFriendId);
   const { selectedEntryId, popupType, isPopupVisible, hidePopup } = usePopupParams();
   const reportedPostIdSet = new Set(reportedPostIds);
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const filteredEntriesByDate: Record<string, EntryWithProfile[]> = Object.fromEntries(
     Object.entries(entriesByDate || {}).map(([date, dateEntries]) => {
-      const visibleDateEntries = (dateEntries as EntryWithProfile[]).filter((entry) => !reportedPostIdSet.has(entry.id));
+      const visibleDateEntries = (dateEntries as EntryWithProfile[])
+        .filter((entry) => !reportedPostIdSet.has(entry.id))
+        .filter((entry) => !blockedUserIds.has(entry.user_id));
       return [date, visibleDateEntries];
     }).filter(([, dateEntries]) => dateEntries.length > 0)
   ) as Record<string, EntryWithProfile[]>;
@@ -66,7 +71,6 @@ export default function VaultScreen() {
 
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
   const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(false);
-  const [actionEntry, setActionEntry] = useState<EntryWithProfile | null>(null);
   const [isFriendFilterVisible, setIsFriendFilterVisible] = useState(false);
 
   const musicPlayerCleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -200,6 +204,72 @@ export default function VaultScreen() {
     },
   });
 
+
+  const removeUserEntriesFromDevice = useCallback(async (blockedUserId: string) => {
+    if (!user?.id) return;
+
+    const blockedUserEntryIds = entries
+      .filter((vaultEntry) => vaultEntry.user_id === blockedUserId)
+      .map((vaultEntry) => vaultEntry.id);
+
+    if (!blockedUserEntryIds.length) return;
+
+    const removalResults = await Promise.allSettled(
+      blockedUserEntryIds.map((entryId) => deviceStorage.removeEntry(user.id, entryId))
+    );
+    const failedRemovals = removalResults.filter((result) => result.status === 'rejected');
+    if (!failedRemovals.length) return;
+
+    logger.warn('Failed to remove one or more blocked user entries from local storage', {
+      blockedUserEntryCount: blockedUserEntryIds.length,
+      failedRemovalCount: failedRemovals.length,
+    });
+
+    try {
+      posthog.capture('vault_block_storage_cleanup_failed', {
+        blocked_user_entry_count: blockedUserEntryIds.length,
+        failed_removal_count: failedRemovals.length,
+      });
+    } catch (error) {
+      logger.warn('Analytics capture failed for vault storage cleanup error', error);
+    }
+  }, [entries, user?.id]);
+
+  const handleBlockUser = useCallback((entry: EntryWithProfile) => {
+    const friendship = friends.find((friend) => friend.friend_profile.id === entry.user_id);
+    if (!friendship) {
+      toast('Unable to block this user right now.', 'error');
+      return;
+    }
+
+    const friendName = entry.profile?.full_name || entry.profile?.username || 'this user';
+    Alert.alert(
+      'Block User',
+      `Are you sure you want to block ${friendName}? They will no longer be able to interact with you.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await blockFriendAction(friendship.id);
+            if (!result.success) {
+              toast(result.error || 'Failed to block user', 'error');
+              return;
+            }
+
+            setBlockedUserIds((prev) => new Set(prev).add(entry.user_id));
+            await removeUserEntriesFromDevice(entry.user_id);
+            toast('User blocked successfully', 'success');
+            if (selectedFriendId === entry.user_id) {
+              router.setParams({ friendId: undefined });
+            }
+          }
+        }
+      ]
+    );
+  }, [blockFriendAction, friends, removeUserEntriesFromDevice, router, selectedFriendId, toast]);
+
   const handleEntryActions = (entry: EntryWithProfile) => {
     Alert.alert(
       'Entry Actions',
@@ -228,6 +298,11 @@ export default function VaultScreen() {
               ]
             );
           }
+        },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: () => handleBlockUser(entry),
         },
         {
           text: 'Cancel',
