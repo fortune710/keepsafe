@@ -34,5 +34,8 @@ const noOpPostHog = {
 const shouldInitializePostHog = apiKey && host && Platform.OS !== 'web';
 
 export const posthog = shouldInitializePostHog
-  ? new PostHog(apiKey, { host })
+  ? new PostHog(apiKey, {
+      host,
+      enableSessionReplay: !__DEV__,
+    })
   : noOpPostHog;

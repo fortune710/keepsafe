@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -16,11 +16,14 @@ import { initializeBackgroundTasks } from '@/lib/background-task-init';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppFonts } from '@/hooks/useFonts';
 import { Platform } from 'react-native';
+import { posthog } from '@/constants/posthog';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
 
   // Initialize deep linking
   useDeepLinking();
@@ -38,6 +41,10 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    posthog.screen(pathname, params);
+  }, [params, pathname]);
 
   if (!fontsLoaded && !fontError) {
     return null;
