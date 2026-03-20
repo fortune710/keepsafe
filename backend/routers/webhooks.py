@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from services.ingestion_service import IngestionService
+from services.queues.entry_ingestion_queue_service import EntryIngestionQueueService
 from services.notification_enqueue_service import NotificationEnqueueService
 from services.friend_service import FriendService
 from services.email_service import EmailService
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 ingestion_service = IngestionService()
+entry_ingestion_queue_service = EntryIngestionQueueService()
 notification_enqueue_service = NotificationEnqueueService()
 friend_service = FriendService()
 email_service = EmailService()
@@ -88,14 +90,13 @@ async def entry_webhook(
             ingestion_success = False
             notification_success = False
             
-            # Ingest entry into vector database
+            # Queue entry ingestion instead of doing the heavy work in the webhook request.
             try:
-                ingestion_success = await ingestion_service.ingest_entry(payload.record)
+                ingestion_success = await entry_ingestion_queue_service.enqueue_entry(payload.record, operation="upsert")
                 if not ingestion_success:
-                    logger.error(f"Failed to ingest entry {entry_id}")
+                    logger.error("Failed to enqueue entry ingestion job: entry_id=%s", entry_id)
             except Exception as e:
-                # Log error but don't fail the webhook if ingestion fails
-                logger.error(f"Error ingesting entry {entry_id}: {str(e)}", exc_info=True)
+                logger.error("Error enqueueing entry ingestion job: entry_id=%s error=%s", entry_id, str(e), exc_info=True)
             
             # Enqueue notification for shared entry
             try:
@@ -109,23 +110,23 @@ async def entry_webhook(
             if ingestion_success and notification_success:
                 return {
                     "status": "success",
-                    "message": f"Entry {entry_id} processed successfully",
+                    "message": f"Entry {entry_id} queued successfully",
                     "entry_id": entry_id,
-                    "ingestion": "success",
+                    "ingestion": "queued",
                     "notification": "success"
                 }
             elif ingestion_success:
                 return {
                     "status": "partial_success",
-                    "message": f"Entry {entry_id} ingested successfully, but notification enqueue failed",
+                    "message": f"Entry {entry_id} queued for ingestion, but notification enqueue failed",
                     "entry_id": entry_id,
-                    "ingestion": "success",
+                    "ingestion": "queued",
                     "notification": "failed"
                 }
             elif notification_success:
                 return {
                     "status": "partial_success",
-                    "message": f"Entry {entry_id} notification enqueued successfully, but ingestion failed",
+                    "message": f"Entry {entry_id} notification enqueued successfully, but ingestion queueing failed",
                     "entry_id": entry_id,
                     "ingestion": "failed",
                     "notification": "success"
@@ -133,7 +134,7 @@ async def entry_webhook(
             else:
                 return {
                     "status": "partial_failure",
-                    "message": f"Both ingestion and notification failed for entry {entry_id}",
+                    "message": f"Both ingestion queueing and notification failed for entry {entry_id}",
                     "entry_id": entry_id,
                     "ingestion": "failed",
                     "notification": "failed"
@@ -146,18 +147,18 @@ async def entry_webhook(
             entry_id = payload.record.get("id")
             logger.info(f"Processing UPDATE webhook for entry {entry_id}")
             
-            success = await ingestion_service.update_entry(payload.record)
+            success = await entry_ingestion_queue_service.enqueue_entry(payload.record, operation="upsert")
             
             if success:
                 return {
                     "status": "success",
-                    "message": f"Entry {entry_id} updated successfully",
+                    "message": f"Entry {entry_id} queued for re-ingestion successfully",
                     "entry_id": entry_id
                 }
             else:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Failed to update entry {entry_id}"
+                    detail=f"Failed to queue entry {entry_id} for re-ingestion"
                 )
         
         elif payload.type == "DELETE":

@@ -14,7 +14,7 @@ if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
 from services.notification_service import NotificationService
-from services.notification_scheduler import NotificationScheduler
+from schedulers.notification_scheduler import NotificationScheduler
 
 
 def mock_httpx_success_response():
@@ -72,11 +72,6 @@ def notification_service(monkeypatch, mock_supabase_client):
     monkeypatch.setattr(notification_module, "Posthog", MagicMock)
     
     with patch("services.notification_service.settings") as mock_settings:
-        mock_settings.NOTIFICATION_QUEUE_NAME = "test_queue"
-        mock_settings.NOTIFICATION_DLQ_NAME = "test_dlq"
-        mock_settings.NOTIFICATION_CONCURRENCY = 20
-        mock_settings.NOTIFICATION_BATCH_SIZE = 100
-        mock_settings.NOTIFICATION_DLQ_LIMIT = 3
         mock_settings.POSTHOG_API_KEY = "test_key"
         mock_settings.POSTHOG_HOST = "https://test.posthog.com"
         
@@ -222,10 +217,10 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     # Verify message was sent to DLQ
     # Check that schema("pgmq_public") was called
     mock_supabase_client.schema.assert_called_with("pgmq_public")
-    # Find the "send" call with test_dlq in the tracked calls
+    # Find the "send" call with notifications_dlq in the tracked calls
     send_calls = [
         call for call in rpc_calls_tracker
-        if call[0] == "send" and call[1] and call[1].get("queue_name") == "test_dlq"
+        if call[0] == "send" and call[1] and call[1].get("queue_name") == "notifications_dlq"
     ]
     assert len(send_calls) > 0
     dlq_call = send_calls[0]
@@ -296,7 +291,7 @@ async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supaba
     # Verify message was NOT sent to DLQ (should be discarded)
     # Get the schema mock
     schema_mock = mock_supabase_client.schema.return_value
-    # Check rpc calls - find any "send" calls with test_dlq
+    # Check rpc calls - find any "send" calls with notifications_dlq
     send_calls = [
         call for call in schema_mock.rpc.call_args_list
         if len(call[0]) > 0 and call[0][0] == "send"
@@ -304,7 +299,7 @@ async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supaba
     # Check if any DLQ sends were made
     dlq_sends = [
         call for call in send_calls
-        if len(call[0]) > 1 and call[0][1].get("queue_name") == "test_dlq"
+        if len(call[0]) > 1 and call[0][1].get("queue_name") == "notifications_dlq"
     ]
     assert len(dlq_sends) == 0
 
@@ -427,7 +422,7 @@ async def test_process_dlq(notification_service, mock_supabase_client):
 
 def test_scheduler_initialization():
     """Test that scheduler initializes correctly."""
-    with patch("services.notification_scheduler.NotificationService"):
+    with patch("schedulers.notification_scheduler.NotificationService"):
         scheduler = NotificationScheduler()
         assert scheduler.is_running is False
         assert scheduler.scheduler is not None
@@ -436,7 +431,7 @@ def test_scheduler_initialization():
 
 def test_scheduler_start_stop():
     """Test scheduler start and stop."""
-    with patch("services.notification_scheduler.NotificationService"):
+    with patch("schedulers.notification_scheduler.NotificationService"):
         scheduler = NotificationScheduler()
         
         # Mock the APScheduler
@@ -457,7 +452,7 @@ def test_scheduler_start_stop():
 @pytest.mark.asyncio
 async def test_scheduler_job_execution(notification_service, mock_supabase_client):
     """Test that scheduler job executes process_queue."""
-    with patch("services.notification_scheduler.NotificationService") as mock_service_class:
+    with patch("schedulers.notification_scheduler.NotificationService") as mock_service_class:
         mock_service_instance = notification_service
         mock_service_class.return_value = mock_service_instance
         
