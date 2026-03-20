@@ -11,7 +11,15 @@ import json
 import httpx
 
 from services.supabase_client import get_supabase_client
+from services.queue_service import QueueService
 from config import settings
+from queue_constants import (
+    NOTIFICATION_BATCH_SIZE,
+    NOTIFICATION_CONCURRENCY,
+    NOTIFICATION_DLQ_LIMIT,
+    NOTIFICATION_DLQ_NAME,
+    NOTIFICATION_QUEUE_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +31,13 @@ class NotificationService:
         """Initialize the notification service with clients and configuration."""
         self.supabase = get_supabase_client()
         self.expo_client = PushClient()
-        self.queue_name = settings.NOTIFICATION_QUEUE_NAME
-        self.dlq_name = settings.NOTIFICATION_DLQ_NAME
-        self.concurrency = settings.NOTIFICATION_CONCURRENCY
-        self.batch_size = settings.NOTIFICATION_BATCH_SIZE
-        self.dlq_limit = settings.NOTIFICATION_DLQ_LIMIT
+        self.queue_name = NOTIFICATION_QUEUE_NAME
+        self.dlq_name = NOTIFICATION_DLQ_NAME
+        self.concurrency = NOTIFICATION_CONCURRENCY
+        self.batch_size = NOTIFICATION_BATCH_SIZE
+        self.dlq_limit = NOTIFICATION_DLQ_LIMIT
+        self.queue_service = QueueService()
+        self.queue_service.supabase = self.supabase
         
         # Initialize PostHog
         if settings.POSTHOG_API_KEY:
@@ -94,13 +104,18 @@ class NotificationService:
             
             # Send to queue using pgmq_public.send
             # Message needs to be JSON stringified
-            self.supabase.schema("pgmq_public").rpc(
-                "send",
-                {
-                    "queue_name": self.queue_name,
-                    "message": json.dumps(message)
-                }
-            ).execute()
+            response = self.queue_service.send_message(
+                queue_name=self.queue_name,
+                message=message,
+            )
+            if not self.queue_service.is_enqueue_response_valid(response):
+                logger.error(
+                    "Notification enqueue returned invalid response: queue=%s recipients=%s response_data=%s",
+                    self.queue_name,
+                    len(recipients),
+                    getattr(response, "data", None),
+                )
+                return False
             
             logger.info(
                 f"Notification enqueued: title='{title}', "
@@ -131,7 +146,7 @@ class NotificationService:
             )
             return False
     
-    async def process_queue(self) -> Dict[str, int]:
+    async def process_queue(self, queue_name: Optional[str] = None) -> Dict[str, int]:
         """
         Process up to the configured batch of messages from the notification queue and aggregate processing statistics.
         
@@ -152,20 +167,16 @@ class NotificationService:
         }
         
         try:
+            target_queue_name = queue_name or self.queue_name
             logger.info(f"Starting queue processing: batch_size={self.batch_size}")
             
             # Read messages from queue (pgmq_public.read with visibility timeout)
             # Read up to batch_size messages
-            response = self.supabase.schema("pgmq_public").rpc(
-                "read",
-                {
-                    "queue_name": self.queue_name,
-                    "sleep_seconds": 300,  # Visibility timeout: 5 minutes
-                    "n": self.batch_size
-                }
-            ).execute()
-            
-            messages = response.data if response.data else []
+            messages = self.queue_service.read_messages(
+                queue_name=target_queue_name,
+                visibility_timeout_seconds=300,
+                batch_size=self.batch_size,
+            )
             
             if not messages:
                 logger.info("No messages in queue to process")
@@ -174,7 +185,7 @@ class NotificationService:
             logger.info(f"Retrieved {len(messages)} messages from queue")
             
             # Process messages concurrently
-            tasks = [self._process_message(msg, stats) for msg in messages]
+            tasks = [self._process_message(msg, stats, target_queue_name) for msg in messages]
             await asyncio.gather(*tasks)
             
             logger.info(
@@ -192,7 +203,12 @@ class NotificationService:
         
         return stats
     
-    async def _process_message(self, message: Dict[str, Any], stats: Dict[str, int]) -> None:
+    async def _process_message(
+        self,
+        message: Dict[str, Any],
+        stats: Dict[str, int],
+        source_queue_name: str,
+    ) -> None:
         """
         Process a single notification queue message: attempts delivery, updates stats, and handles success or failure.
         
@@ -226,7 +242,7 @@ class NotificationService:
             if not title or not body or not recipients:
                 logger.warning(f"Invalid message format: msg_id={msg_id}")
                 # Delete invalid message
-                await self._delete_message(msg_id)
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 stats["failed"] += 1
                 return
             
@@ -242,7 +258,7 @@ class NotificationService:
             
             if success:
                 # Delete message from queue on success
-                await self._delete_message(msg_id)
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 stats["succeeded"] += 1
                 logger.info(f"Successfully processed notification: msg_id={msg_id}")
                 
@@ -261,6 +277,7 @@ class NotificationService:
                     msg_id=msg_id,
                     message_data=msg_data,
                     failure_count=failure_count,
+                    source_queue_name=source_queue_name,
                     stats=stats
                 )
                 
@@ -529,6 +546,7 @@ class NotificationService:
         msg_id: int,
         message_data: Dict[str, Any],
         failure_count: int,
+        source_queue_name: str,
         stats: Dict[str, int]
     ) -> None:
         """
@@ -547,17 +565,18 @@ class NotificationService:
         if new_failure_count <= self.dlq_limit:
             # Move to DLQ
             try:
-                # Delete from main queue
-                await self._delete_message(msg_id)
-                
                 # Send to DLQ
-                self.supabase.schema("pgmq_public").rpc(
-                    "send",
-                    {
-                        "queue_name": self.dlq_name,
-                        "message": json.dumps(message_data)
-                    }
-                ).execute()
+                response = self.queue_service.send_message(
+                    queue_name=self.dlq_name,
+                    message=message_data,
+                )
+                if not self.queue_service.is_enqueue_response_valid(response):
+                    raise ValueError(
+                        f"Invalid DLQ enqueue response for msg_id={msg_id}: {getattr(response, 'data', None)}"
+                    )
+
+                # Delete from source queue only after the DLQ write succeeds.
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 
                 stats["moved_to_dlq"] += 1
                 logger.info(
@@ -578,7 +597,7 @@ class NotificationService:
         else:
             # Discard message (exceeded DLQ limit)
             try:
-                await self._delete_message(msg_id)
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 stats["discarded"] += 1
                 
                 logger.warning(
@@ -611,7 +630,7 @@ class NotificationService:
         
         stats["failed"] += 1
     
-    async def _delete_message(self, msg_id: int) -> None:
+    async def _delete_message(self, msg_id: int, queue_name: Optional[str] = None) -> None:
         """
         Delete a message from the configured queue by its message ID.
         
@@ -622,13 +641,10 @@ class NotificationService:
             Exception: Propagates any exception raised while calling the Supabase delete RPC.
         """
         try:
-            self.supabase.schema("pgmq_public").rpc(
-                "delete",
-                {
-                    "queue_name": self.queue_name,
-                    "message_id": msg_id
-                }
-            ).execute()
+            self.queue_service.delete_message(
+                queue_name=queue_name or self.queue_name,
+                message_id=msg_id,
+            )
         except Exception as e:
             logger.error(f"Error deleting message {msg_id}: {str(e)}", exc_info=True)
             raise
@@ -850,17 +866,7 @@ class NotificationService:
                 - "moved_to_dlq": messages moved into the DLQ during handling
                 - "discarded": messages discarded after exceeding DLQ retry limit
         """
-        # Temporarily swap queue names
-        original_queue = self.queue_name
-        self.queue_name = self.dlq_name
-        
-        try:
-            stats = await self.process_queue()
-        finally:
-            # Restore original queue name
-            self.queue_name = original_queue
-        
-        return stats
+        return await self.process_queue(queue_name=self.dlq_name)
     
     def shutdown(self) -> None:
         """
@@ -875,4 +881,3 @@ class NotificationService:
             logger.info("PostHog client shut down")
         except Exception as e:
             logger.error(f"Error shutting down PostHog client: {str(e)}", exc_info=True)
-
