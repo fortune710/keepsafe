@@ -37,5 +37,12 @@ export const posthog = shouldInitializePostHog
   ? new PostHog(apiKey, {
       host,
       enableSessionReplay: !__DEV__,
+      errorTracking: {
+        autocapture: {
+          uncaughtExceptions: true,
+          unhandledRejections: true,
+          console: ['error', 'warn'],
+        },
+      },
     })
   : noOpPostHog;
