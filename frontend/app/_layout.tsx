@@ -16,6 +16,7 @@ import { initializeBackgroundTasks } from '@/lib/background-task-init';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppFonts } from '@/hooks/useFonts';
 import { Platform } from 'react-native';
+import { CaptureProvider } from '@/providers/capture-provider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -53,49 +54,51 @@ export default function RootLayout() {
             <AuthProvider>
               <ToastProvider>
                 <SaveLockProvider>
-                  <GestureHandlerRootView style={{ flex: 1 }}>
-                    <Stack screenOptions={{ headerShown: false }}>
-                      <Stack.Screen
-                        name="onboarding"
-                        options={{
-                          animation: 'fade',
-                          animationDuration: 500
-                        }}
-                      />
-                      <Stack.Screen name="index" />
-                      <Stack.Screen name="capture" />
-                      <Stack.Screen name="invite/[id]" />
-                      <Stack.Screen
-                        options={{
-                          animationDuration: 350,
-                          animation: 'fade_from_bottom'
-                        }}
-                        name="vault"
-                      />
-                      <Stack.Screen
-                        options={{
-                          animationDuration: 350,
-                          animation: platform === 'ios' ? 'ios_from_left' : 'default'
-                        }}
-                        name="calendar"
-                      />
-                      <Stack.Screen name="calendar/day" />
-                      <Stack.Screen name="social" />
-                      <Stack.Screen name="friends" />
-                      <Stack.Screen name="dreamscape" />
-                      <Stack.Screen name="search" />
-                      <Stack.Screen
-                        name="report-entry"
-                        options={{
-                          animationDuration: 350,
-                          animation: "fade_from_bottom"
-                        }}
-                      />
-                      <Stack.Screen name="capture/details" />
-                      <Stack.Screen name="+not-found" />
-                    </Stack>
-                    <StatusBar style="dark" />
-                  </GestureHandlerRootView>
+                  <CaptureProvider>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen
+                          name="onboarding"
+                          options={{
+                            animation: 'fade',
+                            animationDuration: 500
+                          }}
+                        />
+                        <Stack.Screen name="index" />
+                        <Stack.Screen name="capture" />
+                        <Stack.Screen name="invite/[id]" />
+                        <Stack.Screen
+                          options={{
+                            animationDuration: 350,
+                            animation: 'fade_from_bottom'
+                          }}
+                          name="vault"
+                        />
+                        <Stack.Screen
+                          options={{
+                            animationDuration: 350,
+                            animation: platform === 'ios' ? 'ios_from_left' : 'default'
+                          }}
+                          name="calendar"
+                        />
+                        <Stack.Screen name="calendar/day" />
+                        <Stack.Screen name="social" />
+                        <Stack.Screen name="friends" />
+                        <Stack.Screen name="dreamscape" />
+                        <Stack.Screen name="search" />
+                        <Stack.Screen
+                          name="report-entry"
+                          options={{
+                            animationDuration: 350,
+                            animation: "fade_from_bottom"
+                          }}
+                        />
+                        <Stack.Screen name="capture/details" />
+                        <Stack.Screen name="+not-found" />
+                      </Stack>
+                      <StatusBar style="dark" />
+                    </GestureHandlerRootView>
+                  </CaptureProvider>
                 </SaveLockProvider>
               </ToastProvider>
             </AuthProvider>
