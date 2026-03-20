@@ -11,7 +11,15 @@ import json
 import httpx
 
 from services.supabase_client import get_supabase_client
+from services.queue_service import QueueService
 from config import settings
+from queue_constants import (
+    NOTIFICATION_BATCH_SIZE,
+    NOTIFICATION_CONCURRENCY,
+    NOTIFICATION_DLQ_LIMIT,
+    NOTIFICATION_DLQ_NAME,
+    NOTIFICATION_QUEUE_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +31,13 @@ class NotificationService:
         """Initialize the notification service with clients and configuration."""
         self.supabase = get_supabase_client()
         self.expo_client = PushClient()
-        self.queue_name = settings.NOTIFICATION_QUEUE_NAME
-        self.dlq_name = settings.NOTIFICATION_DLQ_NAME
-        self.concurrency = settings.NOTIFICATION_CONCURRENCY
-        self.batch_size = settings.NOTIFICATION_BATCH_SIZE
-        self.dlq_limit = settings.NOTIFICATION_DLQ_LIMIT
+        self.queue_name = NOTIFICATION_QUEUE_NAME
+        self.dlq_name = NOTIFICATION_DLQ_NAME
+        self.concurrency = NOTIFICATION_CONCURRENCY
+        self.batch_size = NOTIFICATION_BATCH_SIZE
+        self.dlq_limit = NOTIFICATION_DLQ_LIMIT
+        self.queue_service = QueueService()
+        self.queue_service.supabase = self.supabase
         
         # Initialize PostHog
         if settings.POSTHOG_API_KEY:
@@ -94,13 +104,10 @@ class NotificationService:
             
             # Send to queue using pgmq_public.send
             # Message needs to be JSON stringified
-            self.supabase.schema("pgmq_public").rpc(
-                "send",
-                {
-                    "queue_name": self.queue_name,
-                    "message": json.dumps(message)
-                }
-            ).execute()
+            self.queue_service.send_message(
+                queue_name=self.queue_name,
+                message=message,
+            )
             
             logger.info(
                 f"Notification enqueued: title='{title}', "
@@ -156,16 +163,11 @@ class NotificationService:
             
             # Read messages from queue (pgmq_public.read with visibility timeout)
             # Read up to batch_size messages
-            response = self.supabase.schema("pgmq_public").rpc(
-                "read",
-                {
-                    "queue_name": self.queue_name,
-                    "sleep_seconds": 300,  # Visibility timeout: 5 minutes
-                    "n": self.batch_size
-                }
-            ).execute()
-            
-            messages = response.data if response.data else []
+            messages = self.queue_service.read_messages(
+                queue_name=self.queue_name,
+                visibility_timeout_seconds=300,
+                batch_size=self.batch_size,
+            )
             
             if not messages:
                 logger.info("No messages in queue to process")
@@ -551,13 +553,10 @@ class NotificationService:
                 await self._delete_message(msg_id)
                 
                 # Send to DLQ
-                self.supabase.schema("pgmq_public").rpc(
-                    "send",
-                    {
-                        "queue_name": self.dlq_name,
-                        "message": json.dumps(message_data)
-                    }
-                ).execute()
+                self.queue_service.send_message(
+                    queue_name=self.dlq_name,
+                    message=message_data,
+                )
                 
                 stats["moved_to_dlq"] += 1
                 logger.info(
@@ -622,13 +621,10 @@ class NotificationService:
             Exception: Propagates any exception raised while calling the Supabase delete RPC.
         """
         try:
-            self.supabase.schema("pgmq_public").rpc(
-                "delete",
-                {
-                    "queue_name": self.queue_name,
-                    "message_id": msg_id
-                }
-            ).execute()
+            self.queue_service.delete_message(
+                queue_name=self.queue_name,
+                message_id=msg_id,
+            )
         except Exception as e:
             logger.error(f"Error deleting message {msg_id}: {str(e)}", exc_info=True)
             raise

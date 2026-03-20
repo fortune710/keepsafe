@@ -83,11 +83,6 @@ def notification_service(monkeypatch, mock_supabase_client):
     
     # Set minimal config
     with patch("services.notification_service.settings") as mock_settings:
-        mock_settings.NOTIFICATION_QUEUE_NAME = "test_queue"
-        mock_settings.NOTIFICATION_DLQ_NAME = "test_dlq"
-        mock_settings.NOTIFICATION_CONCURRENCY = 20
-        mock_settings.NOTIFICATION_BATCH_SIZE = 100
-        mock_settings.NOTIFICATION_DLQ_LIMIT = 3
         mock_settings.POSTHOG_API_KEY = "test_key"
         mock_settings.POSTHOG_HOST = "https://test.posthog.com"
         
@@ -131,7 +126,7 @@ async def test_enqueue_notification_success(notification_service, mock_supabase_
     assert call_args[0][0] == "send"
     # Second positional argument is the params dict
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
-    assert params.get("queue_name") == "test_queue"
+    assert params.get("queue_name") == "notifications_q"
     import json
     msg_data = json.loads(params.get("message", "{}"))
     assert msg_data["title"] == title
@@ -501,5 +496,5 @@ async def test_delete_message(notification_service, mock_supabase_client):
     call_args = mock_schema.rpc.call_args
     assert call_args[0][0] == "delete"
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
-    assert params.get("queue_name") == "test_queue"
+    assert params.get("queue_name") == "notifications_q"
     assert params.get("message_id") == msg_id
