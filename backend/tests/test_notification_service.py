@@ -190,6 +190,22 @@ async def test_enqueue_notification_invalid_priority(notification_service, mock_
 
 
 @pytest.mark.asyncio
+async def test_enqueue_notification_invalid_queue_response_returns_false(notification_service, mock_supabase_client):
+    """enqueue_notification should fail when queue send returns an invalid response."""
+    mock_response = MagicMock()
+    mock_response.data = None
+    mock_supabase_client.schema.return_value.rpc.return_value.execute.return_value = mock_response
+
+    result = notification_service.enqueue_notification(
+        title="Test",
+        body="Test Body",
+        recipients=["token"],
+    )
+
+    assert result is False
+
+
+@pytest.mark.asyncio
 async def test_send_notification_success(notification_service):
     """_send_notification should successfully send via REST API."""
     # Arrange - Mock httpx for REST API
@@ -327,6 +343,7 @@ async def test_handle_failure_move_to_dlq(notification_service, mock_supabase_cl
         msg_id=msg_id,
         message_data=message_data,
         failure_count=1,
+        source_queue_name=notification_service.queue_name,
         stats=stats
     )
     
@@ -361,6 +378,7 @@ async def test_handle_failure_discard_exceeded_limit(notification_service, mock_
         msg_id=msg_id,
         message_data=message_data,
         failure_count=3,  # Already at limit
+        source_queue_name=notification_service.queue_name,
         stats=stats
     )
     

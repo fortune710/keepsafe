@@ -36,6 +36,18 @@ class QueueService:
             .execute()
         )
 
+    @staticmethod
+    def is_enqueue_response_valid(response: Any) -> bool:
+        """Return whether a queue send response appears successful."""
+        data = getattr(response, "data", None)
+        if data is None:
+            return False
+        if isinstance(data, (list, dict, str)):
+            return bool(data)
+        if isinstance(data, (int, float, bool)):
+            return bool(data)
+        return True
+
     def read_messages(
         self,
         *,

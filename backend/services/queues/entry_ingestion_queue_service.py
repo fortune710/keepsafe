@@ -49,9 +49,9 @@ class EntryIngestionQueueService:
             logger.warning("Entry ingestion enqueue skipped: missing entry_id")
             return False
 
-        if entry.get("is_enqueued"):
+        if not self._try_set_entry_enqueued_atomic(entry_id):
             logger.info(
-                "Entry ingestion enqueue skipped because entry is already queued: entry_id=%s operation=%s",
+                "Entry ingestion enqueue skipped because entry is already queued or unavailable: entry_id=%s operation=%s",
                 entry_id,
                 operation,
             )
@@ -64,8 +64,11 @@ class EntryIngestionQueueService:
         }
 
         try:
-            self.queue_service.send_message(queue_name=self.queue_name, message=message)
-            self._set_entry_enqueued_status(entry_id=entry_id, is_enqueued=True)
+            response = self.queue_service.send_message(queue_name=self.queue_name, message=message)
+            if not self.queue_service.is_enqueue_response_valid(response):
+                raise ValueError(
+                    f"Invalid entry ingestion enqueue response for entry_id={entry_id}: {getattr(response, 'data', None)}"
+                )
             logger.info(
                 "Entry queued for ingestion: entry_id=%s operation=%s queue=%s",
                 entry_id,
@@ -74,6 +77,7 @@ class EntryIngestionQueueService:
             )
             return True
         except Exception as exc:
+            self._rollback_entry_enqueued_status(entry_id)
             logger.error(
                 "Failed to enqueue entry ingestion job: entry_id=%s operation=%s error=%s",
                 entry_id,
@@ -83,7 +87,7 @@ class EntryIngestionQueueService:
             )
             return False
 
-    async def process_queue(self) -> Dict[str, int]:
+    async def process_queue(self, queue_name: Optional[str] = None) -> Dict[str, int]:
         """Process queued entry ingestion jobs."""
         stats = {
             "processed": 0,
@@ -94,26 +98,27 @@ class EntryIngestionQueueService:
         }
 
         try:
+            target_queue_name = queue_name or self.queue_name
             logger.info(
                 "Starting entry ingestion queue processing: queue=%s batch_size=%s",
-                self.queue_name,
+                target_queue_name,
                 self.batch_size,
             )
             messages = self.queue_service.read_messages(
-                queue_name=self.queue_name,
+                queue_name=target_queue_name,
                 batch_size=self.batch_size,
                 visibility_timeout_seconds=300,
             )
             if not messages:
-                logger.info("No entry ingestion messages available: queue=%s", self.queue_name)
+                logger.info("No entry ingestion messages available: queue=%s", target_queue_name)
                 return stats
 
-            await asyncio.gather(*(self._process_message(message, stats) for message in messages))
-            logger.info("Completed entry ingestion queue processing: queue=%s stats=%s", self.queue_name, stats)
+            await asyncio.gather(*(self._process_message(message, stats, target_queue_name) for message in messages))
+            logger.info("Completed entry ingestion queue processing: queue=%s stats=%s", target_queue_name, stats)
         except Exception as exc:
             logger.error(
                 "Entry ingestion queue processing failed: queue=%s error=%s",
-                self.queue_name,
+                queue_name or self.queue_name,
                 str(exc),
                 exc_info=True,
             )
@@ -122,14 +127,14 @@ class EntryIngestionQueueService:
 
     async def process_dlq(self) -> Dict[str, int]:
         """Process messages currently stored in the entry ingestion DLQ."""
-        original_queue = self.queue_name
-        self.queue_name = self.dlq_name
-        try:
-            return await self.process_queue()
-        finally:
-            self.queue_name = original_queue
+        return await self.process_queue(queue_name=self.dlq_name)
 
-    async def _process_message(self, message: Dict[str, Any], stats: Dict[str, int]) -> None:
+    async def _process_message(
+        self,
+        message: Dict[str, Any],
+        stats: Dict[str, int],
+        source_queue_name: str,
+    ) -> None:
         msg_id = message.get("msg_id")
         raw_message = message.get("message", "{}")
         msg_data = json.loads(raw_message) if isinstance(raw_message, str) else raw_message
@@ -142,12 +147,12 @@ class EntryIngestionQueueService:
         if not msg_id or not entry_id:
             logger.warning(
                 "Dropping invalid entry ingestion message: queue=%s msg_id=%s entry_id=%s",
-                self.queue_name,
+                source_queue_name,
                 msg_id,
                 entry_id,
             )
             if msg_id:
-                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
             stats["failed"] += 1
             return
 
@@ -157,11 +162,11 @@ class EntryIngestionQueueService:
                 if not entry:
                     logger.info(
                         "Skipping queued ingestion because entry no longer exists: queue=%s msg_id=%s entry_id=%s",
-                        self.queue_name,
+                        source_queue_name,
                         msg_id,
                         entry_id,
                     )
-                    self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                    self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
                     stats["succeeded"] += 1
                     return
 
@@ -170,12 +175,12 @@ class EntryIngestionQueueService:
 
                 success = await self.ingestion_service.ingest_entry(entry)
                 if success:
-                    self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                    self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
                     self._set_entry_enqueued_status(entry_id=entry_id, is_enqueued=False)
                     stats["succeeded"] += 1
                     logger.info(
                         "Entry ingestion job succeeded: queue=%s msg_id=%s entry_id=%s",
-                        self.queue_name,
+                        source_queue_name,
                         msg_id,
                         entry_id,
                     )
@@ -185,12 +190,13 @@ class EntryIngestionQueueService:
                     msg_id=msg_id,
                     message_data=msg_data,
                     failure_count=failure_count,
+                    source_queue_name=source_queue_name,
                     stats=stats,
                 )
         except Exception as exc:
             logger.error(
                 "Entry ingestion job failed with exception: queue=%s msg_id=%s entry_id=%s error=%s",
-                self.queue_name,
+                source_queue_name,
                 msg_id,
                 entry_id,
                 str(exc),
@@ -200,6 +206,7 @@ class EntryIngestionQueueService:
                 msg_id=msg_id,
                 message_data=msg_data,
                 failure_count=failure_count,
+                source_queue_name=source_queue_name,
                 stats=stats,
             )
 
@@ -209,6 +216,7 @@ class EntryIngestionQueueService:
         msg_id: int,
         message_data: Dict[str, Any],
         failure_count: int,
+        source_queue_name: str,
         stats: Dict[str, int],
     ) -> None:
         entry_id = message_data.get("entry_id")
@@ -216,24 +224,29 @@ class EntryIngestionQueueService:
         message_data["failure_count"] = new_failure_count
 
         try:
-            self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
             if new_failure_count <= self.dlq_limit:
-                self.queue_service.send_message(queue_name=self.dlq_name, message=message_data)
+                response = self.queue_service.send_message(queue_name=self.dlq_name, message=message_data)
+                if not self.queue_service.is_enqueue_response_valid(response):
+                    raise ValueError(
+                        f"Invalid entry ingestion DLQ enqueue response for entry_id={entry_id}: {getattr(response, 'data', None)}"
+                    )
+                self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
                 stats["moved_to_dlq"] += 1
                 logger.warning(
                     "Entry ingestion job moved to DLQ: source_queue=%s dlq=%s msg_id=%s entry_id=%s failure_count=%s",
-                    self.queue_name,
+                    source_queue_name,
                     self.dlq_name,
                     msg_id,
                     entry_id,
                     new_failure_count,
                 )
             else:
+                self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
                 self._set_entry_enqueued_status(entry_id=entry_id, is_enqueued=False)
                 stats["discarded"] += 1
                 logger.error(
                     "Entry ingestion job discarded after DLQ limit: queue=%s msg_id=%s entry_id=%s failure_count=%s",
-                    self.queue_name,
+                    source_queue_name,
                     msg_id,
                     entry_id,
                     new_failure_count,
@@ -241,7 +254,7 @@ class EntryIngestionQueueService:
         except Exception as exc:
             logger.error(
                 "Failed to move entry ingestion message to DLQ: queue=%s msg_id=%s entry_id=%s error=%s",
-                self.queue_name,
+                source_queue_name,
                 msg_id,
                 entry_id,
                 str(exc),
@@ -282,3 +295,36 @@ class EntryIngestionQueueService:
                 exc_info=True,
             )
             raise
+
+    def _try_set_entry_enqueued_atomic(self, entry_id: str) -> bool:
+        """Atomically flip `is_enqueued` from false to true for an entry."""
+        try:
+            response = (
+                self.supabase.table("entries")
+                .update({"is_enqueued": True})
+                .eq("id", entry_id)
+                .eq("is_enqueued", False)
+                .select("id")
+                .execute()
+            )
+            updated_rows = response.data or []
+            return len(updated_rows) > 0
+        except Exception as exc:
+            logger.error(
+                "Failed to atomically update entry queue status: entry_id=%s error=%s",
+                entry_id,
+                str(exc),
+                exc_info=True,
+            )
+            raise
+
+    def _rollback_entry_enqueued_status(self, entry_id: str) -> None:
+        """Best-effort rollback for an atomic enqueue flag flip."""
+        try:
+            self._set_entry_enqueued_status(entry_id=entry_id, is_enqueued=False)
+        except Exception:
+            logger.error(
+                "Failed to roll back entry queue status after enqueue failure: entry_id=%s",
+                entry_id,
+                exc_info=True,
+            )

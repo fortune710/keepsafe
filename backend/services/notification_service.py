@@ -104,10 +104,18 @@ class NotificationService:
             
             # Send to queue using pgmq_public.send
             # Message needs to be JSON stringified
-            self.queue_service.send_message(
+            response = self.queue_service.send_message(
                 queue_name=self.queue_name,
                 message=message,
             )
+            if not self.queue_service.is_enqueue_response_valid(response):
+                logger.error(
+                    "Notification enqueue returned invalid response: queue=%s recipients=%s response_data=%s",
+                    self.queue_name,
+                    len(recipients),
+                    getattr(response, "data", None),
+                )
+                return False
             
             logger.info(
                 f"Notification enqueued: title='{title}', "
@@ -138,7 +146,7 @@ class NotificationService:
             )
             return False
     
-    async def process_queue(self) -> Dict[str, int]:
+    async def process_queue(self, queue_name: Optional[str] = None) -> Dict[str, int]:
         """
         Process up to the configured batch of messages from the notification queue and aggregate processing statistics.
         
@@ -159,12 +167,13 @@ class NotificationService:
         }
         
         try:
+            target_queue_name = queue_name or self.queue_name
             logger.info(f"Starting queue processing: batch_size={self.batch_size}")
             
             # Read messages from queue (pgmq_public.read with visibility timeout)
             # Read up to batch_size messages
             messages = self.queue_service.read_messages(
-                queue_name=self.queue_name,
+                queue_name=target_queue_name,
                 visibility_timeout_seconds=300,
                 batch_size=self.batch_size,
             )
@@ -176,7 +185,7 @@ class NotificationService:
             logger.info(f"Retrieved {len(messages)} messages from queue")
             
             # Process messages concurrently
-            tasks = [self._process_message(msg, stats) for msg in messages]
+            tasks = [self._process_message(msg, stats, target_queue_name) for msg in messages]
             await asyncio.gather(*tasks)
             
             logger.info(
@@ -194,7 +203,12 @@ class NotificationService:
         
         return stats
     
-    async def _process_message(self, message: Dict[str, Any], stats: Dict[str, int]) -> None:
+    async def _process_message(
+        self,
+        message: Dict[str, Any],
+        stats: Dict[str, int],
+        source_queue_name: str,
+    ) -> None:
         """
         Process a single notification queue message: attempts delivery, updates stats, and handles success or failure.
         
@@ -228,7 +242,7 @@ class NotificationService:
             if not title or not body or not recipients:
                 logger.warning(f"Invalid message format: msg_id={msg_id}")
                 # Delete invalid message
-                await self._delete_message(msg_id)
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 stats["failed"] += 1
                 return
             
@@ -244,7 +258,7 @@ class NotificationService:
             
             if success:
                 # Delete message from queue on success
-                await self._delete_message(msg_id)
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 stats["succeeded"] += 1
                 logger.info(f"Successfully processed notification: msg_id={msg_id}")
                 
@@ -263,6 +277,7 @@ class NotificationService:
                     msg_id=msg_id,
                     message_data=msg_data,
                     failure_count=failure_count,
+                    source_queue_name=source_queue_name,
                     stats=stats
                 )
                 
@@ -531,6 +546,7 @@ class NotificationService:
         msg_id: int,
         message_data: Dict[str, Any],
         failure_count: int,
+        source_queue_name: str,
         stats: Dict[str, int]
     ) -> None:
         """
@@ -549,14 +565,18 @@ class NotificationService:
         if new_failure_count <= self.dlq_limit:
             # Move to DLQ
             try:
-                # Delete from main queue
-                await self._delete_message(msg_id)
-                
                 # Send to DLQ
-                self.queue_service.send_message(
+                response = self.queue_service.send_message(
                     queue_name=self.dlq_name,
                     message=message_data,
                 )
+                if not self.queue_service.is_enqueue_response_valid(response):
+                    raise ValueError(
+                        f"Invalid DLQ enqueue response for msg_id={msg_id}: {getattr(response, 'data', None)}"
+                    )
+
+                # Delete from source queue only after the DLQ write succeeds.
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 
                 stats["moved_to_dlq"] += 1
                 logger.info(
@@ -577,7 +597,7 @@ class NotificationService:
         else:
             # Discard message (exceeded DLQ limit)
             try:
-                await self._delete_message(msg_id)
+                await self._delete_message(msg_id, queue_name=source_queue_name)
                 stats["discarded"] += 1
                 
                 logger.warning(
@@ -610,7 +630,7 @@ class NotificationService:
         
         stats["failed"] += 1
     
-    async def _delete_message(self, msg_id: int) -> None:
+    async def _delete_message(self, msg_id: int, queue_name: Optional[str] = None) -> None:
         """
         Delete a message from the configured queue by its message ID.
         
@@ -622,7 +642,7 @@ class NotificationService:
         """
         try:
             self.queue_service.delete_message(
-                queue_name=self.queue_name,
+                queue_name=queue_name or self.queue_name,
                 message_id=msg_id,
             )
         except Exception as e:
@@ -846,17 +866,7 @@ class NotificationService:
                 - "moved_to_dlq": messages moved into the DLQ during handling
                 - "discarded": messages discarded after exceeding DLQ retry limit
         """
-        # Temporarily swap queue names
-        original_queue = self.queue_name
-        self.queue_name = self.dlq_name
-        
-        try:
-            stats = await self.process_queue()
-        finally:
-            # Restore original queue name
-            self.queue_name = original_queue
-        
-        return stats
+        return await self.process_queue(queue_name=self.dlq_name)
     
     def shutdown(self) -> None:
         """
@@ -871,4 +881,3 @@ class NotificationService:
             logger.info("PostHog client shut down")
         except Exception as e:
             logger.error(f"Error shutting down PostHog client: {str(e)}", exc_info=True)
-

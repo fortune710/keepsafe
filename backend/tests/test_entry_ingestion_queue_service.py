@@ -41,6 +41,7 @@ def service(monkeypatch, mock_supabase_client):
 @pytest.mark.asyncio
 async def test_enqueue_entry_sets_flag_and_sends_message(service, mock_supabase_client):
     entry = {"id": "entry-1", "is_enqueued": False}
+    service._try_set_entry_enqueued_atomic = MagicMock(return_value=True)
 
     result = await service.enqueue_entry(entry)
 
@@ -49,15 +50,29 @@ async def test_enqueue_entry_sets_flag_and_sends_message(service, mock_supabase_
         queue_name="entry_ingestion_queue",
         message={"entry_id": "entry-1", "operation": "upsert", "failure_count": 0},
     )
-    mock_supabase_client.table.return_value.update.return_value.eq.return_value.execute.assert_called_once()
+    service._try_set_entry_enqueued_atomic.assert_called_once_with("entry-1")
 
 
 @pytest.mark.asyncio
 async def test_enqueue_entry_skips_when_already_enqueued(service):
+    service._try_set_entry_enqueued_atomic = MagicMock(return_value=False)
+
     result = await service.enqueue_entry({"id": "entry-1", "is_enqueued": True})
 
     assert result is True
     service.queue_service.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_enqueue_entry_rolls_back_flag_when_queue_send_fails(service):
+    service._try_set_entry_enqueued_atomic = MagicMock(return_value=True)
+    service._rollback_entry_enqueued_status = MagicMock()
+    service.queue_service.send_message.side_effect = RuntimeError("queue unavailable")
+
+    result = await service.enqueue_entry({"id": "entry-1"})
+
+    assert result is False
+    service._rollback_entry_enqueued_status.assert_called_once_with("entry-1")
 
 
 @pytest.mark.asyncio
@@ -107,3 +122,19 @@ async def test_process_queue_moves_failed_message_to_dlq(service, mock_supabase_
         queue_name="entry_ingestion_dlq",
         message={"entry_id": "entry-2", "operation": "upsert", "failure_count": 1},
     )
+
+
+@pytest.mark.asyncio
+async def test_process_dlq_uses_explicit_queue_without_mutating_default(service):
+    service.queue_service.read_messages.return_value = []
+
+    original_queue_name = service.queue_name
+    stats = await service.process_dlq()
+
+    assert stats == {"processed": 0, "succeeded": 0, "failed": 0, "moved_to_dlq": 0, "discarded": 0}
+    service.queue_service.read_messages.assert_called_once_with(
+        queue_name="entry_ingestion_dlq",
+        batch_size=service.batch_size,
+        visibility_timeout_seconds=300,
+    )
+    assert service.queue_name == original_queue_name
