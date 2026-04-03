@@ -546,12 +546,11 @@ class NotificationService:
             # Send via Expo SDK
             response = self.expo_client.publish(push_message)
             response.validate_response()
-            
-                    logger.info(
-                        "Notification sent via SDK",
-                        {"recipients": len(recipients), "priority": priority},
-                    )
-                    return True
+            logger.info(
+                "Notification sent via SDK",
+                {"recipients": len(recipients), "priority": priority},
+            )
+            return True
             
         except (PushServerError, DeviceNotRegisteredError) as e:
             # Handle Expo-specific errors
