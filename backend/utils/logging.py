@@ -14,7 +14,7 @@ posthog_token = settings.POSTHOG_API_KEY
 
 # Create OTLP exporter with API key in header
 otlp_exporter = OTLPLogExporter(
-    endpoint=f"{settings.POSTHOG_URL}/i/v1/logs",
+    endpoint=f"{settings.POSTHOG_HOST}/i/v1/logs",
     headers={"Authorization": f"Bearer {posthog_token}"}
 )
 
