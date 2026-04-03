@@ -68,6 +68,8 @@ class Settings:
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "")
 
+    # Frontend
+    ALLOWED_HOSTS: list[str] = os.getenv("ALLOWED_HOSTS", "").split(",")
 
     def validate_entry_report_email_config(self) -> None:
         """Fail fast when required SendGrid settings for entry report emails are missing."""
