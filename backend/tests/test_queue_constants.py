@@ -33,10 +33,12 @@ def test_queue_module_constants_fall_back_to_safe_defaults(monkeypatch):
 
     reloaded = importlib.reload(queue_constants)
 
+    assert reloaded.NOTIFICATION_DEAD_QUEUE_NAME == "notification_dead_queue"
     assert reloaded.NOTIFICATION_CONCURRENCY == 20
     assert reloaded.NOTIFICATION_BATCH_SIZE == 100
     assert reloaded.NOTIFICATION_DLQ_LIMIT == 3
     assert reloaded.NOTIFICATION_INTERVAL_MINUTES == 5
+    assert reloaded.ENTRY_INGESTION_DEAD_QUEUE_NAME == "entry_ingestion_dead_queue"
     assert reloaded.ENTRY_INGESTION_CONCURRENCY == 5
     assert reloaded.ENTRY_INGESTION_BATCH_SIZE == 20
     assert reloaded.ENTRY_INGESTION_DLQ_LIMIT == 3

@@ -15,6 +15,7 @@ if BACKEND_DIR not in sys.path:
 
 from services.notification_service import NotificationService
 from schedulers.notification_scheduler import NotificationScheduler
+from queue_constants import NOTIFICATION_QUEUE_NAME, NOTIFICATION_DLQ_NAME, NOTIFICATION_DEAD_QUEUE_NAME
 
 
 def mock_httpx_success_response():
@@ -220,7 +221,7 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     # Find the "send" call with notifications_dlq in the tracked calls
     send_calls = [
         call for call in rpc_calls_tracker
-        if call[0] == "send" and call[1] and call[1].get("queue_name") == "notifications_dlq"
+        if call[0] == "send" and call[1] and call[1].get("queue_name") == NOTIFICATION_DLQ_NAME
     ]
     assert len(send_calls) > 0
     dlq_call = send_calls[0]
@@ -230,8 +231,8 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
 
 
 @pytest.mark.asyncio
-async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supabase_client):
-    """Test DLQ limit exceeded → discard flow."""
+async def test_dlq_limit_exceeded_moves_to_dead_queue(notification_service, mock_supabase_client):
+    """Test DLQ limit exceeded -> dead queue flow."""
     # Arrange - Message that has already failed 3 times
     message_data = {
         "title": "Test Title",
@@ -285,22 +286,24 @@ async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supaba
     # Assert
     assert stats["processed"] == 1
     assert stats["failed"] == 1
-    assert stats["discarded"] == 1
+    assert stats["moved_to_dead"] == 1
     assert stats["moved_to_dlq"] == 0
     
-    # Verify message was NOT sent to DLQ (should be discarded)
-    # Get the schema mock
+    # Verify message was sent to dead queue and not DLQ
     schema_mock = mock_supabase_client.schema.return_value
-    # Check rpc calls - find any "send" calls with notifications_dlq
     send_calls = [
         call for call in schema_mock.rpc.call_args_list
         if len(call[0]) > 0 and call[0][0] == "send"
     ]
-    # Check if any DLQ sends were made
+    dead_sends = [
+        call for call in send_calls
+        if len(call[0]) > 1 and call[0][1].get("queue_name") == NOTIFICATION_DEAD_QUEUE_NAME
+    ]
     dlq_sends = [
         call for call in send_calls
-        if len(call[0]) > 1 and call[0][1].get("queue_name") == "notifications_dlq"
+        if len(call[0]) > 1 and call[0][1].get("queue_name") == NOTIFICATION_DLQ_NAME
     ]
+    assert len(dead_sends) == 1
     assert len(dlq_sends) == 0
 
 
