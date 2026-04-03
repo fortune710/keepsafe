@@ -111,7 +111,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow Keepsafe to access your contacts to help you find friends"
+          "contactsPermission": "Allow Keepsafe to access your contacts to help you find friends. We do not store or upload your contacts elsewhere."
         }
       ],
       [
