@@ -271,6 +271,7 @@ export default function VaultScreen() {
   }, [blockFriendAction, friends, removeUserEntriesFromDevice, router, selectedFriendId, toast]);
 
   const handleEntryActions = (entry: EntryWithProfile) => {
+    if (entry.user_id === user?.id) return;
     Alert.alert(
       'Entry Actions',
       `What do you want to do with this diary entry from ${entry.profile?.full_name || 'Unknown User'}?`,
