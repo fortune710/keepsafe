@@ -18,7 +18,7 @@ def _get_int_env(key: str, default: int, min_value: int = 0) -> int:
     return parsed_value
 
 
-NOTIFICATION_QUEUE_NAME = "notifications_q"
+NOTIFICATION_QUEUE_NAME = "notifications_queue"
 NOTIFICATION_DLQ_NAME = "notifications_dlq"
 NOTIFICATION_CONCURRENCY = _get_int_env("NOTIFICATION_CONCURRENCY", 20, min_value=1)
 NOTIFICATION_BATCH_SIZE = _get_int_env("NOTIFICATION_BATCH_SIZE", 100, min_value=1)
