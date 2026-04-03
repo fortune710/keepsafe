@@ -1,12 +1,11 @@
-import logging
-
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from queue_constants import ENTRY_INGESTION_INTERVAL_MINUTES
 from services.queues.entry_ingestion_queue_service import EntryIngestionQueueService
+from utils.logging import Logger
 
-logger = logging.getLogger(__name__)
+logger = Logger("EntryIngestionScheduler")
 
 
 class EntryIngestionScheduler:
@@ -20,7 +19,7 @@ class EntryIngestionScheduler:
 
     def start(self):
         if self.is_running:
-            logger.warning("Entry ingestion scheduler is already running")
+            logger.warning("Entry ingestion scheduler is already running", {"job_id": "process_entry_ingestion_queue"})
             return
 
         self.scheduler.add_job(
@@ -33,23 +32,23 @@ class EntryIngestionScheduler:
         self.scheduler.start()
         self.is_running = True
         logger.info(
-            "Entry ingestion scheduler started (runs every %s minute(s))",
-            self.interval_minutes,
+            "Entry ingestion scheduler started",
+            {"job_id": "process_entry_ingestion_queue", "interval_minutes": self.interval_minutes},
         )
 
     def stop(self):
         if not self.is_running:
-            logger.warning("Entry ingestion scheduler is not running")
+            logger.warning("Entry ingestion scheduler is not running", {"job_id": "process_entry_ingestion_queue"})
             return
 
         self.scheduler.shutdown(wait=True)
         self.is_running = False
-        logger.info("Entry ingestion scheduler stopped")
+        logger.info("Entry ingestion scheduler stopped", {"job_id": "process_entry_ingestion_queue"})
 
     async def _process_queue_job(self):
         try:
-            logger.info("Starting scheduled entry ingestion queue processing")
+            logger.info("Starting scheduled entry ingestion queue processing", {"job_id": "process_entry_ingestion_queue"})
             stats = await self.entry_ingestion_service.process_queue()
-            logger.info("Scheduled entry ingestion processing completed: %s", stats)
+            logger.info("Scheduled entry ingestion processing completed", {"job_id": "process_entry_ingestion_queue", "stats": stats})
         except Exception as exc:
-            logger.error("Scheduled entry ingestion processing failed: %s", str(exc), exc_info=True)
+            logger.error("Scheduled entry ingestion processing failed", {"job_id": "process_entry_ingestion_queue", "error": str(exc)})
