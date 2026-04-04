@@ -1,12 +1,20 @@
 import { logger } from '@/lib/logger';
 import { apiFetchStream } from '@/lib/api-client';
 
+export type SearchStreamEventType = 'status' | 'delta' | 'final' | 'results';
+
+export interface SearchStreamEvent {
+  type: SearchStreamEventType;
+  text?: string;
+  entries?: any[];
+}
+
 interface StreamSearchOptions {
   query: string;
   /**
-   * Called for each text chunk received from the backend search stream.
+   * Called for each parsed stream event.
    */
-  onMessage: (chunk: string) => void;
+  onEvent: (event: SearchStreamEvent) => void;
   /**
    * Called when the stream ends successfully.
    */
@@ -30,7 +38,7 @@ interface StreamSearchOptions {
 export class SearchService {
   // Base URL for the FastAPI backend. Override via env in different environments.
   private static readonly BASE_URL =
-    process.env.EXPO_PUBLIC_SEARCH_API_URL ?? 'http://localhost:8000';
+    process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
 
   /**
    * Streams search results from the backend and forwards text chunks to `onMessage`.
@@ -41,7 +49,7 @@ export class SearchService {
    * The user ID is automatically extracted from the Supabase access token by the backend.
    */
   static async streamSearch(options: StreamSearchOptions): Promise<void> {
-    const { query, onMessage, onFinish, onError, signal } = options;
+    const { query, onEvent, onFinish, onError, signal } = options;
 
     const url = `${this.BASE_URL}/search/stream`;
 
@@ -49,7 +57,7 @@ export class SearchService {
       logger.info('SearchService: starting search request', {
         url,
         method: 'POST',
-        body: { query },
+        queryLength: query.length,
       });
 
       const response = await apiFetchStream(url, {
@@ -72,7 +80,7 @@ export class SearchService {
         logger.error('SearchService: non-OK response', {
           status: response.status,
           statusText: response.statusText,
-          
+
         });
         onError?.(error);
         try {
@@ -94,6 +102,28 @@ export class SearchService {
           ? body.getReader()
           : null;
 
+      const processEvent = (rawEvent: string) => {
+        const lines = rawEvent.split(/\r?\n/);
+        const dataLines = lines
+          .map((line) => (line.startsWith('data:') ? line.slice(5).trim() : ''))
+          .filter((line) => line.length > 0);
+        if (dataLines.length === 0) return;
+
+        const payload = dataLines.join('\n');
+        if (!payload || payload === '[DONE]') return;
+
+        try {
+          const event = JSON.parse(payload) as SearchStreamEvent;
+          logger.debug('SearchService: SSE event', { event });
+          onEvent(event);
+        } catch (error) {
+          logger.warn('SearchService: Failed to parse SSE JSON', {
+            payload,
+            error,
+          });
+        }
+      };
+
       // If streaming reader is not available (some React Native environments),
       // fall back to reading the whole text at once and emitting it as a single chunk.
       if (!reader) {
@@ -102,13 +132,11 @@ export class SearchService {
         });
         const text = await response.text();
         logger.debug('SearchService: non-streaming response text', text);
-        // The backend wraps messages as `data: <message>`, possibly multiple lines.
-        const lines = text.split(/\r?\n/);
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue;
-          const data = line.slice(5).trim();
-          if (!data || data === '[DONE]') continue;
-          onMessage(data);
+        // The backend wraps messages as `data: <json>\n\n`.
+        const events = text.split(/\r?\n\r?\n/);
+        for (const rawEvent of events) {
+          if (!rawEvent.trim()) continue;
+          processEvent(rawEvent);
         }
         onFinish?.();
         return;
@@ -116,13 +144,6 @@ export class SearchService {
 
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
-
-      const processLines = (raw: string) => {
-        let data = raw.replace(/data:/g, '').replace(/\[DONE\]/g, '').trim();
-        if (!data) return;
-        logger.debug('SearchService: SSE chunk', data);
-        onMessage(data);
-      };
 
       // Stream loop
       // eslint-disable-next-line no-constant-condition
@@ -133,19 +154,19 @@ export class SearchService {
 
         buffer += decoder.decode(value, { stream: true });
 
-        let lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() ?? '';
+        let events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() ?? '';
 
-        // Process all complete lines; keep the last partial line in `buffer`
-        if (lines.length > 0) {
-          processLines(lines.join('\n'));
+        for (const rawEvent of events) {
+          if (!rawEvent.trim()) continue;
+          processEvent(rawEvent);
         }
       }
 
       // Flush any remaining buffered data after the stream ends so we don't lose
       // the tail of the message if the server didn't end with a newline.
       if (buffer.trim().length > 0) {
-        processLines(buffer);
+        processEvent(buffer);
       }
 
       logger.info('SearchService: stream completed successfully', { url });

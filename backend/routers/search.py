@@ -1,5 +1,6 @@
 import asyncio
-from typing import AsyncGenerator
+import json
+from typing import AsyncGenerator, Any, Dict
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -24,9 +25,9 @@ async def _sse_event_stream(user_id: str, query: str) -> AsyncGenerator[str, Non
     """
     queue: asyncio.Queue[str] = asyncio.Queue()
 
-    async def send(message: str) -> None:
+    async def send(event: Dict[str, Any]) -> None:
         # Each message is wrapped as an SSE 'data' event.
-        await queue.put(f"data: {message}")
+        await queue.put(f"data: {json.dumps(event)}\n\n")
 
     # Run the agent in the background to push messages into the queue.
     task = asyncio.create_task(agent.run(user_id=user_id, query=query, send=send))
@@ -52,6 +53,14 @@ async def search_stream(
     """
     user_id = current_user.user.id
     event_source = _sse_event_stream(user_id=user_id, query=payload.query)
-    return StreamingResponse(event_source, media_type="text/event-stream")
+    return StreamingResponse(
+        event_source,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
