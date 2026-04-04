@@ -15,7 +15,6 @@ if BACKEND_DIR not in sys.path:
 
 from services.notification_service import NotificationService
 from schedulers.notification_scheduler import NotificationScheduler
-from queue_constants import NOTIFICATION_QUEUE_NAME, NOTIFICATION_DLQ_NAME, NOTIFICATION_DEAD_QUEUE_NAME
 
 
 def mock_httpx_success_response():
@@ -221,7 +220,7 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     # Find the "send" call with notifications_dlq in the tracked calls
     send_calls = [
         call for call in rpc_calls_tracker
-        if call[0] == "send" and call[1] and call[1].get("queue_name") == NOTIFICATION_DLQ_NAME
+        if call[0] == "send" and call[1] and call[1].get("queue_name") == "notifications_dlq"
     ]
     assert len(send_calls) > 0
     dlq_call = send_calls[0]
@@ -231,8 +230,8 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
 
 
 @pytest.mark.asyncio
-async def test_dlq_limit_exceeded_moves_to_dead_queue(notification_service, mock_supabase_client):
-    """Test DLQ limit exceeded -> dead queue flow."""
+async def test_dlq_limit_exceeded_discard_flow(notification_service, mock_supabase_client):
+    """Test DLQ limit exceeded → discard flow."""
     # Arrange - Message that has already failed 3 times
     message_data = {
         "title": "Test Title",
@@ -279,57 +278,6 @@ async def test_dlq_limit_exceeded_moves_to_dead_queue(notification_service, mock
         return mock_schema
     
     mock_supabase_client.schema.side_effect = mock_schema_side_effect
-    # Arrange - Message that has already failed 3 times
-    message_data = {
-        "title": "Test Title",
-        "body": "Test Body",
-        "recipients": ["ExponentPushToken[abc123]"],
-        "priority": "default",
-        "failure_count": 3,  # Already at limit
-        "metadata": {}
-    }
-    mock_messages = [
-        {
-            "msg_id": 1,
-            "read_ct": 1,
-            "message": json.dumps(message_data)
-        }
-    ]
-    
-    read_response = MagicMock()
-    read_response.data = mock_messages
-    
-    # Mock failed Expo send
-    from exponent_server_sdk import PushServerError
-    mock_response = MagicMock()
-    mock_response.status_code = 400
-    notification_service.expo_client.publish = MagicMock(
-        side_effect=PushServerError("Invalid token", mock_response)
-    )
-    
-    # Track RPC calls to verify send destinations
-    rpc_calls_tracker = []
-    
-    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
-    def mock_schema_side_effect(schema_name):
-        """Return a mock schema object that handles rpc calls."""
-        mock_schema = MagicMock()
-        
-        def mock_rpc_side_effect(rpc_name, params_dict=None, **kwargs):
-            """Handle different RPC calls."""
-            # Track the call - params_dict is the second positional arg
-            rpc_calls_tracker.append((rpc_name, params_dict or {}))
-            mock_rpc_result = MagicMock()
-            if rpc_name == "read":
-                mock_rpc_result.execute.return_value = read_response
-            else:
-                mock_rpc_result.execute.return_value = MagicMock()
-            return mock_rpc_result
-        
-        mock_schema.rpc.side_effect = mock_rpc_side_effect
-        return mock_schema
-    
-    mock_supabase_client.schema.side_effect = mock_schema_side_effect
     
     # Act
     stats = await notification_service.process_queue()
@@ -337,24 +285,28 @@ async def test_dlq_limit_exceeded_moves_to_dead_queue(notification_service, mock
     # Assert
     assert stats["processed"] == 1
     assert stats["failed"] == 1
-    assert stats["moved_to_dead"] == 1
+    assert stats["discarded"] == 1
     assert stats["moved_to_dlq"] == 0
     
-    # Verify message was sent to dead queue and not DLQ
+    # Verify message was NOT sent to DLQ (should be discarded)
+    # Get the schema mock
+    schema_mock = mock_supabase_client.schema.return_value
+    # Check rpc calls - find any "send" calls with notifications_dlq
     send_calls = [
-        call for call in rpc_calls_tracker
-        if call[0] == "send"
+        call for call in schema_mock.rpc.call_args_list
+        if len(call[0]) > 0 and call[0][0] == "send"
     ]
-    dead_sends = [
-        call for call in send_calls
-        if call[1] and call[1].get("queue_name") == NOTIFICATION_DEAD_QUEUE_NAME
-    ]
+    # Check if any DLQ sends were made
     dlq_sends = [
         call for call in send_calls
-        if call[1] and call[1].get("queue_name") == NOTIFICATION_DLQ_NAME
+        if len(call[0]) > 1 and call[0][1].get("queue_name") == "notifications_dlq"
     ]
-    assert len(dead_sends) == 1
     assert len(dlq_sends) == 0
+
+
+@pytest.mark.asyncio
+async def test_concurrent_processing(notification_service, mock_supabase_client):
+    """Test that multiple messages are processed concurrently."""
     # Arrange - Multiple messages
     mock_messages = [
         {

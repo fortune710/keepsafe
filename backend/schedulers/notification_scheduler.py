@@ -1,11 +1,12 @@
+import logging
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from queue_constants import NOTIFICATION_INTERVAL_MINUTES
 from services.notification_service import NotificationService
-from utils.logging import Logger
 
-logger = Logger("NotificationScheduler")
+logger = logging.getLogger(__name__)
 
 
 class NotificationScheduler:
@@ -19,7 +20,7 @@ class NotificationScheduler:
 
     def start(self):
         if self.is_running:
-            logger.warning("Notification scheduler is already running", {"job_id": "process_notification_queue"})
+            logger.warning("Notification scheduler is already running")
             return
 
         self.scheduler.add_job(
@@ -32,24 +33,24 @@ class NotificationScheduler:
         self.scheduler.start()
         self.is_running = True
         logger.info(
-            "Notification scheduler started",
-            {"job_id": "process_notification_queue", "interval_minutes": self.interval_minutes},
+            "Notification scheduler started (runs every %s minute(s))",
+            self.interval_minutes,
         )
 
     def stop(self):
         if not self.is_running:
-            logger.warning("Notification scheduler is not running", {"job_id": "process_notification_queue"})
+            logger.warning("Notification scheduler is not running")
             return
 
         self.scheduler.shutdown(wait=True)
         self.is_running = False
         self.notification_service.shutdown()
-        logger.info("Notification scheduler stopped", {"job_id": "process_notification_queue"})
+        logger.info("Notification scheduler stopped")
 
     async def _process_queue_job(self):
         try:
-            logger.info("Starting scheduled notification queue processing", {"job_id": "process_notification_queue"})
+            logger.info("Starting scheduled notification queue processing")
             stats = await self.notification_service.process_queue()
-            logger.info("Scheduled notification processing completed", {"job_id": "process_notification_queue", "stats": stats})
+            logger.info("Scheduled notification processing completed: %s", stats)
         except Exception as exc:
-            logger.error("Scheduled notification processing failed", {"job_id": "process_notification_queue", "error": str(exc)})
+            logger.error("Scheduled notification processing failed: %s", str(exc), exc_info=True)

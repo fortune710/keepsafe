@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 import asyncio
 import json
+import logging
 
 from queue_constants import (
     ENTRY_INGESTION_BATCH_SIZE,
     ENTRY_INGESTION_CONCURRENCY,
-    ENTRY_INGESTION_DEAD_QUEUE_NAME,
     ENTRY_INGESTION_DLQ_LIMIT,
     ENTRY_INGESTION_DLQ_NAME,
     ENTRY_INGESTION_QUEUE_NAME,
@@ -15,9 +15,8 @@ from queue_constants import (
 from services.ingestion_service import IngestionService
 from services.queue_service import QueueService
 from services.supabase_client import get_supabase_client
-from utils.logging import Logger
 
-logger = Logger("EntryIngestionQueueService")
+logger = logging.getLogger(__name__)
 
 
 class EntryIngestionQueueService:
@@ -30,37 +29,31 @@ class EntryIngestionQueueService:
         self.ingestion_service = IngestionService()
         self.queue_name = ENTRY_INGESTION_QUEUE_NAME
         self.dlq_name = ENTRY_INGESTION_DLQ_NAME
-        self.dead_queue_name = ENTRY_INGESTION_DEAD_QUEUE_NAME
         self.batch_size = ENTRY_INGESTION_BATCH_SIZE
         self.dlq_limit = ENTRY_INGESTION_DLQ_LIMIT
         self.semaphore = asyncio.Semaphore(ENTRY_INGESTION_CONCURRENCY)
 
         logger.info(
-            "EntryIngestionQueueService initialized",
-            {
-                "queue": self.queue_name,
-                "dlq": self.dlq_name,
-                "dead_queue": self.dead_queue_name,
-                "batch_size": self.batch_size,
-                "concurrency": ENTRY_INGESTION_CONCURRENCY,
-                "dlq_limit": self.dlq_limit,
-            },
+            "EntryIngestionQueueService initialized: queue=%s dlq=%s batch_size=%s concurrency=%s dlq_limit=%s",
+            self.queue_name,
+            self.dlq_name,
+            self.batch_size,
+            ENTRY_INGESTION_CONCURRENCY,
+            self.dlq_limit,
         )
 
     async def enqueue_entry(self, entry: Dict[str, Any], operation: str = "upsert") -> bool:
         """Queue an entry for ingestion if it is not already queued."""
         entry_id = entry.get("id")
         if not entry_id:
-            logger.warning(
-                "Entry ingestion enqueue skipped: missing entry_id",
-                {"operation": operation},
-            )
+            logger.warning("Entry ingestion enqueue skipped: missing entry_id")
             return False
 
         if not self._try_set_entry_enqueued_atomic(entry_id):
             logger.info(
-                "Entry already queued or unavailable",
-                {"entry_id": entry_id, "operation": operation},
+                "Entry ingestion enqueue skipped because entry is already queued or unavailable: entry_id=%s operation=%s",
+                entry_id,
+                operation,
             )
             return True
 
@@ -77,15 +70,20 @@ class EntryIngestionQueueService:
                     f"Invalid entry ingestion enqueue response for entry_id={entry_id}: {getattr(response, 'data', None)}"
                 )
             logger.info(
-                "Entry queued for ingestion",
-                {"entry_id": entry_id, "operation": operation, "queue": self.queue_name},
+                "Entry queued for ingestion: entry_id=%s operation=%s queue=%s",
+                entry_id,
+                operation,
+                self.queue_name,
             )
             return True
         except Exception as exc:
             self._rollback_entry_enqueued_status(entry_id)
             logger.error(
-                "Failed to enqueue entry ingestion job",
-                {"entry_id": entry_id, "operation": operation, "error": str(exc)},
+                "Failed to enqueue entry ingestion job: entry_id=%s operation=%s error=%s",
+                entry_id,
+                operation,
+                str(exc),
+                exc_info=True,
             )
             return False
 
@@ -96,14 +94,15 @@ class EntryIngestionQueueService:
             "succeeded": 0,
             "failed": 0,
             "moved_to_dlq": 0,
-            "moved_to_dead": 0,
+            "discarded": 0,
         }
 
         try:
             target_queue_name = queue_name or self.queue_name
             logger.info(
-                "Starting entry ingestion queue processing",
-                {"queue": target_queue_name, "batch_size": self.batch_size},
+                "Starting entry ingestion queue processing: queue=%s batch_size=%s",
+                target_queue_name,
+                self.batch_size,
             )
             messages = self.queue_service.read_messages(
                 queue_name=target_queue_name,
@@ -111,21 +110,17 @@ class EntryIngestionQueueService:
                 visibility_timeout_seconds=300,
             )
             if not messages:
-                logger.info(
-                    "No entry ingestion messages available",
-                    {"queue": target_queue_name},
-                )
+                logger.info("No entry ingestion messages available: queue=%s", target_queue_name)
                 return stats
 
             await asyncio.gather(*(self._process_message(message, stats, target_queue_name) for message in messages))
-            logger.info(
-                "Completed entry ingestion queue processing",
-                {"queue": target_queue_name, "stats": stats},
-            )
+            logger.info("Completed entry ingestion queue processing: queue=%s stats=%s", target_queue_name, stats)
         except Exception as exc:
             logger.error(
-                "Entry ingestion queue processing failed",
-                {"queue": queue_name or self.queue_name, "error": str(exc)},
+                "Entry ingestion queue processing failed: queue=%s error=%s",
+                queue_name or self.queue_name,
+                str(exc),
+                exc_info=True,
             )
 
         return stats
@@ -151,8 +146,10 @@ class EntryIngestionQueueService:
 
         if not msg_id or not entry_id:
             logger.warning(
-                "Dropping invalid entry ingestion message",
-                {"queue": source_queue_name, "msg_id": msg_id, "entry_id": entry_id},
+                "Dropping invalid entry ingestion message: queue=%s msg_id=%s entry_id=%s",
+                source_queue_name,
+                msg_id,
+                entry_id,
             )
             if msg_id:
                 self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
@@ -164,8 +161,10 @@ class EntryIngestionQueueService:
                 entry = self._get_entry(entry_id)
                 if not entry:
                     logger.info(
-                        "Skipping queued ingestion because entry no longer exists",
-                        {"queue": source_queue_name, "msg_id": msg_id, "entry_id": entry_id},
+                        "Skipping queued ingestion because entry no longer exists: queue=%s msg_id=%s entry_id=%s",
+                        source_queue_name,
+                        msg_id,
+                        entry_id,
                     )
                     self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
                     stats["succeeded"] += 1
@@ -180,8 +179,10 @@ class EntryIngestionQueueService:
                     self._set_entry_enqueued_status(entry_id=entry_id, is_enqueued=False)
                     stats["succeeded"] += 1
                     logger.info(
-                        "Entry ingestion job succeeded",
-                        {"queue": source_queue_name, "msg_id": msg_id, "entry_id": entry_id},
+                        "Entry ingestion job succeeded: queue=%s msg_id=%s entry_id=%s",
+                        source_queue_name,
+                        msg_id,
+                        entry_id,
                     )
                     return
 
@@ -194,8 +195,12 @@ class EntryIngestionQueueService:
                 )
         except Exception as exc:
             logger.error(
-                "Entry ingestion job failed with exception",
-                {"queue": source_queue_name, "msg_id": msg_id, "entry_id": entry_id, "error": str(exc)},
+                "Entry ingestion job failed with exception: queue=%s msg_id=%s entry_id=%s error=%s",
+                source_queue_name,
+                msg_id,
+                entry_id,
+                str(exc),
+                exc_info=True,
             )
             await self._handle_failure(
                 msg_id=msg_id,
@@ -224,43 +229,36 @@ class EntryIngestionQueueService:
                 if not self.queue_service.is_enqueue_response_valid(response):
                     raise ValueError(
                         f"Invalid entry ingestion DLQ enqueue response for entry_id={entry_id}: {getattr(response, 'data', None)}"
-                )
+                    )
                 self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
                 stats["moved_to_dlq"] += 1
                 logger.warning(
-                    "Entry ingestion job moved to DLQ",
-                    {
-                        "source_queue": source_queue_name,
-                        "dlq": self.dlq_name,
-                        "msg_id": msg_id,
-                        "entry_id": entry_id,
-                        "failure_count": new_failure_count,
-                    },
+                    "Entry ingestion job moved to DLQ: source_queue=%s dlq=%s msg_id=%s entry_id=%s failure_count=%s",
+                    source_queue_name,
+                    self.dlq_name,
+                    msg_id,
+                    entry_id,
+                    new_failure_count,
                 )
             else:
-                self.queue_service.send_message(queue_name=self.dead_queue_name, message=message_data)
                 self.queue_service.delete_message(queue_name=source_queue_name, message_id=msg_id)
                 self._set_entry_enqueued_status(entry_id=entry_id, is_enqueued=False)
-                stats["moved_to_dead"] += 1
+                stats["discarded"] += 1
                 logger.error(
-                    "Entry ingestion job moved to dead queue after DLQ limit",
-                    {
-                        "queue": source_queue_name,
-                        "dead_queue": self.dead_queue_name,
-                        "msg_id": msg_id,
-                        "entry_id": entry_id,
-                        "failure_count": new_failure_count,
-                    },
+                    "Entry ingestion job discarded after DLQ limit: queue=%s msg_id=%s entry_id=%s failure_count=%s",
+                    source_queue_name,
+                    msg_id,
+                    entry_id,
+                    new_failure_count,
                 )
         except Exception as exc:
             logger.error(
-                "Failed to handle entry ingestion failure",
-                {
-                    "queue": source_queue_name,
-                    "msg_id": msg_id,
-                    "entry_id": entry_id,
-                    "error": str(exc),
-                },
+                "Failed to move entry ingestion message to DLQ: queue=%s msg_id=%s entry_id=%s error=%s",
+                source_queue_name,
+                msg_id,
+                entry_id,
+                str(exc),
+                exc_info=True,
             )
         finally:
             stats["failed"] += 1
@@ -272,8 +270,10 @@ class EntryIngestionQueueService:
             return response.data if response.data else None
         except Exception as exc:
             logger.error(
-                "Failed to fetch entry for ingestion",
-                {"entry_id": entry_id, "error": str(exc)},
+                "Failed to fetch entry for ingestion: entry_id=%s error=%s",
+                entry_id,
+                str(exc),
+                exc_info=True,
             )
             raise
 
@@ -282,13 +282,17 @@ class EntryIngestionQueueService:
         try:
             self.supabase.table("entries").update({"is_enqueued": is_enqueued}).eq("id", entry_id).execute()
             logger.info(
-                "Updated entry queue status",
-                {"entry_id": entry_id, "is_enqueued": is_enqueued},
+                "Updated entry queue status: entry_id=%s is_enqueued=%s",
+                entry_id,
+                is_enqueued,
             )
         except Exception as exc:
             logger.error(
-                "Failed to update entry queue status",
-                {"entry_id": entry_id, "is_enqueued": is_enqueued, "error": str(exc)},
+                "Failed to update entry queue status: entry_id=%s is_enqueued=%s error=%s",
+                entry_id,
+                is_enqueued,
+                str(exc),
+                exc_info=True,
             )
             raise
 
@@ -307,8 +311,10 @@ class EntryIngestionQueueService:
             return len(updated_rows) > 0
         except Exception as exc:
             logger.error(
-                "Failed to atomically update entry queue status",
-                {"entry_id": entry_id, "error": str(exc)},
+                "Failed to atomically update entry queue status: entry_id=%s error=%s",
+                entry_id,
+                str(exc),
+                exc_info=True,
             )
             raise
 
@@ -318,6 +324,7 @@ class EntryIngestionQueueService:
             self._set_entry_enqueued_status(entry_id=entry_id, is_enqueued=False)
         except Exception:
             logger.error(
-                "Failed to roll back entry queue status after enqueue failure",
-                {"entry_id": entry_id},
+                "Failed to roll back entry queue status after enqueue failure: entry_id=%s",
+                entry_id,
+                exc_info=True,
             )

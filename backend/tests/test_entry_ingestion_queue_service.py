@@ -91,7 +91,7 @@ async def test_process_queue_ingests_latest_entry_and_clears_enqueued_flag(servi
 
     stats = await service.process_queue()
 
-    assert stats == {"processed": 1, "succeeded": 1, "failed": 0, "moved_to_dlq": 0, "moved_to_dead": 0}
+    assert stats == {"processed": 1, "succeeded": 1, "failed": 0, "moved_to_dlq": 0, "discarded": 0}
     service.ingestion_service.ingest_entry.assert_awaited_once()
     service.queue_service.delete_message.assert_called_once_with(queue_name="entry_ingestion_queue", message_id=7)
     assert mock_supabase_client.table.return_value.update.return_value.eq.return_value.execute.call_count == 1
@@ -125,43 +125,13 @@ async def test_process_queue_moves_failed_message_to_dlq(service, mock_supabase_
 
 
 @pytest.mark.asyncio
-async def test_process_queue_moves_to_dead_queue_after_dlq_limit(service, mock_supabase_client):
-    service.queue_service.read_messages.return_value = [
-        {"msg_id": 9, "message": json.dumps({"entry_id": "entry-3", "operation": "upsert", "failure_count": 3})}
-    ]
-    mock_supabase_client.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = {
-        "id": "entry-3",
-        "content_url": "https://example.com/file.jpg",
-        "type": "photo",
-        "user_id": "user-1",
-        "shared_with": [],
-        "attachments": [],
-    }
-    service.ingestion_service.ingest_entry = AsyncMock(return_value=False)
-
-    stats = await service.process_queue()
-
-    assert stats["moved_to_dead"] == 1
-    service.queue_service.send_message.assert_called_with(
-        queue_name="entry_ingestion_dead_queue",
-        message={"entry_id": "entry-3", "operation": "upsert", "failure_count": 4},
-    )
-    service.queue_service.delete_message.assert_called_with(
-        queue_name="entry_ingestion_queue",
-        message_id=9,
-    )
-    # is_enqueued should be cleared
-    assert mock_supabase_client.table.return_value.update.return_value.eq.return_value.execute.call_count >= 1
-
-
-@pytest.mark.asyncio
 async def test_process_dlq_uses_explicit_queue_without_mutating_default(service):
     service.queue_service.read_messages.return_value = []
 
     original_queue_name = service.queue_name
     stats = await service.process_dlq()
 
-    assert stats == {"processed": 0, "succeeded": 0, "failed": 0, "moved_to_dlq": 0, "moved_to_dead": 0}
+    assert stats == {"processed": 0, "succeeded": 0, "failed": 0, "moved_to_dlq": 0, "discarded": 0}
     service.queue_service.read_messages.assert_called_once_with(
         queue_name="entry_ingestion_dlq",
         batch_size=service.batch_size,

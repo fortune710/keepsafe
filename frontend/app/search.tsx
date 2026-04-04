@@ -22,6 +22,7 @@ import { Colors } from '@/lib/constants';
 import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
 import { scale, verticalScale } from 'react-native-size-matters';
+import Typewriter from '@/components/ui/typewriter';
 
 const SAMPLE_QUERIES = [
   'Show me my happiest memories',
@@ -214,7 +215,7 @@ const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
 };
 
 export default function SearchScreen() {
-  const { messages, input, setInput, startSearch, isLoading, loadingText, error } = useSearch();
+  const { messages, input, setInput, startSearch, isLoading, error } = useSearch();
   const { entries, isLoading: entriesLoading } = useUserEntries();
 
   const hasMessages = messages.length > 0;
@@ -320,9 +321,13 @@ export default function SearchScreen() {
                 isLoading && (
                   <View style={styles.loadingContainer}>
                     <Sparkles color={Colors.primary} size={20} />
-                    <Text style={{ fontSize: styles.messageText.fontSize, color: Colors.text, fontWeight: '400' }}>
-                      {loadingText || 'Preparing your memories...'}
-                    </Text>
+                    <Typewriter
+                      texts={['Superzing your fries...', 'Preparing your memories...', 'Cooking a response...']}
+                      loop={true}
+                      delay={50}
+                      pauseDelay={500}
+                      style={{ fontSize: styles.messageText.fontSize, color: Colors.text, fontWeight: '400' }}
+                    />
                   </View>
                 )
               }

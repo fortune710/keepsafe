@@ -1,6 +1,0 @@
-pre-commit:
-  commands:
-    check-lockfile:
-      root: "frontend/"
-      glob: "package.json"
-      run: bun install && git add bun.lock

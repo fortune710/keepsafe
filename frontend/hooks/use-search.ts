@@ -1,9 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { SearchService, SearchStreamEvent } from '@/services/search-service';
+import { SearchService } from '@/services/search-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { posthog } from '@/constants/posthog';
 import { Platform } from 'react-native';
-import { logger } from '@/lib/logger';
 
 export type SearchRole = 'user' | 'assistant' | 'system';
 
@@ -21,7 +20,6 @@ interface UseSearchParams {
 interface UseSearchResult {
   messages: SearchMessage[];
   isLoading: boolean;
-  loadingText: string;
   error: string | null;
   input: string;
   setInput: (value: string) => void;
@@ -35,7 +33,6 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
 
   const [messages, setMessages] = useState<SearchMessage[]>(() => [...initialMessages]);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
 
@@ -49,7 +46,6 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
     setMessages([...initialMessages]);
     setInput('');
     setIsLoading(false);
-    setLoadingText('');
     setError(null);
   }, [initialMessages]);
 
@@ -71,7 +67,6 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
       abortRef.current = controller;
 
       setIsLoading(true);
-      setLoadingText('Preparing your memories...');
       setError(null);
 
       // Seed messages with the user query and an empty assistant message for streaming
@@ -98,80 +93,34 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
         await SearchService.streamSearch({
           query,
           signal: controller.signal,
-          onEvent: (event: SearchStreamEvent) => {
-            if (!event || !event.type) return;
+          onMessage: (chunk) => {
+            if (!chunk) return;
 
-            if (event.type === 'status') {
-              setLoadingText(event.text ?? '');
-              logger.info('Search stream status update', { text: event.text });
-              return;
-            }
-
-            if (event.type === 'delta') {
-              const chunk = event.text ?? '';
-              if (!chunk) return;
-              setMessages((prev) => {
-                const updated = [...prev];
-                const lastIndex = updated.findIndex((m) => m.id === assistantMessageId);
-                if (lastIndex === -1) {
-                  // If for some reason the assistant message is missing, append a new one
-                  updated.push({
-                    id: assistantMessageId,
-                    role: 'assistant',
-                    content: chunk,
-                  });
-                  return updated;
-                }
-                updated[lastIndex] = {
-                  ...updated[lastIndex],
-                  content: updated[lastIndex].content + chunk,
-                };
+            setMessages((prev) => {
+              const updated = [...prev];
+              const lastIndex = updated.findIndex((m) => m.id === assistantMessageId);
+              if (lastIndex === -1) {
+                // If for some reason the assistant message is missing, append a new one
+                updated.push({
+                  id: assistantMessageId,
+                  role: 'assistant',
+                  content: chunk,
+                });
                 return updated;
-              });
-              return;
-            }
-
-            if (event.type === 'results' && Array.isArray(event.entries)) {
-              const jsonBlock = `\n\n\`\`\`json\n${JSON.stringify(
-                event.entries,
-                null,
-                2
-              )}\n\`\`\``;
-              setMessages((prev) => {
-                const updated = [...prev];
-                const lastIndex = updated.findIndex((m) => m.id === assistantMessageId);
-                if (lastIndex === -1) {
-                  updated.push({
-                    id: assistantMessageId,
-                    role: 'assistant',
-                    content: jsonBlock,
-                  });
-                  return updated;
-                }
-                updated[lastIndex] = {
-                  ...updated[lastIndex],
-                  content: updated[lastIndex].content + jsonBlock,
-                };
-                return updated;
-              });
-              return;
-            }
-
-            if (event.type === 'final') {
-              setIsLoading(false);
-              setLoadingText('');
-              logger.info('Search stream final response received', {
-                length: event.text?.length ?? 0,
-              });
-            }
+              }
+              updated[lastIndex] = {
+                ...updated[lastIndex],
+                content: updated[lastIndex].content + chunk,
+              };
+              return updated;
+            });
           },
           onError: (err) => {
-            logger.error('Search stream error', { error: err.message });
+            console.error('Search stream error:', err);
             setError(err.message || 'Something went wrong while searching.');
           },
           onFinish: () => {
             setIsLoading(false);
-            setLoadingText('');
             abortRef.current = null;
 
             if (onFinish) {
@@ -191,10 +140,9 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
           // Swallow aborts
           return;
         }
-        logger.error('Search error', { error: err?.message });
+        console.error('Search error:', err);
         setError(err?.message || 'Search failed.');
         setIsLoading(false);
-        setLoadingText('');
         abortRef.current = null;
       }
     },
@@ -205,14 +153,13 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
     () => ({
       messages,
       isLoading,
-      loadingText,
       error,
       input,
       setInput,
       startSearch,
       reset,
     }),
-    [messages, isLoading, loadingText, error, input, startSearch, reset]
+    [messages, isLoading, error, input, startSearch, reset]
   );
 
   return value;

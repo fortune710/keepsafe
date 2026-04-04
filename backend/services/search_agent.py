@@ -2,25 +2,27 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
+import logging
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
-from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel
-from utils.logging import Logger
+from google import genai
 
+from utils.formatting_utils import strip_backticks
+from config import settings
 from models import FriendSummary, SearchResult
 from services.gemini_client import (
+    GEMINI_FLASH_MODEL,
     generate_embedding,
+    get_gemini_client,
 )
-from services.model_factory import ModelType, get_model
 from services.pinecone_client import get_pinecone_index
 from services.supabase_client import get_supabase_client
 from utils.datetime_utils import iso_to_unix_epoch
 
 
-logger = Logger("SearchAgent")
+logger = logging.getLogger(__name__)
 
-StreamCallback = Callable[[Dict[str, Any]], Awaitable[None]]
+StreamCallback = Callable[[str], Awaitable[None]]
 
 
 class SearchAgent:
@@ -32,7 +34,7 @@ class SearchAgent:
     """
 
     def __init__(self) -> None:
-        self._model = get_model(ModelType.GEMINI)
+        self._gemini_client: genai.Client = get_gemini_client()
         self._pinecone_index = get_pinecone_index()
         self._supabase = get_supabase_client()
 
@@ -52,43 +54,39 @@ class SearchAgent:
             "Tools:\n"
             "- friends_tool: fetch the user's friends list (ids, usernames, emails)\n"
             "- search_tool: search Pinecone memories using semantic similarity\n\n"
-            "Call the `route_search` tool with keys:\n"
+            "Return ONLY valid JSON with keys:\n"
             '{ "use_friends_tool": bool, "use_search_tool": bool, "use_metadata": bool }\n'
             "Do not include any other text."
         )
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=f"User query: {query}"),
+        contents = [
+            system_prompt,
+            f"User query: {query}",
         ]
 
+        response = self._gemini_client.models.generate_content(
+            model=GEMINI_FLASH_MODEL,
+            contents=contents,
+        )
+
+        raw = getattr(response, "text", "") or ""
+        logger.info("Tool routing raw response: %s", raw)
+
         try:
-            ai_msg = await self._model.ainvoke(messages)
-            tool_calls = getattr(ai_msg, "tool_calls", None) or []
-            logger.info(
-                "Search routing tool calls",
-                {"phase": "routing", "tool_calls": tool_calls},
-            )
-
-            if tool_calls:
-                args = tool_calls[0].get("args") or {}
-                return {
-                    "use_friends_tool": bool(args.get("use_friends_tool", True)),
-                    "use_search_tool": bool(args.get("use_search_tool", True)),
-                    "use_metadata": bool(args.get("use_metadata", True)),
-                }
+            config = strip_backticks(raw)
+            return {
+                "use_friends_tool": bool(config.get("use_friends_tool", True)),
+                "use_search_tool": bool(config.get("use_search_tool", True)),
+                "use_metadata": bool(config.get("use_metadata", True)),
+            }
         except Exception as e:
-            logger.warning(
-                "Failed to parse routing tool call; using defaults.",
-                {"phase": "routing", "error": str(e)},
-            )
-
-        # Sensible defaults: search memories and include metadata; friends optional.
-        return {
-            "use_friends_tool": True,
-            "use_search_tool": True,
-            "use_metadata": True,
-        }
+            logger.warning("Failed to parse routing JSON (%s). Using defaults.", e)
+            # Sensible defaults: search memories and include metadata; friends optional.
+            return {
+                "use_friends_tool": True,
+                "use_search_tool": True,
+                "use_metadata": True,
+            }
 
     async def _get_user_friends(self, user_id: str) -> List[FriendSummary]:
         """
@@ -113,7 +111,7 @@ class SearchAgent:
             # If the current user is the recipient, the friend is the requester
             elif row.get("friend_id") == user_id:
                 friend_ids.append(row.get("user_id"))
-        logger.info("Friend IDs", {"friend_ids": friend_ids})
+        logger.info("Friend IDs: %s", friend_ids)
         if not friend_ids:
             return []
 
@@ -197,34 +195,18 @@ class SearchAgent:
             f"Friends (id | username | full_name | email):\n{friends_block}\n"
         )
 
-        class FilterConfig(BaseModel):
-            types: Optional[List[str]] = None
-            friend_ids: Optional[List[str]] = None
-            created_from: Optional[str] = None
-            created_to: Optional[str] = None
-
-        structured_model = self._model.with_structured_output(
-            schema=FilterConfig.model_json_schema(), method="json_schema"
+        response = self._gemini_client.models.generate_content(
+            model=GEMINI_FLASH_MODEL,
+            contents=[system_prompt, user_prompt],
         )
 
+        raw = getattr(response, "text", "") or ""
+        logger.info("Filter extraction raw response: %s", raw)
+
         try:
-            cfg = await structured_model.ainvoke(
-                [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=user_prompt),
-                ]
-            )
-            if isinstance(cfg, FilterConfig):
-                cfg = cfg.model_dump()
-            logger.info(
-                "Filter extraction structured output",
-                {"phase": "filters", "structured": cfg},
-            )
+            cfg = strip_backticks(raw)
         except Exception as e:
-            logger.warning(
-                "Failed to parse filter JSON; using no filters.",
-                {"phase": "filters", "error": str(e)},
-            )
+            logger.warning("Failed to parse filter JSON (%s). Using no filters.", e)
             return {}
 
         pinecone_filter: Dict[str, Any] = {}
@@ -266,10 +248,7 @@ class SearchAgent:
         if cfg.get("user_id"):
             pinecone_filter["user_id"] = cfg["user_id"]
 
-        logger.debug(
-            "Derived Pinecone filter",
-            {"phase": "filters", "pinecone_filter": pinecone_filter},
-        )
+        logger.debug("Derived Pinecone filter: %s", pinecone_filter)
         return pinecone_filter
 
     async def _search_pinecone(
@@ -328,11 +307,8 @@ class SearchAgent:
                     if isinstance(loaded, list):
                         attachments_data = loaded
                 except Exception as e:
-                    logger.warning(
-                        "Failed to parse attachments_json",
-                        {"error": str(e)},
-                    )
-            logger.debug("Search result metadata", {"metadata": metadata})
+                    logger.warning("Failed to parse attachments_json: %s", e)
+            logger.debug("Search result metadata: %s", metadata)
             result = SearchResult(
                 entry_id=str(metadata.get("entry_id") or getattr(match, "id", "")),
                 user_id=owner_id,
@@ -386,26 +362,16 @@ class SearchAgent:
             "could rephrase or broaden their search."
         )
 
-        final_text = ""
-        async for chunk in self._model.astream(
-            [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_prompt),
-            ]
-        ):
-            text = getattr(chunk, "text", None)
-            if text is None:
-                text = getattr(chunk, "content", "") or ""
-            if not text:
-                continue
-            final_text += text
-            logger.info(
-                "Model response chunk",
-                {"phase": "summary", "chunk_size": len(text)},
-            )
-            await send({"type": "delta", "text": text})
+        response = self._gemini_client.models.generate_content_stream(
+            model=GEMINI_FLASH_MODEL,
+            contents=[system_prompt, user_prompt],
+        )
 
-        return final_text
+        for chunk in response:
+            logger.info("Gemini response chunk: %s", chunk.text if chunk.text else "")
+            await send(str(chunk.text) if chunk.text else "")
+
+        #return getattr(response, "text", "") or "Sorry, I couldn't generate an explanation."
 
     async def run(
         self,
@@ -416,7 +382,7 @@ class SearchAgent:
         """
         Orchestrate the end-to-end agent flow and stream progress messages via `send`.
         """
-        await send({"type": "status", "text": "Analyzing your query..."})
+        await send("Analyzing your query...\n\n")
         routing = await self._decide_tools(query)
 
         use_friends = routing.get("use_friends_tool", True)
@@ -427,30 +393,19 @@ class SearchAgent:
         results: List[SearchResult] = []
 
         if use_friends:
-            await send({"type": "status", "text": "Fetching your friends..."})
+            await send("Fetching your friends...\n\n")
             try:
                 friends = await self._get_user_friends(user_id)
-                await send(
-                    {
-                        "type": "status",
-                        "text": f"Found {len(friends)} friends linked to your account.",
-                    }
-                )
+                await send(f"Found {len(friends)} friends linked to your account.\n\n")
             except Exception as e:
-                logger.error(
-                    "Error fetching friends",
-                    {"phase": "friends", "error": str(e)},
-                )
-                await send(
-                    {
-                        "type": "status",
-                        "text": "I ran into an issue fetching your friends, but I'll continue the search.",
-                    }
-                )
+                logger.error("Error fetching friends: %s", e, exc_info=True)
+                await send("I ran into an issue fetching your friends, but I'll continue the search.\n\n")
 
         if use_search:
             # First, try to extract structured filters from the query.
-            await send({"type": "status", "text": "Filtering your search..."})
+            await send(
+                "Filtering your search...\n\n"
+            )
             pinecone_filter: Dict[str, Any] = {}
             try:
                 pinecone_filter = await self._build_pinecone_filter(
@@ -460,32 +415,22 @@ class SearchAgent:
                 )
                 if pinecone_filter:
                     await send(
-                        {
-                            "type": "status",
-                            "text": "Applying requested filters to narrow the search.",
-                        }
+                        "Applying requested filters to narrow the search.\n\n"
                     )
                 else:
                     await send(
-                        {
-                            "type": "status",
-                            "text": "No specific filters detected; searching across all of your visible memories.",
-                        }
+                        "No specific filters detected; searching across all of your visible memories.\n\n"
                     )
             except Exception as e:
                 logger.error(
-                    "Error deriving filters from query",
-                    {"phase": "filters", "error": str(e)},
+                    "Error deriving filters from query: %s", e, exc_info=True
                 )
                 await send(
-                    {
-                        "type": "status",
-                        "text": "I couldn't interpret filters from your query, so I'll search broadly.",
-                    }
+                    "I couldn't interpret filters from your query, so I'll search broadly.\n\n"
                 )
                 pinecone_filter = {}
 
-            await send({"type": "status", "text": "Searching your memories..."})
+            await send("Searching your memories...\n\n")
             try:
                 results = await self._search_pinecone(
                     query=query,
@@ -493,25 +438,13 @@ class SearchAgent:
                     filters=pinecone_filter or None,
                     use_metadata=use_metadata,
                 )
-                response_message = (
-                    "Found something in your memories."
-                    if len(results) > 0
-                    else "No matching entries were found."
-                )
-                await send({"type": "status", "text": response_message})
+                response_message = f"Found something in your memories.\n\n" if len(results) > 0 else "No matching entries were found.\n\n"
+                await send(response_message)
             except Exception as e:
-                logger.error(
-                    "Error searching Pinecone",
-                    {"phase": "search", "error": str(e)},
-                )
-                await send(
-                    {
-                        "type": "status",
-                        "text": "I ran into an issue searching your memories.",
-                    }
-                )
+                logger.error("Error searching Pinecone: %s", e, exc_info=True)
+                await send("I ran into an issue searching your memories.\n\n")
 
-        await send({"type": "status", "text": "Summarizing the results..."})
+        await send("Summarizing the results...\n\n")
         try:
             summary = await self._summarize_for_user(
                 user_id=user_id,
@@ -521,13 +454,10 @@ class SearchAgent:
                 send=send,
             )
         except Exception as e:
-            logger.error(
-                "Error generating summary with Gemini",
-                {"phase": "summary", "error": str(e)},
-            )
+            logger.error("Error generating summary with Gemini: %s", e, exc_info=True)
             summary = "I had trouble generating a detailed explanation, but the search has completed.\n\n"
 
-        await send({"type": "final", "text": summary})
+        #await send(summary)
 
         # Optionally stream raw structured results as JSON for the frontend.
         if results:
@@ -537,6 +467,6 @@ class SearchAgent:
                 for field in ["description", "shared_with", "shared_with_everyone", "is_private"]:
                     result_dict.pop(field, None)
                 filtered_results.append(result_dict)
-            await send({"type": "results", "entries": filtered_results})
+            await send(f"```json\n{json.dumps(filtered_results, indent=2)}\n```")
 
 

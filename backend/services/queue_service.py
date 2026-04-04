@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 import json
+import logging
 
 from services.supabase_client import get_supabase_client
-from utils.logging import Logger
 
-logger = Logger("QueueService")
+logger = logging.getLogger(__name__)
 
 
 class QueueService:
@@ -22,13 +22,7 @@ class QueueService:
         message: Dict[str, Any],
     ) -> Any:
         """Serialize and send a message to the requested queue."""
-        logger.debug(
-            "Sending message to queue",
-            {
-                "queue_name": queue_name,
-                "message_keys": list(message.keys()),
-            },
-        )
+        logger.debug("Sending message to queue=%s", queue_name)
         return (
             self.supabase
             .schema("pgmq_public")
@@ -75,26 +69,11 @@ class QueueService:
             )
             .execute()
         )
-        logger.debug(
-            "Read messages from queue",
-            {
-                "queue_name": queue_name,
-                "batch_size": batch_size,
-                "visibility_timeout_seconds": visibility_timeout_seconds,
-                "messages_found": len(response.data) if response and response.data else 0,
-            },
-        )
         return response.data if response.data else []
 
     def delete_message(self, *, queue_name: str, message_id: int) -> Any:
         """Delete a message from the requested queue."""
-        logger.debug(
-            "Deleting message from queue",
-            {
-                "queue_name": queue_name,
-                "message_id": message_id,
-            },
-        )
+        logger.debug("Deleting message from queue=%s msg_id=%s", queue_name, message_id)
         return (
             self.supabase
             .schema("pgmq_public")
