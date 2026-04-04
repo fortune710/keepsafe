@@ -25,10 +25,12 @@ app = FastAPI(
 # Initialize background schedulers
 scheduler_manager = SchedulerManager()
 
+allowed_hosts = ["*"] if settings.ENVIRONMENT == "development" else settings.ALLOWED_HOSTS
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=allowed_hosts,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

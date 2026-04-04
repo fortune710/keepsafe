@@ -6,6 +6,7 @@ import { Alert } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { CameraView } from 'expo-camera';
 import { MediaService } from '@/services/media-service';
+import { useCaptureContext } from '@/providers/capture-provider';
 
 interface UseCaptureResult {
   isCapturing: boolean;
@@ -20,7 +21,7 @@ interface UseCaptureResult {
 }
 
 export function useMediaCapture(): UseCaptureResult {
-  const [isCapturing, setIsCapturing] = useState(false);
+  const { isCapturing, setIsCapturing } = useCaptureContext();
   const [capturedMedia, setCapturedMedia] = useState<MediaCapture | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -40,7 +41,7 @@ export function useMediaCapture(): UseCaptureResult {
         console.warn("Error with camera or recorsing may not have started yet");
         return;
       }
-      
+
       // Start duration timer
       const timer = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
@@ -50,7 +51,7 @@ export function useMediaCapture(): UseCaptureResult {
         ...capture,
         duration: recordingDuration,
       }
-  
+
       return {
         data: newCapture,
         cleanup: () => clearInterval(timer),
@@ -85,7 +86,7 @@ export function useMediaCapture(): UseCaptureResult {
     setIsCapturing(true);
     setCapturedMedia(null);
     setRecordingDuration(0);
-    
+
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -117,17 +118,17 @@ export function useMediaCapture(): UseCaptureResult {
       });
 
       const { recording: newRecording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      
+
       setRecording(newRecording);
-      
+
       // Start duration timer
       const timer = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
-      
+
       // Store timer reference for cleanup
       (newRecording as any)._timer = timer;
-      
+
     } catch (error) {
       console.error('Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start audio recording');
@@ -137,7 +138,7 @@ export function useMediaCapture(): UseCaptureResult {
 
   const stopAudioRecording = useCallback(async (): Promise<MediaCapture | null> => {
     setIsCapturing(false);
-    
+
     if (!recording) return null;
 
     try {
@@ -145,13 +146,13 @@ export function useMediaCapture(): UseCaptureResult {
       if ((recording as any)._timer) {
         clearInterval((recording as any)._timer);
       }
-      
+
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
       });
       const uri = recording.getURI();
-      
+
       if (!uri) {
         throw new Error('No recording URI available');
       }
@@ -163,16 +164,16 @@ export function useMediaCapture(): UseCaptureResult {
         duration: recordingDuration,
         timestamp: new Date(),
       };
-      
+
       setCapturedMedia(audioCapture);
       setRecording(null);
       setRecordingDuration(0);
-      
+
       return audioCapture;
     } catch (error) {
       console.error('Failed to stop recording:', error);
       Alert.alert('Error', 'Failed to stop audio recording');
-      
+
       // Still try to reset audio mode even if stopping failed
       try {
         await Audio.setAudioModeAsync({
@@ -185,7 +186,7 @@ export function useMediaCapture(): UseCaptureResult {
       } catch (modeError) {
         console.error('Failed to reset audio mode:', modeError);
       }
-      
+
       setRecording(null);
       setRecordingDuration(0);
       return null;
@@ -223,7 +224,7 @@ export function useMediaCapture(): UseCaptureResult {
 
       const asset = result.assets[0];
       const timestamp = new Date();
-      
+
       // Determine the capture type based on the selected asset
       let captureType: MediaType;
       if (asset.type === 'image') {
@@ -254,7 +255,7 @@ export function useMediaCapture(): UseCaptureResult {
       return null;
     }
   }, [generateId]);
-    
+
 
   const clearCapture = useCallback(async () => {
     setCapturedMedia(null);
@@ -267,7 +268,7 @@ export function useMediaCapture(): UseCaptureResult {
           clearInterval((recording as any)._timer);
         }
         await recording.stopAndUnloadAsync();
-        
+
         // Reset audio mode back to normal playback mode
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
