@@ -91,7 +91,7 @@ redis
 requests
 requests-toolbelt
 rsa
-sendgrid
+sendgrid>=6.9.0
 six
 sniffio
 starlette
