@@ -15,6 +15,30 @@ interface VideoCaptureParams {
     updateCameraReady: (ready: boolean) => void;
 }
 
+/**
+ * A custom hook to manage the complex video recording lifecycle using `expo-camera`.
+ * 
+ * This hook handles microphone permissions, camera mode transitions (switching between 
+ * photo and video), recording state management, and navigation to the capture details 
+ * screen once recording is finalized.
+ * 
+ * @param params - The input parameters for the video capture logic.
+ * @param params.cameraRef - A reference to the underlying `CameraView` component.
+ * @param params.isCameraReady - Indicates if the camera component is currently finished loading.
+ * @param params.cameraMode - The current operational mode ('picture' or 'video').
+ * @param params.captureMode - The selected capture interface ('camera' or 'microphone').
+ * @param params.updateCameraMode - Callback to update the parent component's camera mode state.
+ * @param params.updateCameraReady - Callback to manually toggle the camera's readiness state.
+ * @returns An extensive object containing functions (`startVideo`, `stopVideo`, `onCameraReady`) 
+ * and state variables (`isVideoRecording`, `videoDuration`, etc.) to control the video UI.
+ * 
+ * @sideeffects
+ * - Requests microphone permissions if not already granted.
+ * - Automatically updates `cameraMode` to 'video' before initiating a recording.
+ * - Sets a `setInterval` for the recording timer and clears it on completion or unmount.
+ * - Triggers a navigation push to `/capture/details` after a successful capture.
+ * - Forces a camera remount (via `cameraInstance`) if a fatal recording error occurs.
+ */
 export function useVideoCapture({
     cameraRef,
     isCameraReady,
