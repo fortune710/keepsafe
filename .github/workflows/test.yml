@@ -28,7 +28,7 @@ jobs:
 
     - name: Install dependencies
       working-directory: ./backend
-      run: uv pip install -r requirements.txt
+      run: uv pip install --system -r requirements.txt
     
     - name: Run tests
       working-directory: ./backend
@@ -47,5 +47,5 @@ jobs:
         NOTIFICATION_BATCH_SIZE: 100
         NOTIFICATION_DLQ_LIMIT: 3
         REDIS_CACHE_TTL: 3600
-      run: uv run pytest tests/ -v --tb=short
+      run: uv run --system pytest tests/ -v --tb=short
 
