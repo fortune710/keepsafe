@@ -29,6 +29,16 @@ def _get_int_env(key: str, default: int) -> int:
 
 
 class Settings:
+    @staticmethod
+    def get_list_env(value: Optional[str]) -> list[str]:
+        """
+        Parse a comma-separated string into a clean list of strings.
+        Splits by comma, strips whitespace, and filters out empty strings.
+        """
+        if not value:
+            return []
+        return [item.strip() for item in value.split(",") if item.strip()]
+
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
@@ -49,14 +59,6 @@ class Settings:
     POSTHOG_API_KEY: str = os.getenv("POSTHOG_API_KEY", "")
     POSTHOG_HOST: str = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
     
-    # Notification Service
-    NOTIFICATION_QUEUE_NAME: str = os.getenv("NOTIFICATION_QUEUE_NAME", "notifications_q")
-    NOTIFICATION_DLQ_NAME: str = os.getenv("NOTIFICATION_DLQ_NAME", "notifications_dlq")
-    NOTIFICATION_CONCURRENCY: int = _get_int_env("NOTIFICATION_CONCURRENCY", 20)
-    NOTIFICATION_BATCH_SIZE: int = _get_int_env("NOTIFICATION_BATCH_SIZE", 100)
-    NOTIFICATION_DLQ_LIMIT: int = int(os.getenv("NOTIFICATION_DLQ_LIMIT", "3"))
-    NOTIFICATION_INTERVAL_MINUTES: int = _get_int_env("NOTIFICATION_INTERVAL_MINUTES", 5)
-    
     # Redis
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     REDIS_PASSWORD: Optional[str] = os.getenv("REDIS_PASSWORD")
@@ -76,6 +78,8 @@ class Settings:
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "")
 
+    # Frontend
+    ALLOWED_HOSTS: list[str] = get_list_env(os.getenv("ALLOWED_HOSTS", ""))
 
     def validate_entry_report_email_config(self) -> None:
         """Fail fast when required SendGrid settings for entry report emails are missing."""

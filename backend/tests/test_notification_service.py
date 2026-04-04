@@ -12,6 +12,7 @@ if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
 from services.notification_service import NotificationService
+from queue_constants import NOTIFICATION_QUEUE_NAME, NOTIFICATION_DLQ_NAME, NOTIFICATION_DEAD_QUEUE_NAME
 
 
 def mock_httpx_success_response():
@@ -83,11 +84,6 @@ def notification_service(monkeypatch, mock_supabase_client):
     
     # Set minimal config
     with patch("services.notification_service.settings") as mock_settings:
-        mock_settings.NOTIFICATION_QUEUE_NAME = "test_queue"
-        mock_settings.NOTIFICATION_DLQ_NAME = "test_dlq"
-        mock_settings.NOTIFICATION_CONCURRENCY = 20
-        mock_settings.NOTIFICATION_BATCH_SIZE = 100
-        mock_settings.NOTIFICATION_DLQ_LIMIT = 3
         mock_settings.POSTHOG_API_KEY = "test_key"
         mock_settings.POSTHOG_HOST = "https://test.posthog.com"
         
@@ -131,7 +127,7 @@ async def test_enqueue_notification_success(notification_service, mock_supabase_
     assert call_args[0][0] == "send"
     # Second positional argument is the params dict
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
-    assert params.get("queue_name") == "test_queue"
+    assert params.get("queue_name") == NOTIFICATION_QUEUE_NAME
     import json
     msg_data = json.loads(params.get("message", "{}"))
     assert msg_data["title"] == title
@@ -192,6 +188,22 @@ async def test_enqueue_notification_invalid_priority(notification_service, mock_
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
     msg_data = json.loads(params.get("message", "{}"))
     assert msg_data["priority"] == "default"
+
+
+@pytest.mark.asyncio
+async def test_enqueue_notification_invalid_queue_response_returns_false(notification_service, mock_supabase_client):
+    """enqueue_notification should fail when queue send returns an invalid response."""
+    mock_response = MagicMock()
+    mock_response.data = None
+    mock_supabase_client.schema.return_value.rpc.return_value.execute.return_value = mock_response
+
+    result = notification_service.enqueue_notification(
+        title="Test",
+        body="Test Body",
+        recipients=["token"],
+    )
+
+    assert result is False
 
 
 @pytest.mark.asyncio
@@ -320,7 +332,7 @@ async def test_handle_failure_move_to_dlq(notification_service, mock_supabase_cl
         "priority": "default",
         "failure_count": 1
     }
-    stats = {"failed": 0, "moved_to_dlq": 0, "discarded": 0}
+    stats = {"failed": 0, "moved_to_dlq": 0, "moved_to_dead": 0}
     
     # Mock delete and send to DLQ using schema().rpc() pattern
     mock_schema = mock_supabase_client.schema.return_value
@@ -332,6 +344,7 @@ async def test_handle_failure_move_to_dlq(notification_service, mock_supabase_cl
         msg_id=msg_id,
         message_data=message_data,
         failure_count=1,
+        source_queue_name=notification_service.queue_name,
         stats=stats
     )
     
@@ -343,8 +356,8 @@ async def test_handle_failure_move_to_dlq(notification_service, mock_supabase_cl
 
 
 @pytest.mark.asyncio
-async def test_handle_failure_discard_exceeded_limit(notification_service, mock_supabase_client):
-    """_handle_failure should discard message when DLQ limit exceeded."""
+async def test_handle_failure_moves_to_dead_queue(notification_service, mock_supabase_client):
+    """_handle_failure should move message to dead queue when DLQ limit exceeded."""
     # Arrange
     msg_id = 123
     message_data = {
@@ -354,7 +367,7 @@ async def test_handle_failure_discard_exceeded_limit(notification_service, mock_
         "priority": "default",
         "failure_count": 3
     }
-    stats = {"failed": 0, "moved_to_dlq": 0, "discarded": 0}
+    stats = {"failed": 0, "moved_to_dlq": 0, "moved_to_dead": 0}
     
     # Mock delete using schema().rpc() pattern
     mock_schema = mock_supabase_client.schema.return_value
@@ -366,13 +379,20 @@ async def test_handle_failure_discard_exceeded_limit(notification_service, mock_
         msg_id=msg_id,
         message_data=message_data,
         failure_count=3,  # Already at limit
+        source_queue_name=notification_service.queue_name,
         stats=stats
     )
     
     # Assert
-    assert stats["discarded"] == 1
+    assert stats["moved_to_dead"] == 1
     assert stats["failed"] == 1
     assert stats["moved_to_dlq"] == 0
+    send_calls = [
+        call for call in mock_schema.rpc.call_args_list
+        if len(call[0]) > 0 and call[0][0] == "send"
+    ]
+    assert any(call[0][1].get("queue_name") == NOTIFICATION_DEAD_QUEUE_NAME for call in send_calls)
+    assert stats["moved_to_dead"] == 1
 
 
 @pytest.mark.asyncio
@@ -501,5 +521,5 @@ async def test_delete_message(notification_service, mock_supabase_client):
     call_args = mock_schema.rpc.call_args
     assert call_args[0][0] == "delete"
     params = call_args[0][1] if len(call_args[0]) > 1 else {}
-    assert params.get("queue_name") == "test_queue"
+    assert params.get("queue_name") == NOTIFICATION_QUEUE_NAME
     assert params.get("message_id") == msg_id

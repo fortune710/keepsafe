@@ -5,7 +5,7 @@ from routers import search
 from routers import user
 from routers import phone_number
 from config import settings
-from services.notification_scheduler import NotificationScheduler
+from schedulers.scheduler_manager import SchedulerManager
 import logging
 
 # Configure logging
@@ -22,13 +22,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Initialize notification scheduler
-notification_scheduler = NotificationScheduler()
+# Initialize background schedulers
+scheduler_manager = SchedulerManager()
+
+allowed_hosts = ["*"] if settings.ENVIRONMENT == "development" else settings.ALLOWED_HOSTS
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=allowed_hosts,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,12 +71,12 @@ async def startup_event():
     """
     Start application background tasks during startup.
     
-    Initiates the module-level NotificationScheduler to run background notification jobs. Any exceptions raised while starting the scheduler are logged and not propagated.
+    Initiates the configured scheduler manager to run background queue-processing jobs.
     """
     logger.info("Starting up application...")
     try:
         settings.validate_entry_report_email_config()
-        notification_scheduler.start()
+        scheduler_manager.start()
         logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}", exc_info=True)
@@ -85,7 +87,7 @@ async def shutdown_event():
     """Stop background tasks on application shutdown."""
     logger.info("Shutting down application...")
     try:
-        notification_scheduler.stop()
+        scheduler_manager.stop()
         logger.info("Application shutdown complete")
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}", exc_info=True)
