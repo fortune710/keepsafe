@@ -28,7 +28,6 @@ google-auth==2.49.1
 google-auth-httplib2==0.2.1
 google-genai==1.70.0
 googleapis-common-protos==1.72.0
-gotrue==2.28.3
 grpcio==1.76.0
 grpcio-status==1.71.2
 h11==0.16.0
@@ -65,7 +64,6 @@ pinecone-client==5.0.1
 pinecone-plugin-inference==1.1.0
 pinecone-plugin-interface==0.0.7
 pluggy==1.6.0
-postgrest==0.17.2
 posthog==3.4.0
 propcache==0.4.1
 proto-plus==1.26.1
@@ -86,7 +84,6 @@ python-http-client==3.3.7
 python-multipart==0.0.22
 pytz==2025.2
 PyYAML==6.0.3
-realtime==2.28.3
 redis
 requests
 requests-toolbelt
@@ -95,8 +92,7 @@ sendgrid>=6.9.0
 six
 sniffio
 starlette
-supabase==2.28.3
-supafunc==2.28.3
+supabase
 tenacity==9.1.4
 tqdm==4.67.1
 twilio==9.10.1
