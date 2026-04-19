@@ -7,16 +7,31 @@ class EntryController(BaseController):
     def __init__(self, supabase: Client):
         super().__init__(supabase, DatabaseTables.ENTRIES)
 
-    def fetch_user_entries_in_range(self, user_id: str, start_utc_iso: str, end_utc_iso: str):
+    def fetch_user_entries_by_month(
+        self, 
+        user_id: str, 
+        start_utc_iso: str, 
+        end_utc_iso: str, 
+        entry_type: Optional[str] = None,
+        limit: int = 10,
+        offset: int = 0
+    ):
         """
-        Fetch all entries for a specific user within a date range.
+        Fetch entries for a user in a specific month with optional type filtering and pagination.
         """
-        return (
+        query = (
             self.supabase.table(self.table_name.value)
-            .select("*")
+            .select("*", count="exact")
             .eq("user_id", user_id)
             .gte("created_at", start_utc_iso)
             .lt("created_at", end_utc_iso)
-            .order("created_at")
+        )
+        
+        if entry_type:
+            query = query.eq("type", entry_type)
+            
+        return (
+            query.order("created_at", descending=True)
+            .range(offset, offset + limit - 1)
             .execute()
         )

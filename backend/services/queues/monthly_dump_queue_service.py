@@ -196,45 +196,64 @@ class MonthlyDumpQueueService:
     ) -> None:
         new_failure_count = failure_count + 1
         msg_data["failure_count"] = new_failure_count
-
         monthly_dump_id = msg_data.get("monthly_dump_id")
+        
+        # Determine target queue and desired status
         if new_failure_count <= self.dlq_limit:
-            response = self.queue_service.send_message(
-                queue_name=self.dlq_name,
-                message=msg_data,
-            )
-            if self.queue_service.is_enqueue_response_valid(response):
-                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
-                stats["moved_to_dlq"] += 1
-                if monthly_dump_id:
-                    self.dump_controller.update_status(
-                        monthly_dump_id,
-                        "pending",
-                        {
-                            "error": msg_data.get("last_error"),
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                    )
-            else:
-                stats["failed"] += 1
+            target_queue = self.dlq_name
+            target_stat = "moved_to_dlq"
+            target_status = "pending"
         else:
+            target_queue = self.dead_queue_name
+            target_stat = "moved_to_dead"
+            target_status = "failed"
+
+        # Bounded retry for enqueuing to DLQ/Dead queue
+        max_retries = 3
+        enqueue_success = False
+        for attempt in range(max_retries):
             response = self.queue_service.send_message(
-                queue_name=self.dead_queue_name,
+                queue_name=target_queue,
                 message=msg_data,
             )
             if self.queue_service.is_enqueue_response_valid(response):
-                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
-                stats["moved_to_dead"] += 1
-                if monthly_dump_id:
-                    self.dump_controller.update_status(
-                        monthly_dump_id,
-                        "failed",
-                        {
-                            "error": msg_data.get("last_error"),
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                    )
-            else:
-                stats["failed"] += 1
+                enqueue_success = True
+                break
+            
+            logger.warning(
+                f"Failed to enqueue to {target_queue} (attempt {attempt + 1}/{max_retries})",
+                {"msg_id": msg_id, "monthly_dump_id": monthly_dump_id}
+            )
+
+        if enqueue_success:
+            # Successfully moved to DLQ/Dead
+            self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+            stats[target_stat] += 1
+            if monthly_dump_id:
+                self.dump_controller.update_status(
+                    monthly_dump_id,
+                    target_status,
+                    {
+                        "error": msg_data.get("last_error"),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+        else:
+            # Final failure: remove from main queue to prevent infinite loop
+            logger.error(
+                f"CRITICAL: Failed to move message to {target_queue} after {max_retries} attempts. Deleting from main queue.",
+                {"msg_id": msg_id, "monthly_dump_id": monthly_dump_id}
+            )
+            self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+            stats["failed"] += 1
+            if monthly_dump_id:
+                self.dump_controller.update_status(
+                    monthly_dump_id,
+                    "failed",
+                    {
+                        "error": f"Queue move failed: {msg_data.get('last_error')}",
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
 
 

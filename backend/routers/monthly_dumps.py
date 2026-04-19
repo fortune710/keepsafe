@@ -40,7 +40,10 @@ async def create_monthly_dump(
     
     # Auth check: Ensure user is creating for themselves
     if current_user.user.id != user_id:
-        logger.warning(f"Unauthorized dump creation: {current_user.user.id} tried for {user_id}")
+        logger.warning(
+            "Unauthorized dump creation attempt",
+            extra={"actor_user_id": current_user.user.id, "target_user_id": user_id}
+        )
         raise HTTPException(status_code=403, detail="Not authorized to create dump for this user")
 
     month = normalize_month(payload.month)
@@ -49,8 +52,8 @@ async def create_monthly_dump(
     force = bool(payload.force)
     
     logger.info(
-        "Monthly dump request received (new router)",
-        {"user_id": user_id, "month": month, "timezone": timezone_name, "force": force},
+        "Monthly dump request received",
+        extra={"user_id": user_id, "month": month, "timezone": timezone_name, "force": force},
     )
 
     supabase = get_supabase_client()
@@ -61,7 +64,6 @@ async def create_monthly_dump(
     existing_response = controller.get_dump(user_id, month_date, timezone_name)
     existing = existing_response.data if existing_response else None
 
-    dump_service = MonthlyDumpService(supabase)
     queue_service = MonthlyDumpQueueService()
 
     if existing and existing.get("status") == "completed" and not force:

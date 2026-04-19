@@ -16,7 +16,6 @@ class MonthlyDumpController(BaseController):
         return self.get(filters=filters, maybe_single=True)
 
     def update_status(self, dump_id: str, status: str, data: Optional[Dict[str, Any]] = None):
-        update_data = {"status": status}
-        if data:
-            update_data.update(data)
+        update_data = data.copy() if data else {}
+        update_data["status"] = status
         return self.update({"id": dump_id}, update_data)
