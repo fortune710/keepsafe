@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from services.supabase_client import get_supabase_client
 from services.monthly_dump_service import MonthlyDumpService
 from services.queues.monthly_dump_queue_service import MonthlyDumpQueueService
+from services.storage_service import StorageService
 from utils.auth import get_current_user
 from utils.rate_limit import rate_limit
 from utils.dumps.dump_utils import normalize_month, month_to_date, hydrate_monthly_dump_slides
@@ -44,6 +45,7 @@ async def create_monthly_dump(
 
     month = normalize_month(payload.month)
     timezone_name = payload.timezone or "UTC"
+    bucket_name = "monthly_dumps"
     force = bool(payload.force)
     
     logger.info(
@@ -53,16 +55,17 @@ async def create_monthly_dump(
 
     supabase = get_supabase_client()
     controller = MonthlyDumpController(supabase)
+    storage_service = StorageService(supabase, bucket_name)
     month_date = month_to_date(month)
 
     existing_response = controller.get_dump(user_id, month_date, timezone_name)
     existing = existing_response.data if existing_response else None
 
-    dump_service = MonthlyDumpService()
+    dump_service = MonthlyDumpService(supabase)
     queue_service = MonthlyDumpQueueService()
 
     if existing and existing.get("status") == "completed" and not force:
-        slides = hydrate_monthly_dump_slides(dump_service, existing.get("slides") or [])
+        slides = hydrate_monthly_dump_slides(storage_service, existing.get("slides") or [])
         return {"status": "completed", "slides": slides}
 
     if existing and existing.get("status") in {"pending", "processing"} and not force:
@@ -123,13 +126,13 @@ async def get_monthly_dump(
 
     supabase = get_supabase_client()
     controller = MonthlyDumpController(supabase)
+    storage_service = StorageService(supabase, "monthly_dumps")
     response = controller.get_dump(user_id, month_date, timezone)
 
     if not response or not response.data:
         raise HTTPException(status_code=404, detail="Monthly dump not found")
 
     dump = response.data
-    dump_service = MonthlyDumpService()
-    slides = hydrate_monthly_dump_slides(dump_service, dump.get("slides") or [])
+    slides = hydrate_monthly_dump_slides(storage_service, dump.get("slides") or [])
 
     return {"status": dump.get("status"), "slides": slides}

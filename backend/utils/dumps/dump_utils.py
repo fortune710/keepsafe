@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 from fastapi import HTTPException
-from services.monthly_dump_service import MonthlyDumpService
+from services.storage_service import StorageService
 
 def normalize_month(month: str) -> str:
     """Return YYYY-MM string or raise HTTPException."""
@@ -21,13 +21,13 @@ def month_to_date(month: str) -> str:
     return f"{month}-01"
 
 def hydrate_monthly_dump_slides(
-    dump_service: MonthlyDumpService,
+    storage_service: StorageService,
     slides: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     hydrated: List[Dict[str, Any]] = []
     for slide in slides:
         if slide.get("type") == "image" and slide.get("storage_path"):
-            signed_url = dump_service.get_signed_url(slide["storage_path"])
+            signed_url = storage_service.get_signed_url(slide["storage_path"])
             hydrated.append({**slide, "url": signed_url})
         else:
             hydrated.append(slide)
