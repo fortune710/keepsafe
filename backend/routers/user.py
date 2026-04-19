@@ -17,8 +17,7 @@ from pydantic import BaseModel
 from config import settings
 from services.pinecone_client import get_pinecone_index
 from services.supabase_client import get_supabase_client
-from services.monthly_dump_service import MonthlyDumpService
-from services.queues.monthly_dump_queue_service import MonthlyDumpQueueService
+from services.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 
 
@@ -46,10 +45,7 @@ export_jobs: Dict[str, ExportJobState] = {}
 export_jobs_lock = threading.Lock()
 
 
-class MonthlyDumpRequest(BaseModel):
-    month: str
-    timezone: Optional[str] = None
-    force: Optional[bool] = False
+
 
 
 def _normalize_month(month: str) -> str:
@@ -588,168 +584,8 @@ async def download_user_export(
     return response
 
 
-@router.post("/{user_id}/monthly-dumps", status_code=status.HTTP_202_ACCEPTED)
-async def create_monthly_dump(
-    user_id: str,
-    payload: MonthlyDumpRequest,
-    current_user=Depends(get_current_user),
-):
-    if current_user.user.id != user_id:
-        logger.warning(
-            "Unauthorized monthly dump attempt. User %s tried to create dump for %s",
-            current_user.user.id,
-            user_id,
-        )
-        raise HTTPException(status_code=403, detail="Not authorized to create this dump")
+# --- Monthly Dumps moved to dedicated router (routers/monthly_dumps.py) ---
 
-    month = _normalize_month(payload.month)
-    timezone_name = payload.timezone or "UTC"
-    force = bool(payload.force)
-    logger.info(
-        "Monthly dump request received",
-        {"user_id": user_id, "month": month, "timezone": timezone_name, "force": force},
-    )
-
-    supabase = get_supabase_client()
-    month_date = _month_to_date(month)
-
-    existing_response = (
-        supabase.table("monthly_dumps")
-        .select("*")
-        .eq("user_id", user_id)
-        .eq("month", month_date)
-        .eq("timezone", timezone_name)
-        .maybe_single()
-        .execute()
-    )
-    existing = existing_response.data if existing_response else None
-
-    dump_service = MonthlyDumpService()
-    queue_service = MonthlyDumpQueueService()
-
-    if existing and existing.get("status") == "completed" and not force:
-        slides = _hydrate_monthly_dump_slides(dump_service, existing.get("slides") or [])
-        logger.info(
-            "Returning cached monthly dump",
-            {"user_id": user_id, "month": month, "timezone": timezone_name},
-        )
-        return {"status": "completed", "monthly_dump": {**existing, "slides": slides}}
-
-    if existing and existing.get("status") in {"pending", "processing"} and not force:
-        logger.info(
-            "Monthly dump already in progress",
-            {"user_id": user_id, "month": month, "timezone": timezone_name, "status": existing.get("status")},
-        )
-        return {"status": existing.get("status"), "monthly_dump": existing}
-
-    if existing:
-        monthly_dump_id = existing.get("id")
-        supabase.table("monthly_dumps").update(
-            {
-                "status": "pending",
-                "slides": [],
-                "photo_count": 0,
-                "video_count": 0,
-                "audio_count": 0,
-                "grid_count": 0,
-                "error": None,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "completed_at": None,
-            }
-        ).eq("id", monthly_dump_id).execute()
-    else:
-        monthly_dump_id = str(uuid.uuid4())
-        supabase.table("monthly_dumps").insert(
-            {
-                "id": monthly_dump_id,
-                "user_id": user_id,
-                "month": month_date,
-                "timezone": timezone_name,
-                "status": "pending",
-                "slides": [],
-                "photo_count": 0,
-                "video_count": 0,
-                "audio_count": 0,
-                "grid_count": 0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ).execute()
-
-    enqueued = queue_service.enqueue_dump(monthly_dump_id, user_id, month, timezone_name)
-    if not enqueued:
-        supabase.table("monthly_dumps").update(
-            {
-                "status": "failed",
-                "error": "Failed to enqueue monthly dump job",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ).eq("id", monthly_dump_id).execute()
-        raise HTTPException(status_code=500, detail="Failed to enqueue monthly dump job")
-
-    logger.info(
-        "Monthly dump queued",
-        {"user_id": user_id, "month": month, "timezone": timezone_name, "monthly_dump_id": monthly_dump_id},
-    )
-    return {"status": "pending", "monthly_dump_id": monthly_dump_id}
-
-
-@router.get("/{user_id}/monthly-dumps/{month}")
-async def get_monthly_dump(
-    user_id: str,
-    month: str,
-    timezone_name: Optional[str] = None,
-    current_user=Depends(get_current_user),
-):
-    if current_user.user.id != user_id:
-        logger.warning(
-            "Unauthorized monthly dump fetch. User %s tried to fetch dump for %s",
-            current_user.user.id,
-            user_id,
-        )
-        raise HTTPException(status_code=403, detail="Not authorized to fetch this dump")
-
-    month = _normalize_month(month)
-    timezone_name = timezone_name or "UTC"
-    logger.info(
-        "Monthly dump fetch requested",
-        {"user_id": user_id, "month": month, "timezone": timezone_name},
-    )
-    month_date = _month_to_date(month)
-
-    supabase = get_supabase_client()
-    response = (
-        supabase.table("monthly_dumps")
-        .select("*")
-        .eq("user_id", user_id)
-        .eq("month", month_date)
-        .eq("timezone", timezone_name)
-        .maybe_single()
-        .execute()
-    )
-
-    if not response or not response.data:
-        raise HTTPException(status_code=404, detail="Monthly dump not found")
-
-    dump = response.data
-    dump_service = MonthlyDumpService()
-    slides = _hydrate_monthly_dump_slides(dump_service, dump.get("slides") or [])
-
-    return {"status": dump.get("status"), "monthly_dump": {**dump, "slides": slides}}
-
-
-def _hydrate_monthly_dump_slides(
-    dump_service: MonthlyDumpService,
-    slides: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
-    hydrated: List[Dict[str, Any]] = []
-    for slide in slides:
-        if slide.get("type") == "image" and slide.get("storage_path"):
-            signed_url = dump_service.get_signed_url(slide["storage_path"])
-            hydrated.append({**slide, "url": signed_url})
-        else:
-            hydrated.append(slide)
-    return hydrated
 
 
 @router.get("/{user_id}/export")
