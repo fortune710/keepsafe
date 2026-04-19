@@ -23,7 +23,7 @@ logger_provider.add_log_record_processor(
     BatchLogRecordProcessor(otlp_exporter)
 )
 
-handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
+handler = LoggingHandler(level=logging.DEBUG, logger_provider=logger_provider)
 logging.getLogger().addHandler(handler)
 
 
