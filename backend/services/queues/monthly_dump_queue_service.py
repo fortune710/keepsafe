@@ -237,4 +237,4 @@ class MonthlyDumpQueueService:
             else:
                 stats["failed"] += 1
 
-        stats["failed"] += 1
+
