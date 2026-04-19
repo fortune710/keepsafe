@@ -15,12 +15,21 @@ def rate_limit(requests_per_minute: int = 60, context: str = "default"):
     def decorator(func: Callable):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
-            # Find the request object in kwargs
+            # Find the request object in args or kwargs
             request: Optional[Request] = None
-            for arg in kwargs.values():
+            
+            # Check positional args
+            for arg in args:
                 if isinstance(arg, Request):
                     request = arg
                     break
+            
+            # Check keyword args if not found in positional
+            if not request:
+                for arg in kwargs.values():
+                    if isinstance(arg, Request):
+                        request = arg
+                        break
             
             if not request:
                 # If no request object found, skip rate limiting
