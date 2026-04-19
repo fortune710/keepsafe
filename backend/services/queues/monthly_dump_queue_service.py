@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from services.queue_service import QueueService
 from services.supabase_client import get_supabase_client
 from services.monthly_dump_service import MonthlyDumpService, MonthlyDumpInputs
+from controllers.monthly_dump_controller import MonthlyDumpController
+from database.tables import DatabaseTables
 from queue_constants import (
     MONTHLY_DUMP_QUEUE_NAME,
     MONTHLY_DUMP_DLQ_NAME,
@@ -32,7 +34,8 @@ class MonthlyDumpQueueService:
         self.dead_queue_name = MONTHLY_DUMP_DEAD_QUEUE_NAME
         self.batch_size = MONTHLY_DUMP_BATCH_SIZE
         self.dlq_limit = MONTHLY_DUMP_DLQ_LIMIT
-        self.dump_service = MonthlyDumpService()
+        self.dump_service = MonthlyDumpService(self.supabase)
+        self.dump_controller = MonthlyDumpController(self.supabase)
 
         logger.info(
             "MonthlyDumpQueueService initialized",
@@ -136,13 +139,14 @@ class MonthlyDumpQueueService:
             if seed is None:
                 seed = random.randint(1, 2_000_000_000)
 
-            self.supabase.table("monthly_dumps").update(
+            self.dump_controller.update_status(
+                monthly_dump_id, 
+                "processing", 
                 {
-                    "status": "processing",
                     "random_seed": seed,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
-            ).eq("id", monthly_dump_id).execute()
+            )
 
             result = self.dump_service.build_monthly_dump(
                 MonthlyDumpInputs(
@@ -153,9 +157,10 @@ class MonthlyDumpQueueService:
                 )
             )
 
-            self.supabase.table("monthly_dumps").update(
+            self.dump_controller.update_status(
+                monthly_dump_id,
+                "completed",
                 {
-                    "status": "completed",
                     "slides": result.slides,
                     "photo_count": result.photo_count,
                     "video_count": result.video_count,
@@ -165,7 +170,7 @@ class MonthlyDumpQueueService:
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                     "error": None,
                 }
-            ).eq("id", monthly_dump_id).execute()
+            )
 
             self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
             stats["succeeded"] += 1
@@ -202,13 +207,14 @@ class MonthlyDumpQueueService:
                 self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
                 stats["moved_to_dlq"] += 1
                 if monthly_dump_id:
-                    self.supabase.table("monthly_dumps").update(
+                    self.dump_controller.update_status(
+                        monthly_dump_id,
+                        "pending",
                         {
-                            "status": "pending",
                             "error": msg_data.get("last_error"),
                             "updated_at": datetime.now(timezone.utc).isoformat(),
                         }
-                    ).eq("id", monthly_dump_id).execute()
+                    )
             else:
                 stats["failed"] += 1
         else:
@@ -220,13 +226,14 @@ class MonthlyDumpQueueService:
                 self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
                 stats["moved_to_dead"] += 1
                 if monthly_dump_id:
-                    self.supabase.table("monthly_dumps").update(
+                    self.dump_controller.update_status(
+                        monthly_dump_id,
+                        "failed",
                         {
-                            "status": "failed",
                             "error": msg_data.get("last_error"),
                             "updated_at": datetime.now(timezone.utc).isoformat(),
                         }
-                    ).eq("id", monthly_dump_id).execute()
+                    )
             else:
                 stats["failed"] += 1
 

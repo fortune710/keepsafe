@@ -10,8 +10,10 @@ import requests
 import pytz
 from dateutil.relativedelta import relativedelta
 from PIL import Image
+from supabase import Client
 
 from services.supabase_client import get_supabase_client
+from controllers.entry_controller import EntryController
 from utils.logging import Logger
 
 logger = Logger("MonthlyDumpService")
@@ -44,8 +46,9 @@ class MonthlyDumpService:
     GRID_ROWS = 3
     IMAGE_DURATION_SECONDS = 5
 
-    def __init__(self) -> None:
-        self.supabase = get_supabase_client()
+    def __init__(self, supabase: Optional[Client] = None) -> None:
+        self.supabase = supabase or get_supabase_client()
+        self.entry_controller = EntryController(self.supabase)
 
     def get_month_bounds(self, month: str, tz_name: str) -> Tuple[datetime, datetime]:
         """Return UTC start/end datetimes for the given month in the provided timezone."""
@@ -70,16 +73,15 @@ class MonthlyDumpService:
         start_utc: datetime,
         end_utc: datetime,
     ) -> List[Dict[str, Any]]:
-        response = (
-            self.supabase.table("entries")
-            .select("id,type,content_url,created_at,metadata,is_private")
-            .eq("user_id", user_id)
-            .eq("is_private", False)
-            .gte("created_at", start_utc.isoformat())
-            .lt("created_at", end_utc.isoformat())
-            .execute()
+        # Use EntryController to fetch entries
+        response = self.entry_controller.fetch_user_entries_in_range(
+            user_id=user_id,
+            start_utc_iso=start_utc.isoformat(),
+            end_utc_iso=end_utc.isoformat()
         )
-        return response.data or []
+        # Apply the is_private=False filter as per existing logic
+        entries = response.data or []
+        return [e for e in entries if not e.get("is_private", False)]
 
     def build_monthly_dump(self, inputs: MonthlyDumpInputs) -> MonthlyDumpResult:
         start_utc, end_utc = self.get_month_bounds(inputs.month, inputs.timezone)
