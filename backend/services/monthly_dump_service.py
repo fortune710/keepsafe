@@ -252,7 +252,7 @@ class MonthlyDumpService:
         self.supabase.storage.from_(self.STORAGE_BUCKET).upload(
             storage_path,
             buffer.read(),
-            {"content-type": "image/jpeg", "upsert": True},
+            {"content-type": "image/jpeg", "upsert": "true"},
         )
         logger.info(
             "Uploaded monthly dump grid",
