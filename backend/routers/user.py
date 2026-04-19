@@ -8,13 +8,15 @@ from enum import Enum
 
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Optional, List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from config import settings
 from services.pinecone_client import get_pinecone_index
+from services.supabase_client import get_supabase_client
 from services.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 
@@ -41,6 +43,26 @@ MAX_PENDING_EXPORT_JOBS_PER_USER = 3
 ExportJobState = Dict[str, Any]
 export_jobs: Dict[str, ExportJobState] = {}
 export_jobs_lock = threading.Lock()
+
+
+
+
+
+def _normalize_month(month: str) -> str:
+    """Return YYYY-MM string or raise HTTPException."""
+    try:
+        year_str, month_str = month.split("-")
+        year = int(year_str)
+        month_num = int(month_str)
+        if month_num < 1 or month_num > 12:
+            raise ValueError("month out of range")
+        return f"{year:04d}-{month_num:02d}"
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="month must be in YYYY-MM format") from exc
+
+
+def _month_to_date(month: str) -> str:
+    return f"{month}-01"
 
 
 def _prune_export_jobs() -> None:
@@ -560,6 +582,10 @@ async def download_user_export(
 
     background_tasks.add_task(_cleanup_export_after_download, job_id, file_path)
     return response
+
+
+# --- Monthly Dumps moved to dedicated router (routers/monthly_dumps.py) ---
+
 
 
 @router.get("/{user_id}/export")
