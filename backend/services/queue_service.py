@@ -42,6 +42,36 @@ class QueueService:
             .execute()
         )
 
+    def send_message_batch(
+        self,
+        *,
+        queue_name: str,
+        messages: List[Dict[str, Any]],
+    ) -> Any:
+        """Serialize and send a batch of messages to the requested queue."""
+        logger.debug(
+            "Sending batch of messages to queue",
+            {
+                "queue_name": queue_name,
+                "message_count": len(messages),
+            },
+        )
+        # Assuming pgmq.send_batch expects an array of JSON objects or jsonb[]
+        # We can pass an array of serialized strings or array of dicts depending on RPC definition.
+        # usually pgmq extension expects a JSON array of messages.
+        return (
+            self.supabase
+            .schema("pgmq_public")
+            .rpc(
+                "send_batch",
+                {
+                    "queue_name": queue_name,
+                    "messages": [json.dumps(msg) for msg in messages],
+                },
+            )
+            .execute()
+        )
+
     @staticmethod
     def is_enqueue_response_valid(response: Any) -> bool:
         """Return whether a queue send response appears successful."""
