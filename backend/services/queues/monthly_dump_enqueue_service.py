@@ -1,8 +1,8 @@
 import uuid
 import calendar
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List
 import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
 from dateutil.relativedelta import relativedelta
 
@@ -11,7 +11,7 @@ from services.queue_service import QueueService
 from queue_constants import MONTHLY_DUMP_QUEUE_NAME, MONTHLY_DUMP_ENQUEUE_BATCH_SIZE
 from database.tables import DatabaseTables
 
-logger = logging.getLogger("MonthlyDumpEnqueueService")
+logger = logging.getLogger(__name__)
 
 
 class MonthlyDumpEnqueueService:
@@ -27,19 +27,22 @@ class MonthlyDumpEnqueueService:
     def enqueue_eligible_users(self) -> None:
         """Find eligible users and enqueue their monthly dumps."""
         now_utc = datetime.now(timezone.utc)
-        
+
         # Calculate the last day of the current month
         last_day_of_month = calendar.monthrange(now_utc.year, now_utc.month)[1]
-        
+
         # We only want to be active during the last 3 days of the month (e.g. 29, 30, 31 for a 31-day month).
         # Which means today's day must be >= last_day_of_month - 2
         active_threshold = last_day_of_month - 2
-        
+
         if now_utc.day < active_threshold:
             return  # Not in the active window, silently exit
-        
-        logger.info(f"Within monthly dump active window (Day {now_utc.day} >= {active_threshold}). Checking for eligible users.")
-        
+
+        logger.info(
+            "Within monthly dump active window, checking for eligible users",
+            extra={"day": now_utc.day, "active_threshold": active_threshold},
+        )
+
         # Find eligible users
         # Condition: monthly_dump_next_run IS NULL OR <= NOW()
         response = (
@@ -49,35 +52,35 @@ class MonthlyDumpEnqueueService:
             .limit(self.batch_size)
             .execute()
         )
-        
+
         users = response.data
         if not users:
-            logger.info("No eligible users found for monthly dump enqueueing.")
+            logger.info("No eligible users found for monthly dump enqueueing")
             return
-            
-        logger.info(f"Found {len(users)} eligible users. Preparing to enqueue.")
-        
+
+        logger.info("Eligible users found for monthly dump", extra={"user_count": len(users)})
+
         # Prepare dump data
         month_str = now_utc.strftime("%Y-%m")
         month_date = f"{month_str}-01"
         timezone_name = "UTC"
-        
+
         # Compute next run (3rd to the last day of next month)
         next_month_date = now_utc + relativedelta(months=1)
         next_month_last_day = calendar.monthrange(next_month_date.year, next_month_date.month)[1]
-        
+
         # 3rd to the last day = next_month_last_day - 2 days
         next_run_day = next_month_last_day - 2
         next_run_ts = next_month_date.replace(day=next_run_day, hour=0, minute=0, second=0, microsecond=0)
-        
+
         dump_records = []
         messages = []
         user_ids_to_update = []
-        
+
         for user in users:
             user_id = user["id"]
             monthly_dump_id = str(uuid.uuid4())
-            
+
             dump_records.append({
                 "id": monthly_dump_id,
                 "user_id": user_id,
@@ -94,7 +97,7 @@ class MonthlyDumpEnqueueService:
                 "updated_at": now_utc.isoformat(),
                 "completed_at": None,
             })
-            
+
             messages.append({
                 "monthly_dump_id": monthly_dump_id,
                 "user_id": user_id,
@@ -104,13 +107,13 @@ class MonthlyDumpEnqueueService:
                 "failure_count": 0,
                 "created_at": now_utc.isoformat(),
             })
-            
+
             user_ids_to_update.append(user_id)
-        
+
         # 1. Upsert dummy entries in monthly_dumps. We use on_conflict to not overwrite if exists.
         try:
             self.supabase.table(DatabaseTables.MONTHLY_DUMPS).upsert(
-                dump_records, 
+                dump_records,
                 on_conflict="user_id,month,timezone",
                 ignore_duplicates=True
             ).execute()
@@ -127,14 +130,15 @@ class MonthlyDumpEnqueueService:
         except Exception as e:
             logger.error("Failed to send message batch for monthly dumps", exc_info=True)
             return
-            
+
         # 3. Update the profiles next run explicitly
-        # We loop through batch because Supabase API doesn't support list-based IN update elegantly without custom RPC,
-        # but since batch size is moderate, we can use an IN query if possible.
         try:
             self.supabase.table(DatabaseTables.PROFILES).update({
                 "monthly_dump_next_run": next_run_ts.isoformat()
             }).in_("id", user_ids_to_update).execute()
-            logger.info(f"Successfully enqueued and updated {len(user_ids_to_update)} users. Next run scheduled for {next_run_ts.isoformat()}")
+            logger.info(
+                "Successfully enqueued monthly dumps and updated next run for users",
+                extra={"user_count": len(user_ids_to_update), "next_run": next_run_ts.isoformat()},
+            )
         except Exception as e:
             logger.error("Failed to update user profiles next run data", exc_info=True)
