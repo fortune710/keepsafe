@@ -18,26 +18,32 @@ def rate_limit(requests_per_minute: int = 60, context: str = "default"):
             # Find the request object in args or kwargs
             request: Optional[Request] = None
             
+            def is_request(obj):
+                # Standard check
+                if isinstance(obj, Request):
+                    return True
+                # Robust check for mocks or different module paths
+                return hasattr(obj, "client") and hasattr(obj, "state") and hasattr(obj, "scope")
             # Check positional args
             for arg in args:
-                if isinstance(arg, Request):
+                if is_request(arg):
                     request = arg
                     break
             
             # Check keyword args if not found in positional
-            if not request:
+            if request is None:
                 for arg in kwargs.values():
-                    if isinstance(arg, Request):
+                    if is_request(arg):
                         request = arg
                         break
             
-            if not request:
-                # If no request object found, skip rate limiting
+            if request is None:
+                logger.debug("No request object found in rate_limit decorator, skipping")
                 return await func(*args, **kwargs)
 
             redis = get_redis_client()
             if not redis:
-                # If Redis is unavailable, skip rate limiting (fail open)
+                logger.debug("Redis unavailable, skipping rate limit")
                 return await func(*args, **kwargs)
 
             # Determine identifiers
@@ -89,8 +95,11 @@ def rate_limit(requests_per_minute: int = 60, context: str = "default"):
             except HTTPException:
                 raise
             except Exception as e:
-                logger.error(f"Error in rate limiter: {str(e)}")
-                # Fail open if Redis errors out
+                # Check if it's an HTTPException-like object by name to be safe
+                if e.__class__.__name__ == "HTTPException":
+                    raise
+                logger.error(f"Error in rate limiter: {str(e)}", exc_info=True)
+                # Fail open if Redis errors out (but not for rate limit exceed exceptions)
                 pass
 
             return await func(*args, **kwargs)
