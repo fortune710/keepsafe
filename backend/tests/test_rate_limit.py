@@ -20,6 +20,7 @@ async def test_rate_limit_success():
         mock_request = MagicMock(spec=Request)
         mock_request.client.host = "1.2.3.4"
         mock_request.state.user = {"id": "user123"}
+        mock_request.scope = {} # Required for robust request detection
         
         @rate_limit(requests_per_minute=5, context="test")
         async def mock_endpoint(req: Request):
@@ -39,6 +40,7 @@ async def test_rate_limit_exceeded_ip():
         mock_request = MagicMock(spec=Request)
         mock_request.client.host = "1.2.3.4"
         mock_request.state.user = {"id": "user123"}
+        mock_request.scope = {}
         
         @rate_limit(requests_per_minute=5, context="test")
         async def mock_endpoint(req: Request):
@@ -59,6 +61,7 @@ async def test_rate_limit_exceeded_user():
         mock_request = MagicMock(spec=Request)
         mock_request.client.host = "1.2.3.4"
         mock_request.state.user = {"id": "user123"}
+        mock_request.scope = {}
         
         @rate_limit(requests_per_minute=5, context="test")
         async def mock_endpoint(req: Request):
@@ -83,6 +86,7 @@ async def test_rate_limit_redis_unavailable():
     # If redis is unavailable, it should fail open
     with patch("utils.rate_limit.get_redis_client", return_value=None):
         mock_request = MagicMock(spec=Request)
+        mock_request.scope = {}
         
         @rate_limit(requests_per_minute=5, context="test")
         async def mock_endpoint(req: Request):
