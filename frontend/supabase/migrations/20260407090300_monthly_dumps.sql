@@ -33,30 +33,35 @@ create unique index if not exists idx_monthly_dumps_user_month_tz
 
 alter table public.monthly_dumps enable row level security;
 
+drop policy if exists "Users can read own monthly dumps" on public.monthly_dumps;
 create policy "Users can read own monthly dumps"
   on public.monthly_dumps
   for select
   to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own monthly dumps" on public.monthly_dumps;
 create policy "Users can insert own monthly dumps"
   on public.monthly_dumps
   for insert
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own monthly dumps" on public.monthly_dumps;
 create policy "Users can update own monthly dumps"
   on public.monthly_dumps
   for update
   to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own monthly dumps" on public.monthly_dumps;
 create policy "Users can delete own monthly dumps"
   on public.monthly_dumps
   for delete
   to authenticated
   using (auth.uid() = user_id);
 
+drop trigger if exists update_monthly_dumps_updated_at on public.monthly_dumps;
 create trigger update_monthly_dumps_updated_at
   before update on public.monthly_dumps
   for each row
@@ -66,6 +71,7 @@ insert into storage.buckets (id, name, public)
 values ('monthly_dumps', 'monthly_dumps', false)
 on conflict (id) do nothing;
 
+drop policy if exists "Users can read own monthly dumps" on storage.objects;
 create policy "Users can read own monthly dumps"
   on storage.objects
   for select
@@ -75,6 +81,7 @@ create policy "Users can read own monthly dumps"
     and auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Users can upload own monthly dumps" on storage.objects;
 create policy "Users can upload own monthly dumps"
   on storage.objects
   for insert
@@ -84,6 +91,7 @@ create policy "Users can upload own monthly dumps"
     and auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Users can update own monthly dumps" on storage.objects;
 create policy "Users can update own monthly dumps"
   on storage.objects
   for update
@@ -93,6 +101,7 @@ create policy "Users can update own monthly dumps"
     and auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Users can delete own monthly dumps" on storage.objects;
 create policy "Users can delete own monthly dumps"
   on storage.objects
   for delete

@@ -9,6 +9,6 @@
     - Adds the column as nullable.
 */
 
-ALTER TABLE public.profiles ADD COLUMN monthly_dump_next_run timestamptz;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS monthly_dump_next_run timestamptz;
 
-CREATE INDEX idx_profiles_monthly_dump_next_run ON public.profiles(monthly_dump_next_run);
+CREATE INDEX IF NOT EXISTS idx_profiles_monthly_dump_next_run ON public.profiles(monthly_dump_next_run);
