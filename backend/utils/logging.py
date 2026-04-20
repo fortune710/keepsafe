@@ -23,7 +23,9 @@ logger_provider.add_log_record_processor(
     BatchLogRecordProcessor(otlp_exporter)
 )
 
-handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
+# Use environment-driven log level for the OTLP handler
+log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+handler = LoggingHandler(level=log_level, logger_provider=logger_provider)
 logging.getLogger().addHandler(handler)
 
 

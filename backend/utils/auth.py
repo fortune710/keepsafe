@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import Client
 from services.supabase_client import get_supabase_client
@@ -6,6 +6,7 @@ from services.supabase_client import get_supabase_client
 auth_scheme = HTTPBearer()
 
 async def get_current_user(
+    request: Request,
     token: HTTPAuthorizationCredentials = Depends(auth_scheme),
     supabase: Client = Depends(get_supabase_client)
 ):
@@ -23,6 +24,9 @@ async def get_current_user(
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        
+        # Store user in request state for use in decorators/middleware
+        request.state.user = user_response
             
         return user_response
         

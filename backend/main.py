@@ -4,13 +4,15 @@ from routers import webhooks
 from routers import search
 from routers import user
 from routers import phone_number
+from routers import monthly_dumps
+from routers import entries
 from config import settings
 from schedulers.scheduler_manager import SchedulerManager
 import logging
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=settings.LOG_LEVEL,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
@@ -41,6 +43,8 @@ app.include_router(webhooks.router)
 app.include_router(search.router)
 app.include_router(user.router)
 app.include_router(phone_number.router)
+app.include_router(monthly_dumps.router)
+app.include_router(entries.router)
 
 @app.get("/")
 async def root():
@@ -98,5 +102,6 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=settings.PORT,
-        reload=settings.ENVIRONMENT == "development"
+        reload=settings.ENVIRONMENT == "development",
+        log_level=settings.LOG_LEVEL.lower()
     )
