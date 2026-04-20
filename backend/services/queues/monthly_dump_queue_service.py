@@ -107,8 +107,19 @@ class MonthlyDumpQueueService:
         stats["processed"] += 1
         msg_id = message.get("msg_id")
         msg_str = message.get("message", "{}")
-        msg_data = json.loads(msg_str) if isinstance(msg_str, str) else msg_str
-
+        try:
+            msg_data = json.loads(msg_str) if isinstance(msg_str, str) else msg_str
+            if not isinstance(msg_data, dict):
+                raise ValueError("Message data is not a dictionary")
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(
+                "Malformed JSON in monthly dump message",
+                {"msg_id": msg_id, "error": str(e), "queue": self.queue_name},
+            )
+            if msg_id is not None:
+                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+            stats["failed"] += 1
+            return
         monthly_dump_id = msg_data.get("monthly_dump_id")
         user_id = msg_data.get("user_id")
         month = msg_data.get("month")
@@ -136,8 +147,26 @@ class MonthlyDumpQueueService:
                 },
             )
 
-            if seed is None:
+            existing_dump_query = self.dump_controller.get({"id": monthly_dump_id}, maybe_single=True)
+            existing_dump = existing_dump_query.data if existing_dump_query else None
+
+            if existing_dump and existing_dump.get("status") == "completed":
+                logger.info(
+                    "Monthly dump already completed, skipping processing",
+                    {"monthly_dump_id": monthly_dump_id, "queue": self.queue_name},
+                )
+                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                stats["succeeded"] += 1
+                return
+
+            persisted_seed = existing_dump.get("random_seed") if existing_dump else None
+            if persisted_seed is not None:
+                seed = persisted_seed
+            elif seed is None:
                 seed = random.randint(1, 2_000_000_000)
+                
+            # Ensure msg_data has the seed in case it goes to DLQ
+            msg_data["random_seed"] = seed
 
             self.dump_controller.update_status(
                 monthly_dump_id, 
@@ -235,6 +264,7 @@ class MonthlyDumpQueueService:
                     target_status,
                     {
                         "error": msg_data.get("last_error"),
+                        "random_seed": msg_data.get("random_seed"),
                         "updated_at": datetime.now(timezone.utc).isoformat(),
                     }
                 )
@@ -252,6 +282,7 @@ class MonthlyDumpQueueService:
                     "failed",
                     {
                         "error": f"Queue move failed: {msg_data.get('last_error')}",
+                        "random_seed": msg_data.get("random_seed"),
                         "updated_at": datetime.now(timezone.utc).isoformat(),
                     }
                 )

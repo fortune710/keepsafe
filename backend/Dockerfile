@@ -16,5 +16,12 @@ RUN uv pip install --system -r requirements.txt
 # Copy the rest of the application code into the container
 COPY . .
 
+# Create a non-root user and change ownership of the application directory
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && chown -R appuser:appuser /app
+
+# Switch to the non-root user
+USER appuser
+
 # Set the command to run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

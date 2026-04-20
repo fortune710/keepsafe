@@ -49,6 +49,7 @@ class MonthlyDumpService:
     GRID_ROWS = 3
     IMAGE_DURATION_SECONDS = 5
     MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10MB
+    MAX_IMAGE_PIXELS = 12441600  # ~12.4MP
     ALLOWED_IMAGE_HOSTS = [
         "images.unsplash.com",
         "plus.unsplash.com",
@@ -295,8 +296,25 @@ class MonthlyDumpService:
                 buffer.write(chunk)
 
             buffer.seek(0)
-            image = Image.open(buffer).convert("RGB")
-            return image
+            try:
+                # Open to inspect metadata without loading fully
+                image = Image.open(buffer)
+                
+                # Pixel limit
+                if image.width * image.height > MonthlyDumpService.MAX_IMAGE_PIXELS:
+                    logger.error(
+                        "Image exceeds pixel limit", 
+                        {"url": url, "width": image.width, "height": image.height}
+                    )
+                    return None
+                    
+                return image.convert("RGB")
+            except (Image.DecompressionBombError, Exception) as exc:
+                logger.error(
+                    "Failed to process image metadata or data", 
+                    {"url": url, "error": str(exc)}
+                )
+                return None
         except Exception as exc:
             logger.logger.exception(
                 "Failed to download image safely for grid",
