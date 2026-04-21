@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -57,8 +58,7 @@ class MonthlyDumpEnqueueScheduler:
 
     async def _enqueue_job(self) -> None:
         try:
-            # We don't need to await because the service uses sync supabase calls
-            self.enqueue_service.enqueue_eligible_users()
+            await asyncio.to_thread(self.enqueue_service.enqueue_eligible_users)
         except Exception as exc:  # noqa: BLE001
             logger.error(
                 "Scheduled monthly dump enqueuing failed",

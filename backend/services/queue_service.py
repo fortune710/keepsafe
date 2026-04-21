@@ -4,9 +4,9 @@ from typing import Any, Dict, List
 import json
 
 from services.supabase_client import get_supabase_client
-from utils.logging import Logger
+import logging
 
-logger = Logger("QueueService")
+logger = logging.getLogger(__name__)
 
 
 class QueueService:
@@ -24,7 +24,7 @@ class QueueService:
         """Serialize and send a message to the requested queue."""
         logger.debug(
             "Sending message to queue",
-            {
+            extra={
                 "queue_name": queue_name,
                 "message_keys": list(message.keys()),
             },
@@ -51,7 +51,7 @@ class QueueService:
         """Serialize and send a batch of messages to the requested queue."""
         logger.debug(
             "Sending batch of messages to queue",
-            {
+            extra={
                 "queue_name": queue_name,
                 "message_count": len(messages),
             },
@@ -66,7 +66,7 @@ class QueueService:
                 "send_batch",
                 {
                     "queue_name": queue_name,
-                    "messages": [json.dumps(msg) for msg in messages],
+                    "messages": messages,
                 },
             )
             .execute()
@@ -107,7 +107,7 @@ class QueueService:
         )
         logger.debug(
             "Read messages from queue",
-            {
+            extra={
                 "queue_name": queue_name,
                 "batch_size": batch_size,
                 "visibility_timeout_seconds": visibility_timeout_seconds,
@@ -120,7 +120,7 @@ class QueueService:
         """Delete a message from the requested queue."""
         logger.debug(
             "Deleting message from queue",
-            {
+            extra={
                 "queue_name": queue_name,
                 "message_id": message_id,
             },
