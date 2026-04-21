@@ -15,3 +15,16 @@
 ## Routing
 - Routers should call controllers for data access.
 - Avoid business logic in routers where possible.
+
+## Logging
+- **ALWAYS** use the standard Python `logging` module.
+- **ALWAYS** get a logger via `logging.getLogger(__name__)` — never pass a hardcoded string name.
+- **NEVER** use the `utils/logging.py` `Logger` factory class; it is deprecated.
+- **ALWAYS** pass structured context as a dict to the `extra` keyword argument:
+  ```python
+  import logging
+  logger = logging.getLogger(__name__)
+  logger.info("Message here", extra={"key": "value", "other": 123})
+  ```
+- Use `logger.exception(...)` inside `except` blocks to automatically capture the traceback.
+- Do **not** embed dynamic data inside the message string — put it in `extra` instead.

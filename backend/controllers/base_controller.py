@@ -15,8 +15,10 @@ class BaseController:
         """Standardized filter application for queries."""
         if filters:
             for key, value in filters.items():
-                # We no longer skip None values, allowing .eq(key, None) to trigger IS NULL
-                query = query.eq(key, value)
+                if value is None:
+                    query = query.is_(key, "null")
+                else:
+                    query = query.eq(key, value)
         return query
 
     def _validate_mutating_filters(self, filters: Dict[str, Any], operation: str):

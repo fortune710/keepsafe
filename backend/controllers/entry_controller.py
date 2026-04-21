@@ -31,7 +31,7 @@ class EntryController(BaseController):
             query = query.eq("type", entry_type)
             
         return (
-            query.order("created_at", descending=True)
+            query.order("created_at", desc=True)
             .range(offset, offset + limit - 1)
             .execute()
         )
