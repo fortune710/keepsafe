@@ -6,5 +6,11 @@
 */
 
 UPDATE public.profiles
-SET monthly_dump_next_run = (date_trunc('month', now()) + interval '1 month' - interval '3 days')::timestamptz
+SET monthly_dump_next_run = (
+  CASE
+    WHEN now() < date_trunc('month', now()) + interval '1 month' - interval '3 days'
+      THEN date_trunc('month', now()) + interval '1 month' - interval '3 days'
+    ELSE date_trunc('month', now()) + interval '2 months' - interval '3 days'
+  END
+)::timestamptz
 WHERE monthly_dump_next_run IS NULL;

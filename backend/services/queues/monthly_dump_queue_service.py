@@ -148,7 +148,20 @@ class MonthlyDumpQueueService:
                 },
             )
 
-            existing_dump_query = self.dump_controller.get({"id": monthly_dump_id}, maybe_single=True)
+            try:
+                existing_dump_query = self.dump_controller.get({"id": monthly_dump_id}, maybe_single=True)
+            except Exception as lookup_exc:
+                # Older supabase clients raise APIError when maybe_single finds no rows.
+                # Treat any lookup failure as "not found" so we don't mis-trigger _handle_failure.
+                cls_name = type(lookup_exc).__name__
+                if "APIError" in cls_name or "NotFound" in cls_name:
+                    logger.warning(
+                        "dump_controller.get raised lookup error, treating as not found",
+                        extra={"monthly_dump_id": monthly_dump_id, "error": str(lookup_exc)},
+                    )
+                    existing_dump_query = None
+                else:
+                    raise
             existing_dump = existing_dump_query.data if existing_dump_query else None
 
             if existing_dump and existing_dump.get("status") == "completed":

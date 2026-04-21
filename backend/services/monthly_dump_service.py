@@ -274,7 +274,7 @@ class MonthlyDumpService:
             if response.history:
                 for r in response.history:
                     if not MonthlyDumpService._is_safe_url(r.url):
-                        logger.warning("Rejected disallowed redirect URL", {"url": r.url})
+                        logger.warning("Rejected disallowed redirect URL", extra={"url": r.url})
                         return None
             
             response.raise_for_status()
@@ -282,7 +282,7 @@ class MonthlyDumpService:
             # Header check for size
             cl = response.headers.get("Content-Length")
             if cl and int(cl) > MonthlyDumpService.MAX_IMAGE_BYTES:
-                logger.error("Image exceeds size limit (from header)", {"url": url, "size": cl})
+                logger.error("Image exceeds size limit (from header)", extra={"url": url, "size": cl})
                 return None
 
             # Bounded read in chunks
@@ -291,7 +291,7 @@ class MonthlyDumpService:
             for chunk in response.iter_content(chunk_size=8192):
                 total_bytes += len(chunk)
                 if total_bytes > MonthlyDumpService.MAX_IMAGE_BYTES:
-                    logger.error("Image exceeds size limit during download", {"url": url})
+                    logger.error("Image exceeds size limit during download", extra={"url": url})
                     return None
                 buffer.write(chunk)
 
@@ -299,24 +299,30 @@ class MonthlyDumpService:
             try:
                 # Open to inspect metadata without loading fully
                 image = Image.open(buffer)
-                
+
                 # Pixel limit
                 if image.width * image.height > MonthlyDumpService.MAX_IMAGE_PIXELS:
-                    logger.error(
-                        "Image exceeds pixel limit", 
-                        {"url": url, "width": image.width, "height": image.height}
+                    logger.error(  # noqa: PLE1205
+                        "Image exceeds pixel limit",
+                        extra={"url": url, "width": image.width, "height": image.height},
                     )
                     return None
-                    
+
                 return image.convert("RGB")
-            except (Image.DecompressionBombError, Exception) as exc:
-                logger.error(
-                    "Failed to process image metadata or data", 
-                    {"url": url, "error": str(exc)}
+            except Image.DecompressionBombError as exc:
+                logger.error(  # noqa: PLE1205
+                    "Image rejected: decompression bomb detected",
+                    extra={"url": url, "error": str(exc)},
+                )
+                return None
+            except (OSError, ValueError) as exc:
+                logger.error(  # noqa: PLE1205
+                    "Failed to process image metadata or data",
+                    extra={"url": url, "error": str(exc)},
                 )
                 return None
         except Exception as exc:
-            logger.logger.exception(
+            logger.exception(
                 "Failed to download image safely for grid",
                 extra={"url": url, "error": str(exc)},
             )
