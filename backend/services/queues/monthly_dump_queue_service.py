@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 import json
+import logging
 import random
 from datetime import datetime, timezone
 
@@ -17,9 +18,8 @@ from queue_constants import (
     MONTHLY_DUMP_BATCH_SIZE,
     MONTHLY_DUMP_DLQ_LIMIT,
 )
-from utils.logging import Logger
 
-logger = Logger("MonthlyDumpQueueService")
+logger = logging.getLogger(__name__)
 
 
 class MonthlyDumpQueueService:
@@ -39,7 +39,7 @@ class MonthlyDumpQueueService:
 
         logger.info(
             "MonthlyDumpQueueService initialized",
-            {
+            extra={
                 "queue": self.queue_name,
                 "dlq": self.dlq_name,
                 "dead_queue": self.dead_queue_name,
@@ -66,13 +66,13 @@ class MonthlyDumpQueueService:
         if not self.queue_service.is_enqueue_response_valid(response):
             logger.error(
                 "Monthly dump enqueue returned invalid response",
-                {"monthly_dump_id": monthly_dump_id, "queue": self.queue_name},
+                extra={"monthly_dump_id": monthly_dump_id, "queue": self.queue_name},
             )
             return False
 
         logger.info(
             "Monthly dump enqueued",
-            {"monthly_dump_id": monthly_dump_id, "user_id": user_id, "month": month},
+            extra={"monthly_dump_id": monthly_dump_id, "user_id": user_id, "month": month},
         )
         return True
 
@@ -91,7 +91,7 @@ class MonthlyDumpQueueService:
             visibility_timeout_seconds=300,
         )
         if not messages:
-            logger.info("No monthly dump messages available", {"queue": self.queue_name})
+            logger.info("No monthly dump messages available", extra={"queue": self.queue_name})
             return stats
 
         for message in messages:
@@ -99,7 +99,7 @@ class MonthlyDumpQueueService:
 
         logger.info(
             "Monthly dump queue processing complete",
-            {"queue": self.queue_name, "stats": stats},
+            extra={"queue": self.queue_name, "stats": stats},
         )
         return stats
 
@@ -107,7 +107,19 @@ class MonthlyDumpQueueService:
         stats["processed"] += 1
         msg_id = message.get("msg_id")
         msg_str = message.get("message", "{}")
-        msg_data = json.loads(msg_str) if isinstance(msg_str, str) else msg_str
+        try:
+            msg_data = json.loads(msg_str) if isinstance(msg_str, str) else msg_str
+            if not isinstance(msg_data, dict):
+                raise ValueError("Message data is not a dictionary")
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(
+                "Malformed JSON in monthly dump message",
+                extra={"msg_id": msg_id, "error": str(e), "queue": self.queue_name},
+            )
+            if msg_id is not None:
+                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+            stats["failed"] += 1
+            return
 
         monthly_dump_id = msg_data.get("monthly_dump_id")
         user_id = msg_data.get("user_id")
@@ -119,7 +131,7 @@ class MonthlyDumpQueueService:
         if not monthly_dump_id or not user_id or not month:
             logger.warning(
                 "Invalid monthly dump message",
-                {"msg_id": msg_id, "queue": self.queue_name},
+                extra={"msg_id": msg_id, "queue": self.queue_name},
             )
             self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
             stats["failed"] += 1
@@ -128,7 +140,7 @@ class MonthlyDumpQueueService:
         try:
             logger.info(
                 "Processing monthly dump job",
-                {
+                extra={
                     "monthly_dump_id": monthly_dump_id,
                     "user_id": user_id,
                     "month": month,
@@ -136,12 +148,65 @@ class MonthlyDumpQueueService:
                 },
             )
 
-            if seed is None:
+            try:
+                existing_dump_query = self.dump_controller.get({"id": monthly_dump_id}, maybe_single=True)
+            except Exception as lookup_exc:
+                # Older supabase clients raise APIError when maybe_single finds no rows.
+                # Treat any lookup failure as "not found" so we don't mis-trigger _handle_failure.
+                cls_name = type(lookup_exc).__name__
+                if "APIError" in cls_name or "NotFound" in cls_name:
+                    logger.warning(
+                        "dump_controller.get raised lookup error, treating as not found",
+                        extra={"monthly_dump_id": monthly_dump_id, "error": str(lookup_exc)},
+                    )
+                    existing_dump_query = None
+                else:
+                    raise
+            existing_dump = existing_dump_query.data if existing_dump_query else None
+
+            if existing_dump and existing_dump.get("status") == "completed":
+                logger.info(
+                    "Monthly dump already completed, skipping processing",
+                    extra={"monthly_dump_id": monthly_dump_id, "queue": self.queue_name},
+                )
+                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                stats["succeeded"] += 1
+                return
+
+            persisted_seed = existing_dump.get("random_seed") if existing_dump else None
+            if persisted_seed is not None:
+                seed = persisted_seed
+            elif seed is None:
                 seed = random.randint(1, 2_000_000_000)
 
+            # Fetch entries to check if we can skip
+            start_utc, end_utc = self.dump_service.get_month_bounds(month, timezone_name)
+            entries = self.dump_service.fetch_entries(
+                user_id=user_id,
+                start_utc=start_utc,
+                end_utc=end_utc
+            )
+
+            if not entries:
+                logger.info(
+                    "No entries found for month, skipping monthly dump",
+                    extra={
+                        "monthly_dump_id": monthly_dump_id,
+                        "user_id": user_id,
+                        "month": month,
+                    },
+                )
+                self.dump_controller.delete({"id": monthly_dump_id})
+                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                stats["succeeded"] += 1
+                return
+
+            # Ensure msg_data has the seed in case it goes to DLQ
+            msg_data["random_seed"] = seed
+
             self.dump_controller.update_status(
-                monthly_dump_id, 
-                "processing", 
+                monthly_dump_id,
+                "processing",
                 {
                     "random_seed": seed,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -154,6 +219,7 @@ class MonthlyDumpQueueService:
                     month=month,
                     timezone=timezone_name,
                     random_seed=int(seed),
+                    entries=entries,
                 )
             )
 
@@ -176,7 +242,7 @@ class MonthlyDumpQueueService:
             stats["succeeded"] += 1
         except Exception as exc:  # noqa: BLE001
             msg_data["last_error"] = str(exc)
-            logger.logger.exception(
+            logger.exception(
                 "Monthly dump processing failed",
                 extra={
                     "monthly_dump_id": monthly_dump_id,
@@ -197,7 +263,7 @@ class MonthlyDumpQueueService:
         new_failure_count = failure_count + 1
         msg_data["failure_count"] = new_failure_count
         monthly_dump_id = msg_data.get("monthly_dump_id")
-        
+
         # Determine target queue and desired status
         if new_failure_count <= self.dlq_limit:
             target_queue = self.dlq_name
@@ -219,10 +285,10 @@ class MonthlyDumpQueueService:
             if self.queue_service.is_enqueue_response_valid(response):
                 enqueue_success = True
                 break
-            
+
             logger.warning(
-                f"Failed to enqueue to {target_queue} (attempt {attempt + 1}/{max_retries})",
-                {"msg_id": msg_id, "monthly_dump_id": monthly_dump_id}
+                "Failed to enqueue to target queue",
+                extra={"target_queue": target_queue, "attempt": attempt + 1, "max_retries": max_retries, "msg_id": msg_id, "monthly_dump_id": monthly_dump_id},
             )
 
         if enqueue_success:
@@ -235,14 +301,15 @@ class MonthlyDumpQueueService:
                     target_status,
                     {
                         "error": msg_data.get("last_error"),
+                        "random_seed": msg_data.get("random_seed"),
                         "updated_at": datetime.now(timezone.utc).isoformat(),
                     }
                 )
         else:
             # Final failure: remove from main queue to prevent infinite loop
             logger.error(
-                f"CRITICAL: Failed to move message to {target_queue} after {max_retries} attempts. Deleting from main queue.",
-                {"msg_id": msg_id, "monthly_dump_id": monthly_dump_id}
+                "CRITICAL: Failed to move message to target queue after max retries. Deleting from main queue.",
+                extra={"target_queue": target_queue, "max_retries": max_retries, "msg_id": msg_id, "monthly_dump_id": monthly_dump_id},
             )
             self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
             stats["failed"] += 1
@@ -252,8 +319,7 @@ class MonthlyDumpQueueService:
                     "failed",
                     {
                         "error": f"Queue move failed: {msg_data.get('last_error')}",
+                        "random_seed": msg_data.get("random_seed"),
                         "updated_at": datetime.now(timezone.utc).isoformat(),
                     }
                 )
-
-

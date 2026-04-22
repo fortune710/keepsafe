@@ -17,9 +17,9 @@ from supabase import Client
 
 from services.supabase_client import get_supabase_client
 from controllers.entry_controller import EntryController
-from utils.logging import Logger
+import logging
 
-logger = Logger("MonthlyDumpService")
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -28,6 +28,7 @@ class MonthlyDumpInputs:
     month: str  # "YYYY-MM"
     timezone: str
     random_seed: int
+    entries: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass
@@ -49,6 +50,7 @@ class MonthlyDumpService:
     GRID_ROWS = 3
     IMAGE_DURATION_SECONDS = 5
     MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10MB
+    MAX_IMAGE_PIXELS = 12441600  # ~12.4MP
     ALLOWED_IMAGE_HOSTS = [
         "images.unsplash.com",
         "plus.unsplash.com",
@@ -97,7 +99,7 @@ class MonthlyDumpService:
         start_utc, end_utc = self.get_month_bounds(inputs.month, inputs.timezone)
         logger.info(
             "Monthly dump bounds computed",
-            {
+            extra={
                 "user_id": inputs.user_id,
                 "month": inputs.month,
                 "timezone": inputs.timezone,
@@ -106,11 +108,14 @@ class MonthlyDumpService:
             },
         )
 
-        entries = self.fetch_entries(
-            user_id=inputs.user_id,
-            start_utc=start_utc,
-            end_utc=end_utc,
-        )
+        if inputs.entries is not None:
+            entries = inputs.entries
+        else:
+            entries = self.fetch_entries(
+                user_id=inputs.user_id,
+                start_utc=start_utc,
+                end_utc=end_utc,
+            )
 
         photos = [e for e in entries if e.get("type") == "photo" and e.get("content_url")]
         videos = [e for e in entries if e.get("type") == "video" and e.get("content_url")]
@@ -119,7 +124,7 @@ class MonthlyDumpService:
         photos.sort(key=lambda e: e.get("created_at") or "")
         logger.info(
             "Monthly dump media collected",
-            {
+            extra={
                 "user_id": inputs.user_id,
                 "month": inputs.month,
                 "photo_count": len(photos),
@@ -191,9 +196,13 @@ class MonthlyDumpService:
             )
             return response.get("signedURL") or response.get("signedUrl")
         except Exception as exc:  # noqa: BLE001
-            logger.logger.exception(
+            logger.exception(
                 "Failed to create signed URL for monthly dump grid",
-                extra={"storage_path": storage_path, "error": str(exc)},
+                extra={
+                    "storage_path": storage_path, 
+                    "error": str(exc),
+                    "storage_bucket": self.STORAGE_BUCKET
+                },
             )
             return None
 
@@ -262,7 +271,7 @@ class MonthlyDumpService:
     def _load_image(url: str) -> Optional[Image.Image]:
         """Download image with size limits and SSRF protection."""
         if not MonthlyDumpService._is_safe_url(url):
-            logger.warning("Rejected unsafe or disallowed URL for monthly dump", {"url": url})
+            logger.warning("Rejected unsafe or disallowed URL for monthly dump", extra={"url": url})
             return None
 
         try:
@@ -273,7 +282,7 @@ class MonthlyDumpService:
             if response.history:
                 for r in response.history:
                     if not MonthlyDumpService._is_safe_url(r.url):
-                        logger.warning("Rejected disallowed redirect URL", {"url": r.url})
+                        logger.warning("Rejected disallowed redirect URL", extra={"url": r.url})
                         return None
             
             response.raise_for_status()
@@ -281,7 +290,7 @@ class MonthlyDumpService:
             # Header check for size
             cl = response.headers.get("Content-Length")
             if cl and int(cl) > MonthlyDumpService.MAX_IMAGE_BYTES:
-                logger.error("Image exceeds size limit (from header)", {"url": url, "size": cl})
+                logger.error("Image exceeds size limit (from header)", extra={"url": url, "size": cl})
                 return None
 
             # Bounded read in chunks
@@ -290,15 +299,38 @@ class MonthlyDumpService:
             for chunk in response.iter_content(chunk_size=8192):
                 total_bytes += len(chunk)
                 if total_bytes > MonthlyDumpService.MAX_IMAGE_BYTES:
-                    logger.error("Image exceeds size limit during download", {"url": url})
+                    logger.error("Image exceeds size limit during download", extra={"url": url})
                     return None
                 buffer.write(chunk)
 
             buffer.seek(0)
-            image = Image.open(buffer).convert("RGB")
-            return image
+            try:
+                # Open to inspect metadata without loading fully
+                image = Image.open(buffer)
+
+                # Pixel limit
+                if image.width * image.height > MonthlyDumpService.MAX_IMAGE_PIXELS:
+                    logger.error(  # noqa: PLE1205
+                        "Image exceeds pixel limit",
+                        extra={"url": url, "width": image.width, "height": image.height},
+                    )
+                    return None
+
+                return image.convert("RGB")
+            except Image.DecompressionBombError as exc:
+                logger.error(  # noqa: PLE1205
+                    "Image rejected: decompression bomb detected",
+                    extra={"url": url, "error": str(exc)},
+                )
+                return None
+            except (OSError, ValueError) as exc:
+                logger.error(  # noqa: PLE1205
+                    "Failed to process image metadata or data",
+                    extra={"url": url, "error": str(exc)},
+                )
+                return None
         except Exception as exc:
-            logger.logger.exception(
+            logger.exception(
                 "Failed to download image safely for grid",
                 extra={"url": url, "error": str(exc)},
             )
@@ -334,7 +366,7 @@ class MonthlyDumpService:
         )
         logger.info(
             "Uploaded monthly dump grid",
-            {"storage_path": storage_path},
+            extra={"storage_path": storage_path},
         )
 
     @staticmethod
