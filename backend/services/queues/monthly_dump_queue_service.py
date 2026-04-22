@@ -179,6 +179,28 @@ class MonthlyDumpQueueService:
             elif seed is None:
                 seed = random.randint(1, 2_000_000_000)
 
+            # Fetch entries to check if we can skip
+            start_utc, end_utc = self.dump_service.get_month_bounds(month, timezone_name)
+            entries = self.dump_service.fetch_entries(
+                user_id=user_id,
+                start_utc=start_utc,
+                end_utc=end_utc
+            )
+
+            if not entries:
+                logger.info(
+                    "No entries found for month, skipping monthly dump",
+                    extra={
+                        "monthly_dump_id": monthly_dump_id,
+                        "user_id": user_id,
+                        "month": month,
+                    },
+                )
+                self.dump_controller.delete({"id": monthly_dump_id})
+                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                stats["succeeded"] += 1
+                return
+
             # Ensure msg_data has the seed in case it goes to DLQ
             msg_data["random_seed"] = seed
 
@@ -197,6 +219,7 @@ class MonthlyDumpQueueService:
                     month=month,
                     timezone=timezone_name,
                     random_seed=int(seed),
+                    entries=entries,
                 )
             )
 
