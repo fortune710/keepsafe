@@ -1,8 +1,8 @@
 from typing import Optional
 from supabase import Client
-from utils.logging import Logger
+import logging
 
-logger = Logger("StorageService")
+logger = logging.getLogger(__name__)
 
 class StorageService:
     def __init__(self, supabase: Client, bucket_name: str):
@@ -21,7 +21,7 @@ class StorageService:
             )
             return response.get("signedURL") or response.get("signedUrl")
         except Exception as exc:
-            logger.logger.exception(
+            logger.exception(
                 "Failed to create signed URL",
                 extra={"bucket": self.bucket_name, "storage_path": storage_path, "error": str(exc)},
             )
@@ -39,7 +39,7 @@ class StorageService:
                 )
             )
         except Exception as exc:
-            logger.logger.exception(
+            logger.exception(
                 "Failed to upload file",
                 extra={"bucket": self.bucket_name, "storage_path": storage_path, "error": str(exc)},
             )
