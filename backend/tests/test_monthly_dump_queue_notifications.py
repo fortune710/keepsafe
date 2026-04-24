@@ -84,7 +84,7 @@ async def test_monthly_dump_queue_enqueues_notification_on_success():
     service.dump_controller = MagicMock()
     service.dump_controller.get.return_value.data = {"status": "pending"}
     
-    service.dump_service = AsyncMock()
+    service.dump_service = MagicMock()
     service.dump_service.get_month_bounds.return_value = (None, None)
     service.dump_service.fetch_entries.return_value = [{"id": "entry-1"}]
     service.dump_service.build_monthly_dump.return_value = MonthlyDumpResult(
