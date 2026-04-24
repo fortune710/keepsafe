@@ -101,4 +101,4 @@ async def test_monthly_dump_queue_enqueues_notification_on_success():
         assert stats["failed"] == 0
         
         # Check that it called the enqueue notifications logic ONLY once, for all successful users
-        mock_notif_instance.enqueue_monthly_dump_notifications.assert_awaited_once_with(["user-B", "user-C"])
+        mock_notif_instance.enqueue_monthly_dump_notifications.assert_awaited_once_with(["user-B", "user-C"], "2026-04")
