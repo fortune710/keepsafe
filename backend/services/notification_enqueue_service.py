@@ -262,3 +262,66 @@ class NotificationEnqueueService:
         except Exception as e:
             logger.error(f"Error fetching push tokens for users: {str(e)}")
             return []
+
+    async def enqueue_monthly_dump_notifications(
+        self,
+        user_ids: List[str]
+    ) -> bool:
+        """
+        Enqueue push notifications for a batch of users when their monthly dump is ready.
+        
+        Parameters:
+            user_ids (List[str]): User IDs of users whose monthly dumps are generated.
+            
+        Returns:
+            bool: True if fully processed.
+        """
+        if not user_ids:
+            return True
+            
+        try:
+            # We filter by 'push_notifications' or we can just send it to all tokens
+            # Let's filter by push_notifications setting (default to True if not found)
+            filtered_recipients = self._filter_recipients_by_notification_settings(
+                user_ids,
+                notification_type="push_notifications"
+            )
+            
+            if not filtered_recipients:
+                logger.info("No recipients with push_notifications enabled for monthly dump batch")
+                return True
+                
+            push_tokens = self._get_push_tokens_for_users(filtered_recipients)
+            
+            if not push_tokens:
+                logger.info("No push tokens found for monthly dump batch")
+                return True
+                
+            title = "Your Monthly Dump is Ready! 🎉"
+            body = "Relive your best moments from last month."
+            
+            success = self.notification_service.enqueue_notification(
+                title=title,
+                body=body,
+                recipients=push_tokens,
+                priority="normal",
+                metadata={
+                    "notification_type": "monthly_dump_ready"
+                },
+                data={
+                    "page_url": "/vault",
+                }
+            )
+            
+            if success:
+                logger.info(
+                    f"Monthly dump batch notification enqueued: recipients={len(push_tokens)}"
+                )
+            else:
+                logger.error("Failed to enqueue monthly dump batch notification")
+                
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error enqueueing monthly dump batch notification: {str(e)}", exc_info=True)
+            return False
