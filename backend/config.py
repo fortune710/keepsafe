@@ -54,6 +54,10 @@ class Settings:
     # Server
     PORT: int = int(os.getenv("PORT", "8000"))
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    _DEFAULT_LOG_LEVEL = "DEBUG" if ENVIRONMENT == "development" else "INFO"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", _DEFAULT_LOG_LEVEL).upper()
+    if LOG_LEVEL not in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}:
+        LOG_LEVEL = _DEFAULT_LOG_LEVEL
     
     # PostHog
     POSTHOG_API_KEY: str = os.getenv("POSTHOG_API_KEY", "")

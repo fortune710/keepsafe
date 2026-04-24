@@ -4,9 +4,9 @@ from typing import Any, Dict, List
 import json
 
 from services.supabase_client import get_supabase_client
-from utils.logging import Logger
+import logging
 
-logger = Logger("QueueService")
+logger = logging.getLogger(__name__)
 
 
 class QueueService:
@@ -24,7 +24,7 @@ class QueueService:
         """Serialize and send a message to the requested queue."""
         logger.debug(
             "Sending message to queue",
-            {
+            extra={
                 "queue_name": queue_name,
                 "message_keys": list(message.keys()),
             },
@@ -37,6 +37,36 @@ class QueueService:
                 {
                     "queue_name": queue_name,
                     "message": json.dumps(message),
+                },
+            )
+            .execute()
+        )
+
+    def send_message_batch(
+        self,
+        *,
+        queue_name: str,
+        messages: List[Dict[str, Any]],
+    ) -> Any:
+        """Serialize and send a batch of messages to the requested queue."""
+        logger.debug(
+            "Sending batch of messages to queue",
+            extra={
+                "queue_name": queue_name,
+                "message_count": len(messages),
+            },
+        )
+        # Assuming pgmq.send_batch expects an array of JSON objects or jsonb[]
+        # We can pass an array of serialized strings or array of dicts depending on RPC definition.
+        # usually pgmq extension expects a JSON array of messages.
+        return (
+            self.supabase
+            .schema("pgmq_public")
+            .rpc(
+                "send_batch",
+                {
+                    "queue_name": queue_name,
+                    "messages": messages,
                 },
             )
             .execute()
@@ -77,7 +107,7 @@ class QueueService:
         )
         logger.debug(
             "Read messages from queue",
-            {
+            extra={
                 "queue_name": queue_name,
                 "batch_size": batch_size,
                 "visibility_timeout_seconds": visibility_timeout_seconds,
@@ -90,7 +120,7 @@ class QueueService:
         """Delete a message from the requested queue."""
         logger.debug(
             "Deleting message from queue",
-            {
+            extra={
                 "queue_name": queue_name,
                 "message_id": message_id,
             },
