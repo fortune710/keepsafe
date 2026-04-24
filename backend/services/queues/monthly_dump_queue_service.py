@@ -1,6 +1,6 @@
-from __future__ import annotations
 
-from typing import Any, Dict, Optional
+
+from typing import Any, Dict, Optional, List
 import json
 import logging
 import random
@@ -95,16 +95,28 @@ class MonthlyDumpQueueService:
             logger.info("No monthly dump messages available", extra={"queue": self.queue_name})
             return stats
 
-        successful_user_ids = []
+        # Group successful users by their dump month to send batch notifications
+        month_to_user_ids: Dict[str, List[str]] = {}
 
         for message in messages:
-            user_id = await self._process_message(message, stats)
-            if user_id:
-                successful_user_ids.append(user_id)
+            # We need the month from the message data to group notifications
+            msg_str = message.get("message", "{}")
+            try:
+                msg_data = json.loads(msg_str) if isinstance(msg_str, str) else msg_str
+                msg_month = msg_data.get("month")
+            except Exception:
+                msg_month = None
 
-        if successful_user_ids:
-            notification_service = NotificationEnqueueService()
-            await notification_service.enqueue_monthly_dump_notifications(successful_user_ids)
+            user_id = await self._process_message(message, stats)
+            if user_id and msg_month:
+                if msg_month not in month_to_user_ids:
+                    month_to_user_ids[msg_month] = []
+                month_to_user_ids[msg_month].append(user_id)
+
+        if month_to_user_ids:
+            notification_enqueue_service = NotificationEnqueueService()
+            for msg_month, user_ids in month_to_user_ids.items():
+                await notification_enqueue_service.enqueue_monthly_dump_notifications(user_ids, msg_month)
 
         logger.info(
             "Monthly dump queue processing complete",
