@@ -80,14 +80,22 @@ def rate_limit(requests_per_minute: int = 60, context: str = "default"):
                 user_count = results[2]
 
                 if ip_count > requests_per_minute:
-                    logger.warning(f"Rate limit exceeded for IP: {ip}")
+                    logger.warning("Rate limit exceeded for IP", extra={
+                        "ip": ip,
+                        "requests_per_minute": requests_per_minute,
+                        "ip_count": ip_count,
+                    })
                     raise HTTPException(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                         detail="Rate limit exceeded. Please try again in a minute."
                     )
                 
                 if user_id != "anonymous" and user_count > requests_per_minute:
-                    logger.warning(f"Rate limit exceeded for User: {user_id}")
+                    logger.warning("Rate limit exceeded for User", extra={
+                        "user_id": user_id,
+                        "requests_per_minute": requests_per_minute,
+                        "user_count": user_count,
+                    })
                     raise HTTPException(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                         detail="Rate limit exceeded. Please try again in a minute."

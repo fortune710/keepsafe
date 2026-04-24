@@ -31,7 +31,7 @@ async def get_entries_by_month(
     try:
         norm_month = normalize_month(month)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM.")
     
     # 3. Calculate date range for the month
     try:
@@ -73,5 +73,10 @@ async def get_entries_by_month(
             }
         }
     except Exception as e:
-        logger.exception(f"Failed to fetch entries: {str(e)}")
+        logger.exception("Failed to fetch entries", extra={
+            "user_id": user_id,
+            "month": month,
+            "type": type,
+            "page": page,
+        })
         raise HTTPException(status_code=500, detail="Internal server error while fetching entries")
