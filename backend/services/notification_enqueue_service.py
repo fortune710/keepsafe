@@ -323,13 +323,20 @@ class NotificationEnqueueService:
             
             if success:
                 logger.info(
-                    f"Monthly dump batch notification enqueued for {month}: recipients={len(push_tokens)}"
+                    "Monthly dump batch notification enqueued",
+                    extra={"month": month, "recipients": len(push_tokens)},
                 )
             else:
-                logger.error(f"Failed to enqueue monthly dump batch notification for {month}")
-                
+                logger.error(
+                    "Failed to enqueue monthly dump batch notification",
+                    extra={"month": month},
+                )
+
             return success
-            
-        except Exception as e:
-            logger.error(f"Error enqueueing monthly dump batch notification for {month}: {str(e)}", exc_info=True)
+
+        except Exception:
+            logger.exception(
+                "Error enqueueing monthly dump batch notification",
+                extra={"month": month},
+            )
             return False
