@@ -1,4 +1,5 @@
 import logging
+import pytz
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -48,6 +49,12 @@ async def create_monthly_dump(
 
     month = normalize_month(payload.month)
     timezone_name = payload.timezone or "UTC"
+    
+    try:
+        pytz.timezone(timezone_name)
+    except pytz.UnknownTimeZoneError:
+        raise HTTPException(status_code=400, detail="Invalid timezone. Use a valid IANA timezone string (e.g. 'America/New_York')")
+
     bucket_name = "monthly_dumps"
     force = bool(payload.force)
     

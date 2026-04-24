@@ -234,6 +234,13 @@ class MonthlyDumpService:
         return grid
 
     @staticmethod
+    def _is_allowlisted_host(hostname: str) -> bool:
+        for allowed in MonthlyDumpService.ALLOWED_IMAGE_HOSTS:
+            if hostname == allowed or hostname.endswith(f".{allowed}"):
+                return True
+        return ".supabase.co" in hostname
+
+    @staticmethod
     def _is_safe_url(url: str) -> bool:
         """Verify URL uses safe protocol, resides on allowlisted host, and resolves to public IP."""
         try:
@@ -246,10 +253,7 @@ class MonthlyDumpService:
                 return False
                 
             # Check against allowlist
-            is_allowlisted = (
-                any(h in hostname for h in MonthlyDumpService.ALLOWED_IMAGE_HOSTS) or 
-                ".supabase.co" in hostname
-            )
+            is_allowlisted = MonthlyDumpService._is_allowlisted_host(hostname)
             if not is_allowlisted:
                 return False
                 
@@ -284,6 +288,10 @@ class MonthlyDumpService:
                     if not MonthlyDumpService._is_safe_url(r.url):
                         logger.warning("Rejected disallowed redirect URL", extra={"url": r.url})
                         return None
+
+            if not MonthlyDumpService._is_safe_url(str(response.url)):
+                logger.warning("Rejected disallowed final redirect URL", extra={"url": str(response.url)})
+                return None
             
             response.raise_for_status()
 
