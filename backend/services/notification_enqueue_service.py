@@ -265,13 +265,15 @@ class NotificationEnqueueService:
 
     async def enqueue_monthly_dump_notifications(
         self,
-        user_ids: List[str]
+        user_ids: List[str],
+        month: str
     ) -> bool:
         """
         Enqueue push notifications for a batch of users when their monthly dump is ready.
         
         Parameters:
             user_ids (List[str]): User IDs of users whose monthly dumps are generated.
+            month (str): The month string in YYYY-MM format.
             
         Returns:
             bool: True if fully processed.
@@ -280,25 +282,30 @@ class NotificationEnqueueService:
             return True
             
         try:
-            # We filter by 'push_notifications' or we can just send it to all tokens
-            # Let's filter by push_notifications setting (default to True if not found)
+            # Extract month name and year
+            from datetime import datetime
+            dt = datetime.strptime(month, "%Y-%m")
+            month_name = dt.strftime("%B")
+            year = dt.year
+
+            # Filter by push_notifications setting
             filtered_recipients = self._filter_recipients_by_notification_settings(
                 user_ids,
                 notification_type="push_notifications"
             )
             
             if not filtered_recipients:
-                logger.info("No recipients with push_notifications enabled for monthly dump batch")
+                logger.info(f"No recipients with push_notifications enabled for {month_name} dump batch")
                 return True
                 
             push_tokens = self._get_push_tokens_for_users(filtered_recipients)
             
             if not push_tokens:
-                logger.info("No push tokens found for monthly dump batch")
+                logger.info(f"No push tokens found for {month_name} dump batch")
                 return True
                 
-            title = "Your Monthly Dump is Ready! 🎉"
-            body = "Relive your best moments from last month."
+            title = f"Your {month_name} Dump is Ready! 🎉"
+            body = f"Relive your best moments from {month_name} {year}."
             
             success = self.notification_service.enqueue_notification(
                 title=title,
@@ -306,22 +313,23 @@ class NotificationEnqueueService:
                 recipients=push_tokens,
                 priority="normal",
                 metadata={
-                    "notification_type": "monthly_dump_ready"
+                    "notification_type": "monthly_dump_ready",
+                    "month": month
                 },
                 data={
-                    "page_url": "/vault",
+                    "page_url": f"/monthly-dumps/{month}",
                 }
             )
             
             if success:
                 logger.info(
-                    f"Monthly dump batch notification enqueued: recipients={len(push_tokens)}"
+                    f"Monthly dump batch notification enqueued for {month}: recipients={len(push_tokens)}"
                 )
             else:
-                logger.error("Failed to enqueue monthly dump batch notification")
+                logger.error(f"Failed to enqueue monthly dump batch notification for {month}")
                 
             return success
             
         except Exception as e:
-            logger.error(f"Error enqueueing monthly dump batch notification: {str(e)}", exc_info=True)
+            logger.error(f"Error enqueueing monthly dump batch notification for {month}: {str(e)}", exc_info=True)
             return False
