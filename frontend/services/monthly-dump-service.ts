@@ -86,11 +86,15 @@ export class MonthlyDumpService {
     await deviceStorage.setItem(MONTHLY_DUMP_GRID_QUEUE_KEY, queue);
   }
 
-  private static async dequeueGridQueueItem(): Promise<MonthlyDumpGridQueueItem | undefined> {
+  private static async peekGridQueueItem(): Promise<MonthlyDumpGridQueueItem | undefined> {
     const queue = await this.loadGridQueue();
-    const next = queue.shift();
-    await this.saveGridQueue(queue);
-    return next;
+    return queue[0];
+  }
+
+  private static async removeGridQueueItem(idempotencyKey: string): Promise<void> {
+    const queue = await this.loadGridQueue();
+    const filtered = queue.filter((item) => item.idempotencyKey !== idempotencyKey);
+    await this.saveGridQueue(filtered);
   }
 
   private static async processGridQueueItem(item: MonthlyDumpGridQueueItem): Promise<void> {
@@ -169,11 +173,17 @@ export class MonthlyDumpService {
     try {
       let next: MonthlyDumpGridQueueItem | undefined;
       // eslint-disable-next-line no-constant-condition
-      while ((next = await this.dequeueGridQueueItem())) {
+      while ((next = await this.peekGridQueueItem())) {
         try {
           await this.processGridQueueItem(next);
+          // Only remove after successful processing
+          await this.removeGridQueueItem(next.idempotencyKey);
         } catch (error) {
           logger.error('Monthly dump custom grid queue item failed', { error, next });
+          // Optionally: on failure, we could implement a retry counter or backoff.
+          // For now, we'll keep it in the queue for a retry on next app launch/processor start,
+          // but we MUST break the loop to avoid an infinite failing loop.
+          break;
         }
       }
     } finally {
@@ -242,6 +252,7 @@ export class MonthlyDumpService {
   ) {
     userIdSchema.parse(userId);
     monthSchema.parse(month);
+    z.enum(['photo', 'video', 'audio']).parse(type);
     z.number().int().min(1).parse(page);
 
     try {
@@ -344,7 +355,7 @@ export class MonthlyDumpService {
       userId: userIdSchema,
       month: monthSchema,
       photos: z.array(monthlyDumpGridPhotoSchema).min(1).max(6),
-      captureGridImage: z.any(),
+      captureGridImage: z.custom<(photos: MonthlyDumpGridPhoto[]) => Promise<string>>((val) => typeof val === 'function'),
     });
 
     const { userId, month, photos, captureGridImage } = schema.parse(params);

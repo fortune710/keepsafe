@@ -95,13 +95,19 @@ export default function MonthlyDumpBanner({ month, animationProgress }: MonthlyD
     return { borderRadius };
   });
 
+  const handlePress = () => {
+    if (!month) return;
+    router.push(`/monthly-dumps/${month}`);
+  }
+
   return (
     <View style={styles.container} testID="monthly-dump-banner">
       <Animated.View style={touchableAnimatedStyle}>
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => router.push(`/monthly-dumps/${month}`)}
+          onPress={handlePress}
           style={styles.touchable}
+          disabled={!month}
         >
           <Animated.View style={[styles.bannerShell, bannerShapeAnimatedStyle]}>
             <BlurView intensity={40} tint="dark" style={styles.blur}>

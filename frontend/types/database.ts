@@ -27,6 +27,7 @@ export interface Database {
           max_uses: number
           current_uses: number
           is_active: boolean
+          monthly_dump_next_run: string | null
         }
         Insert: {
           id: string
@@ -40,6 +41,7 @@ export interface Database {
           invite_code?: string | null
           phone_number?: string | null
           birthday?: string | null
+          monthly_dump_next_run?: string | null
         }
         Update: {
           email?: string,
@@ -50,6 +52,7 @@ export interface Database {
           bio?: string | null,
           updated_at?: string,
           phone_number?: string | null,
+          monthly_dump_next_run?: string | null
         }
       }
       entries: {

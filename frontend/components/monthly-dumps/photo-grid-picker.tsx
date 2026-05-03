@@ -15,8 +15,10 @@ const GRID_ROWS = 3;
 const GRID_CELL_WIDTH = GRID_CAPTURE_WIDTH / GRID_COLUMNS;
 const GRID_CELL_HEIGHT = GRID_CAPTURE_HEIGHT / GRID_ROWS;
 
+import { MonthlyDumpGridPhoto } from '@/services/monthly-dump-service';
+
 export interface PhotoGridPickerCompletePayload {
-  selectedPhotos: any[];
+  selectedPhotos: MonthlyDumpGridPhoto[];
   createGridImage: () => Promise<string>;
 }
 
@@ -29,7 +31,7 @@ interface PhotoGridPickerProps {
 export default function PhotoGridPicker({ month, onComplete, onCancel }: PhotoGridPickerProps) {
   const { user } = useAuth();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectedPhotos, setSelectedPhotos] = useState<any[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<MonthlyDumpGridPhoto[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const gridShotRef = useRef<ViewShot | null>(null);
 
@@ -61,7 +63,7 @@ export default function PhotoGridPicker({ month, onComplete, onCancel }: PhotoGr
     return next.slice(0, 6);
   }, [selectedPhotos]);
 
-  const togglePhoto = (photo: any) => {
+  const togglePhoto = (photo: MonthlyDumpGridPhoto) => {
     if (isSubmitting) return;
 
     if (selectedIds.includes(photo.id)) {

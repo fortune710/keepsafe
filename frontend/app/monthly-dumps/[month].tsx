@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,14 +6,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMonthlyDump } from '@/hooks/use-monthly-dump';
 import { useAuth } from '@/hooks/use-auth';
 import { X } from 'lucide-react-native';
-import Animated, { useSharedValue, withTiming, Easing, runOnJS } from 'react-native-reanimated';
+import { useSharedValue, withTiming, Easing, runOnJS, cancelAnimation } from 'react-native-reanimated';
 import PhotoGridPicker, { PhotoGridPickerCompletePayload } from '@/components/monthly-dumps/photo-grid-picker';
 import MonthlyDumpVideoSlide from '@/components/monthly-dumps/monthly-dump-video-slide';
 import MonthlyDumpProgressBarItem from '@/components/monthly-dumps/monthly-dump-progress-bar-item';
 import MonthlyDumpAudioSlide from '@/components/monthly-dumps/monthly-dump-audio-slide';
 import MonthlyDumpGridPromptSlide from '@/components/monthly-dumps/monthly-dump-grid-prompt-slide';
 import { logger } from '@/lib/logger';
-import { MonthlyDumpService, MonthlyDumpSlide } from '@/services/monthly-dump-service';
+import { MonthlyDumpService, MonthlyDumpSlide, CachedMonthlyDump } from '@/services/monthly-dump-service';
 
 const { width, height } = Dimensions.get('window');
 
@@ -61,21 +61,21 @@ export default function MonthlyDumpPage() {
     }
   }, [allSlides]);
 
-  const nextSlide = () => {
+  const nextSlide = useCallback(() => {
     if (currentIndex < allSlides.length - 1) {
       setCurrentIndex(prev => prev + 1);
       progress.value = 0;
     } else {
       router.back();
     }
-  };
+  }, [currentIndex, allSlides.length, router, progress]);
 
-  const prevSlide = () => {
+  const prevSlide = useCallback(() => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
       progress.value = 0;
     }
-  };
+  }, [currentIndex, progress]);
 
   useEffect(() => {
     if (showGridPicker) return;
@@ -99,11 +99,12 @@ export default function MonthlyDumpPage() {
     });
 
     return () => {
+      cancelAnimation(progress);
       progress.value = 0;
     };
-  }, [currentIndex, allSlides, showGridPicker]);
+  }, [currentIndex, allSlides, showGridPicker, nextSlide, progress]);
 
-  const handleTap = (evt: any) => {
+  const handleTap = (evt: { nativeEvent: { locationX: number } }) => {
     const x = evt.nativeEvent.locationX;
     if (x < width * 0.33) {
       prevSlide();
@@ -133,7 +134,7 @@ export default function MonthlyDumpPage() {
       if (!user?.id || !month) return;
 
       let targetIndex = slides.length;
-      queryClient.setQueryData(['monthlyDump', user.id, month], (previous: any) => {
+      queryClient.setQueryData(['monthlyDump', user.id, month], (previous: CachedMonthlyDump | undefined) => {
         const previousSlides = Array.isArray(previous?.slides) ? previous.slides : slides;
         const alreadyExists = previousSlides.some(
           (slide: MonthlyDumpSlide) => slide.entry_id && slide.entry_id === optimisticSlide.entry_id
@@ -164,10 +165,18 @@ export default function MonthlyDumpPage() {
     );
   }
 
+  if (!month) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={{ color: 'white' }}>Invalid month parameter</Text>
+      </View>
+    );
+  }
+
   if (showGridPicker) {
     return (
       <PhotoGridPicker
-        month={month!}
+        month={month}
         onCancel={() => setShowGridPicker(false)}
         onComplete={async (payload) => {
           await customGridMutation.mutateAsync(payload);

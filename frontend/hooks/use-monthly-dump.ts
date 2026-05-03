@@ -118,7 +118,7 @@ export function useMonthlyDump(requestedMonth?: string): UseMonthlyDumpResult {
         return { hasDump: false, slides: [] };
       }
     },
-    //enabled: isEnabled && !!user?.id,
+    enabled: isEnabled && !!user?.id,
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
 
