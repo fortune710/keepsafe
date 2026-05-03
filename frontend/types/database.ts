@@ -372,6 +372,85 @@ export interface Database {
           created_at?: string
         }
       }
+      monthly_dumps: {
+        Row: {
+          id: string
+          user_id: string
+          month: string
+          timezone: string
+          status: 'pending' | 'processing' | 'completed' | 'failed'
+          slides: Json[] | null
+          photo_count: number
+          video_count: number
+          audio_count: number
+          grid_count: number
+          error: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          month: string
+          timezone?: string
+          status?: 'pending' | 'processing' | 'completed' | 'failed'
+          slides?: Json[] | null
+          photo_count?: number
+          video_count?: number
+          audio_count?: number
+          grid_count?: number
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          month?: string
+          timezone?: string
+          status?: 'pending' | 'processing' | 'completed' | 'failed'
+          slides?: Json[] | null
+          photo_count?: number
+          video_count?: number
+          audio_count?: number
+          grid_count?: number
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+      }
+      entry_reports: {
+        Row: {
+          id: string
+          entry_id: string
+          reporter_id: string
+          reason: string
+          details: string | null
+          status: 'pending' | 'reviewed' | 'dismissed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          entry_id: string
+          reporter_id: string
+          reason: string
+          details?: string | null
+          status?: 'pending' | 'reviewed' | 'dismissed'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          entry_id?: string
+          reporter_id?: string
+          reason?: string
+          details?: string | null
+          status?: 'pending' | 'reviewed' | 'dismissed'
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
