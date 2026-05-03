@@ -27,6 +27,7 @@ export interface Database {
           max_uses: number
           current_uses: number
           is_active: boolean
+          monthly_dump_next_run: string | null
         }
         Insert: {
           id: string
@@ -40,6 +41,7 @@ export interface Database {
           invite_code?: string | null
           phone_number?: string | null
           birthday?: string | null
+          monthly_dump_next_run?: string | null
         }
         Update: {
           email?: string,
@@ -50,6 +52,7 @@ export interface Database {
           bio?: string | null,
           updated_at?: string,
           phone_number?: string | null,
+          monthly_dump_next_run?: string | null
         }
       }
       entries: {
@@ -369,6 +372,85 @@ export interface Database {
           user_id?: string
           phone_number?: string
           otp_hash?: string
+          created_at?: string
+        }
+      }
+      monthly_dumps: {
+        Row: {
+          id: string
+          user_id: string
+          month: string
+          timezone: string
+          status: 'pending' | 'processing' | 'completed' | 'failed'
+          slides: Json[] | null
+          photo_count: number
+          video_count: number
+          audio_count: number
+          grid_count: number
+          error: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          month: string
+          timezone?: string
+          status?: 'pending' | 'processing' | 'completed' | 'failed'
+          slides?: Json[] | null
+          photo_count?: number
+          video_count?: number
+          audio_count?: number
+          grid_count?: number
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          month?: string
+          timezone?: string
+          status?: 'pending' | 'processing' | 'completed' | 'failed'
+          slides?: Json[] | null
+          photo_count?: number
+          video_count?: number
+          audio_count?: number
+          grid_count?: number
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+      }
+      entry_reports: {
+        Row: {
+          id: string
+          entry_id: string
+          reporter_id: string
+          reason: string
+          details: string | null
+          status: 'pending' | 'reviewed' | 'dismissed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          entry_id: string
+          reporter_id: string
+          reason: string
+          details?: string | null
+          status?: 'pending' | 'reviewed' | 'dismissed'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          entry_id?: string
+          reporter_id?: string
+          reason?: string
+          details?: string | null
+          status?: 'pending' | 'reviewed' | 'dismissed'
           created_at?: string
         }
       }

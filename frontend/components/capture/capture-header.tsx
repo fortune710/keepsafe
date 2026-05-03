@@ -9,9 +9,21 @@ interface CaptureHeaderProps {
     profile: any;
     defaultAvatarUrl: string;
     convertToLocalTimezone: (date: Date | string) => Date;
+    onDatePress?: () => void;
+    showRecapChip?: boolean;
+    recapChipText?: string;
+    highlightDateBorder?: boolean;
 }
 
-export const CaptureHeader = ({ profile, defaultAvatarUrl, convertToLocalTimezone }: CaptureHeaderProps) => {
+export const CaptureHeader = ({
+    profile,
+    defaultAvatarUrl,
+    convertToLocalTimezone,
+    onDatePress,
+    showRecapChip = false,
+    recapChipText,
+    highlightDateBorder = false,
+}: CaptureHeaderProps) => {
     return (
         <View style={styles.header}>
             <TouchableOpacity
@@ -26,7 +38,13 @@ export const CaptureHeader = ({ profile, defaultAvatarUrl, convertToLocalTimezon
                 />
             </TouchableOpacity>
 
-            <DateContainer date={convertToLocalTimezone(new Date())} />
+            <DateContainer
+                date={convertToLocalTimezone(new Date())}
+                onPress={onDatePress}
+                showRecapChip={showRecapChip}
+                recapChipText={recapChipText}
+                highlightBorder={highlightDateBorder}
+            />
 
             <TouchableOpacity
                 style={styles.friendsButton}
