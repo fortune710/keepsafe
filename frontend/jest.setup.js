@@ -28,3 +28,27 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 process.env.EXPO_PUBLIC_SUPABASE_URL="https://supabase.test.co"
 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY="test-anon-key"
 process.env.EXPO_PUBLIC_NODE_ENV="development"
+
+// Reanimated mock
+require('react-native-reanimated').setUpTests();
+
+// Expo Blur mock
+jest.mock('expo-blur', () => {
+    const React = require('react');
+    const { View } = require('react-native');
+    return {
+        BlurView: ({ children, style }) => <View style={style}>{children}</View>,
+    };
+});
+
+// Lucide mock (often needed as it uses ES modules)
+jest.mock('lucide-react-native', () => {
+    const React = require('react');
+    const { View } = require('react-native');
+    return {
+        Sparkles: () => <View />,
+        Play: () => <View />,
+        UserPlus: () => <View />,
+        X: () => <View />,
+    };
+});
