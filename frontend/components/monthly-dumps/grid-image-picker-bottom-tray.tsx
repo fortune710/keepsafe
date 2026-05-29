@@ -15,11 +15,21 @@ export default function GridImagePickerBottomTray({
 }: GridImagePickerBottomTrayProps) {
   return (
     <View style={[styles.bottomTrayCollapsed, { marginBottom: bottomMargin }]}>
-      <TouchableOpacity activeOpacity={0.85} onPress={onOpenEntries} style={styles.trayActionButton}>
+      <TouchableOpacity
+        testID="monthly-dump-grid-open-entries-button"
+        activeOpacity={0.85}
+        onPress={onOpenEntries}
+        style={styles.trayActionButton}
+      >
         <ImagePlus size={22} color="#F8FAFC" strokeWidth={2.2} />
       </TouchableOpacity>
 
-      <TouchableOpacity activeOpacity={0.85} onPress={onOpenCamera} style={styles.trayActionButton}>
+      <TouchableOpacity
+        testID="monthly-dump-grid-open-camera-button"
+        activeOpacity={0.85}
+        onPress={onOpenCamera}
+        style={styles.trayActionButton}
+      >
         <Camera size={20} color="#F8FAFC" strokeWidth={2.2} />
       </TouchableOpacity>
     </View>

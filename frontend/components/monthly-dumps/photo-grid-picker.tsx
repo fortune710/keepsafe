@@ -359,7 +359,12 @@ export default function PhotoGridPicker({ month, onComplete, onCancel }: PhotoGr
       </View>
 
       <View style={[styles.topBar, { top: insets.top + 12 }]}>
-        <TouchableOpacity onPress={onCancel} activeOpacity={0.85} style={styles.closeButton}>
+        <TouchableOpacity
+          testID="monthly-dump-grid-close-button"
+          onPress={onCancel}
+          activeOpacity={0.85}
+          style={styles.closeButton}
+        >
           <X size={20} color="#F8FAFC" />
         </TouchableOpacity>
 
@@ -441,7 +446,12 @@ export default function PhotoGridPicker({ month, onComplete, onCancel }: PhotoGr
                   <Text style={styles.sourceTitle}>Remove {removeCount} photos</Text>
                   <Text style={styles.sourceSubtitle}>Tap the ones to drop before switching layout.</Text>
                 </View>
-                <TouchableOpacity onPress={cancelLayoutReduction} activeOpacity={0.85} style={styles.sourceCloseButton}>
+                <TouchableOpacity
+                  testID="monthly-dump-grid-source-overlay-close-button"
+                  onPress={cancelLayoutReduction}
+                  activeOpacity={0.85}
+                  style={styles.sourceCloseButton}
+                >
                   <X size={18} color="#F8FAFC" />
                 </TouchableOpacity>
               </View>

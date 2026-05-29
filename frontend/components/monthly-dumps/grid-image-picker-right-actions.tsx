@@ -31,6 +31,7 @@ export default function GridImagePickerRightActions({
       />
 
       <TouchableOpacity
+        testID="monthly-dump-grid-done-button"
         activeOpacity={0.9}
         onPress={onDone}
         disabled={!selectionComplete || isSubmitting}

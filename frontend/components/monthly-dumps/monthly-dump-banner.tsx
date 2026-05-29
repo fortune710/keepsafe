@@ -104,6 +104,7 @@ export default function MonthlyDumpBanner({ month, animationProgress }: MonthlyD
     <View style={styles.container} testID="monthly-dump-banner">
       <Animated.View style={touchableAnimatedStyle}>
         <TouchableOpacity
+          testID="monthly-dump-banner-button"
           activeOpacity={0.9}
           onPress={handlePress}
           style={styles.touchable}

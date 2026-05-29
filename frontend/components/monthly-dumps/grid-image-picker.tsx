@@ -89,12 +89,22 @@ export default function GridImagePicker({ visible, month, onClose, onSelectPhoto
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <TouchableOpacity activeOpacity={0.85} onPress={() => setShowSourceMenu((prev) => !prev)} style={styles.sourceMenuButton}>
+            <TouchableOpacity
+              testID="monthly-dump-grid-source-menu-button"
+              activeOpacity={0.85}
+              onPress={() => setShowSourceMenu((prev) => !prev)}
+              style={styles.sourceMenuButton}
+            >
               <Text style={styles.sourceMenuButtonText}>{activeSource === 'entries' ? 'Entries' : 'Gallery'}</Text>
               <ChevronDown size={14} color="#F8FAFC" />
             </TouchableOpacity>
 
-            <TouchableOpacity activeOpacity={0.85} onPress={onClose} style={styles.trayCloseButton}>
+            <TouchableOpacity
+              testID="monthly-dump-grid-sheet-close-button"
+              activeOpacity={0.85}
+              onPress={onClose}
+              style={styles.trayCloseButton}
+            >
               <X size={18} color="#F8FAFC" />
             </TouchableOpacity>
           </View>
@@ -115,8 +125,13 @@ export default function GridImagePicker({ visible, month, onClose, onSelectPhoto
                 data={visiblePhotos}
                 numColumns={SOURCE_GRID_NUM_COLUMNS}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity activeOpacity={0.88} onPress={() => handleSelect(item)} style={styles.sourceTile}>
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    testID={`monthly-dump-grid-source-tile-${index}`}
+                    activeOpacity={0.88}
+                    onPress={() => handleSelect(item)}
+                    style={styles.sourceTile}
+                  >
                     <Image source={{ uri: item.content_url }} style={styles.sourceImage} contentFit="cover" />
                     <View style={styles.sourceTileBorder} />
                   </TouchableOpacity>

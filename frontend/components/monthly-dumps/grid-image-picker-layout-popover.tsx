@@ -72,7 +72,12 @@ export default function GridImagePickerLayoutPopover({
   return (
     <>
       <View ref={buttonRef}>
-        <TouchableOpacity activeOpacity={0.85} onPress={handleButtonPress} style={styles.actionButton}>
+        <TouchableOpacity
+          testID="monthly-dump-grid-layout-button"
+          activeOpacity={0.85}
+          onPress={handleButtonPress}
+          style={styles.actionButton}
+        >
           <CurrentLayoutIcon size={18} color="#F8FAFC" mutedColor="rgba(248,250,252,0.26)" />
         </TouchableOpacity>
       </View>
