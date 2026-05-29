@@ -32,7 +32,6 @@ export function MonthlyDumpGrid2x2Icon({
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x={1.5} y={1.5} width={21} height={21} rx={6} stroke={mutedColor} strokeWidth={1.3} />
       <GridCell x={5} y={5} color={color} width={cellSize} height={cellSize} />
       <GridCell x={13} y={5} color={color} width={cellSize} height={cellSize} />
       <GridCell x={5} y={13} color={color} width={cellSize} height={cellSize} />
@@ -51,7 +50,6 @@ export function MonthlyDumpGrid2x3Icon({
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x={1.5} y={1.5} width={21} height={21} rx={6} stroke={mutedColor} strokeWidth={1.3} />
       <GridCell x={5} y={4.5} color={color} width={cellWidth} height={cellHeight} />
       <GridCell x={13} y={4.5} color={color} width={cellWidth} height={cellHeight} />
       <GridCell x={5} y={10.75} color={color} width={cellWidth} height={cellHeight} />

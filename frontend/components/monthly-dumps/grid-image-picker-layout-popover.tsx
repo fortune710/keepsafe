@@ -10,7 +10,7 @@ import {
 import { MonthlyDumpGridLayout } from '@/services/monthly-dump-service';
 
 const { width: screenWidth } = Dimensions.get('window');
-const GRID_POPOVER_WIDTH = 192;
+const GRID_POPOVER_WIDTH = 160;
 
 type GridIconProps = {
   size?: number;
@@ -63,9 +63,9 @@ export default function GridImagePickerLayoutPopover({
 
   const layoutPopoverLeft = popoverAnchor
     ? Math.min(
-        Math.max(popoverAnchor.x + popoverAnchor.width - GRID_POPOVER_WIDTH, 12),
-        screenWidth - GRID_POPOVER_WIDTH - 12
-      )
+      Math.max(popoverAnchor.x + popoverAnchor.width - GRID_POPOVER_WIDTH, 12),
+      screenWidth - GRID_POPOVER_WIDTH - 12
+    )
     : 12;
   const layoutPopoverTop = popoverAnchor ? popoverAnchor.y + popoverAnchor.height + 10 : 0;
 
