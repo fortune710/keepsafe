@@ -7,18 +7,15 @@ import { useFriends } from '@/hooks/use-friends';
 export default function RootScreen() {
   const { user, loading, session } = useAuthContext();
 
-  console.log("User: %s", user);
-  console.log("Session: %s", session);
-
   //Get Hook to Prefetch Suggested Friends
   const { prefetchSuggestedFriends } = useFriends();
 
   useEffect(() => {
     if (user && session) {
       prefetchSuggestedFriends();
-    } 
+    }
   }, [user, session, prefetchSuggestedFriends])
-  
+
 
   // Show loading while checking auth
   if (loading) {
