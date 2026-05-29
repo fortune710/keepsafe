@@ -35,7 +35,7 @@ function buildSupabasePublicUrl(storagePath?: string): string {
 
   const [possibleBucket, ...remaining] = sanitizedPath.split('/');
   const hasBucketPrefix = Object.values(STORAGE_BUCKETS).includes(possibleBucket as (typeof STORAGE_BUCKETS)[keyof typeof STORAGE_BUCKETS]) && remaining.length > 0;
-  const bucket = hasBucketPrefix ? possibleBucket : STORAGE_BUCKETS.MEDIA;
+  const bucket = hasBucketPrefix ? possibleBucket : STORAGE_BUCKETS.MONTHLY_DUMPS;
   const path = hasBucketPrefix ? remaining.join('/') : sanitizedPath;
 
   return `${baseUrl}${SUPABASE_STORAGE_PUBLIC_SEGMENT}${bucket}/${path}`;
