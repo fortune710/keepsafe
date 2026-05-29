@@ -1,9 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useCameraPermissions } from 'expo-camera';
 import Animated, {
-  SlideInUp
+  Easing,
+  Extrapolation,
+  SlideInUp,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { useMediaCapture } from '@/hooks/use-media-capture';
 import { useAuthContext } from '@/providers/auth-provider';
@@ -28,11 +35,21 @@ import { ModeSelector } from '@/components/capture/mode-selector';
 import { MediaDisplay } from '@/components/capture/media-display';
 import { CaptureActions } from '@/components/capture/capture-actions';
 import { VaultButton } from '@/components/capture/vault-button';
+import MonthlyDumpBanner from '@/components/monthly-dumps/monthly-dump-banner';
+import { useMonthlyDump } from '@/hooks/use-monthly-dump';
 
 export default function CaptureScreen() {
+  const RECAP_CLOSE_DURATION_MS = 620;
+  const RECAP_CHIP_REVEAL_EARLY_MS = 140;
+
   const responsive = useResponsive();
   const { convertToLocalTimezone } = useTimezone();
   const [selectedMode, setSelectedMode] = useState<'camera' | 'microphone'>('camera');
+  const [isRecapExpanded, setIsRecapExpanded] = useState(false);
+  const [isRecapChipReady, setIsRecapChipReady] = useState(true);
+  const recapBannerProgress = useSharedValue(0);
+  const recapChipRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { month, hasDump, isEnabled } = useMonthlyDump();
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -111,6 +128,66 @@ export default function CaptureScreen() {
   };
 
   const defaultAvatarUrl = getDefaultAvatarUrl(profile?.full_name || '');
+  const canShowRecap = !!month && (hasDump || isEnabled);
+
+  const formatRecapChipMonth = (value?: string) => {
+    if (!value) return '';
+    try {
+      const [year, monthValue] = value.split('-');
+      const date = new Date(parseInt(year, 10), parseInt(monthValue, 10) - 1);
+      return date.toLocaleString('default', { month: 'long' });
+    } catch {
+      return value;
+    }
+  };
+
+  const toggleRecapBanner = () => {
+    if (!canShowRecap) return;
+
+    if (recapChipRevealTimerRef.current) {
+      clearTimeout(recapChipRevealTimerRef.current);
+      recapChipRevealTimerRef.current = null;
+    }
+
+    const nextExpanded = !isRecapExpanded;
+    if (nextExpanded) {
+      setIsRecapChipReady(false);
+    } else {
+      const revealAfterMs = Math.max(0, RECAP_CLOSE_DURATION_MS - RECAP_CHIP_REVEAL_EARLY_MS);
+      recapChipRevealTimerRef.current = setTimeout(() => {
+        setIsRecapChipReady(true);
+        recapChipRevealTimerRef.current = null;
+      }, revealAfterMs);
+    }
+
+    setIsRecapExpanded(nextExpanded);
+    recapBannerProgress.value = withTiming(nextExpanded ? 1 : 0, {
+      duration: RECAP_CLOSE_DURATION_MS,
+      easing: Easing.inOut(Easing.cubic),
+    }, (finished) => {
+      if (!finished) return;
+      if (!nextExpanded) {
+        runOnJS(setIsRecapChipReady)(true);
+      }
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (!recapChipRevealTimerRef.current) return;
+      clearTimeout(recapChipRevealTimerRef.current);
+    };
+  }, []);
+
+  const recapBannerAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(recapBannerProgress.value, [0, 0.2, 1], [0, 1, 1], Extrapolation.CLAMP);
+    const translateY = interpolate(recapBannerProgress.value, [0, 0.55, 1], [-24, 0, 0], Extrapolation.CLAMP);
+
+    return {
+      opacity,
+      transform: [{ translateY }],
+    };
+  });
 
   if (!permission) {
     return <View style={styles.container} />;
@@ -136,11 +213,26 @@ export default function CaptureScreen() {
     >
       <SafeAreaView style={styles.container}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          <CaptureHeader
-            profile={profile}
-            defaultAvatarUrl={defaultAvatarUrl}
-            convertToLocalTimezone={convertToLocalTimezone}
-          />
+          <View style={styles.headerSection}>
+            <View style={styles.headerTopLayer}>
+              <CaptureHeader
+                profile={profile}
+                defaultAvatarUrl={defaultAvatarUrl}
+                convertToLocalTimezone={convertToLocalTimezone}
+                onDatePress={toggleRecapBanner}
+                showRecapChip={canShowRecap && !isRecapExpanded && isRecapChipReady}
+                recapChipText={`${formatRecapChipMonth(month)} Recap`}
+                highlightDateBorder={canShowRecap && !isRecapExpanded && isRecapChipReady}
+              />
+            </View>
+
+            <Animated.View
+              pointerEvents={isRecapExpanded ? 'auto' : 'none'}
+              style={[styles.bannerOverlay, recapBannerAnimatedStyle]}
+            >
+              <MonthlyDumpBanner month={month} animationProgress={recapBannerProgress} />
+            </Animated.View>
+          </View>
 
           <ModeSelector
             selectedMode={selectedMode}
@@ -206,6 +298,25 @@ const styles = StyleSheet.create({
   },
   pageStyle: {
   },
+  headerSection: {
+    position: 'relative',
+    zIndex: 20,
+  },
+  headerTopLayer: {
+    zIndex: 30,
+  },
+  bannerOverlay: {
+    position: 'absolute',
+    top: 58,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    elevation: 10,
+  },
   content: {
     flex: 1,
     alignSelf: 'center',
@@ -237,3 +348,4 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-SemiBold',
   },
 });
+

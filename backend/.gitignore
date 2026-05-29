@@ -26,5 +26,6 @@ wheels/
 *.log
 .DS_Store
 
+.pytest_cache
 # Blog posts
 blogs/

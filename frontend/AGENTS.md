@@ -10,6 +10,8 @@
 
 3. DO NOT call supabase tables inside of useEffect, ALWAYS use useQuery for fetching data from supabase, UNLESS you are using Supabase Realtime.
 
+4. Before making any calls to supabase, perform input validation with zod to ensure data is valid.
+
 
 ### Creating Custom Hooks
 1. Data already made available from another custom hook should NOT be passed as a parameter INSTEAD it should be called inside the new custom hook itself
@@ -20,6 +22,8 @@
 1. All calls to backend APIs or service methods must use either `useQuery` for fetching data, or `useMutation` for updating/creating data. When updating data, favour optimistic updates over query invalidation.
 
 2. When Calling backend APIs use the `apiFetch` helper (or `apiFetchStream` if streaming endpoint)
+
+3. Before making any calls to backend APIs, perform input validation with zod to ensure data is valid.
 
 ### Code Style
 1. Always evaulate negative conditions first eg.

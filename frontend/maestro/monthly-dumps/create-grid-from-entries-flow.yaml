@@ -1,0 +1,37 @@
+appId: com.fortunethedev.keepsafe
+---
+# Assumes the selected month already has a monthly-dump route available.
+- openLink: keepsafe://monthly-dumps/2026-05
+- assertVisible: "Create Your Dump"
+- tapOn: "Create Your Dump"
+
+# Default source is Entries.
+- tapOn:
+    id: monthly-dump-grid-open-entries-button
+
+- tapOn:
+    id: monthly-dump-grid-source-tile-0
+- tapOn:
+    id: monthly-dump-grid-open-entries-button
+- tapOn:
+    id: monthly-dump-grid-source-tile-1
+- tapOn:
+    id: monthly-dump-grid-open-entries-button
+- tapOn:
+    id: monthly-dump-grid-source-tile-2
+- tapOn:
+    id: monthly-dump-grid-open-entries-button
+- tapOn:
+    id: monthly-dump-grid-source-tile-3
+- tapOn:
+    id: monthly-dump-grid-open-entries-button
+- tapOn:
+    id: monthly-dump-grid-source-tile-4
+- tapOn:
+    id: monthly-dump-grid-open-entries-button
+- tapOn:
+    id: monthly-dump-grid-source-tile-5
+
+- tapOn:
+    id: monthly-dump-grid-done-button
+- assertNotVisible: "Create Your Dump"
