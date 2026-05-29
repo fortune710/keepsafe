@@ -26,7 +26,7 @@ const monthlyDumpGridPhotoSchema = z.object({
 const monthlyDumpSlideSchema = z.object({
   type: z.enum(['image', 'video', 'audio']),
   url: z.string().min(1),
-  duration_seconds: z.number().min(1),
+  duration_seconds: z.number().min(0).default(0),
   entry_id: z.string().optional(),
   storage_path: z.string().optional(),
 });
