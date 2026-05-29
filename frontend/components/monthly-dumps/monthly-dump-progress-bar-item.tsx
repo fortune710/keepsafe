@@ -30,13 +30,15 @@ const styles = StyleSheet.create({
   progressBarBackground: {
     flex: 1,
     height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
     marginHorizontal: 2,
-    borderRadius: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: 'white',
+    backgroundColor: '#F8FAFC',
   },
 });

@@ -55,10 +55,14 @@ function mergePendingLocalSlides(remoteSlides: MonthlyDumpSlide[], cached?: Cach
   return [...remoteSlides, ...pendingLocalSlides];
 }
 
-export function useMonthlyDump(requestedMonth?: string): UseMonthlyDumpResult {
+export function useMonthlyDump(requestedMonth?: string | null): UseMonthlyDumpResult {
   const { user } = useAuth();
 
   const { isEnabled, dumpMonth } = useMemo(() => {
+    if (requestedMonth === null) {
+      return { isEnabled: false, dumpMonth: undefined };
+    }
+
     if (requestedMonth) {
       return { isEnabled: true, dumpMonth: requestedMonth };
     }

@@ -11,10 +11,16 @@ const MONTHLY_DUMP_GRID_QUEUE_KEY = 'monthly_dump_grid_queue';
 
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
 const userIdSchema = z.string().min(1);
+const monthlyDumpGridLayoutSchema = z.enum(['2x2', '2x3']);
+export type MonthlyDumpGridLayout = z.infer<typeof monthlyDumpGridLayoutSchema>;
+const MONTHLY_DUMP_GRID_PHOTO_COUNTS: Record<MonthlyDumpGridLayout, number> = {
+  '2x2': 4,
+  '2x3': 6,
+};
 
 const monthlyDumpGridPhotoSchema = z.object({
   id: z.string().min(1),
-  content_url: z.string().url(),
+  content_url: z.string().min(1),
 });
 
 const monthlyDumpSlideSchema = z.object({
@@ -294,18 +300,28 @@ export class MonthlyDumpService {
     );
   }
 
-  static async create3x2GridImage(
+  static async createGridImage(
     photos: MonthlyDumpGridPhoto[],
-    captureGridImage: (photos: MonthlyDumpGridPhoto[]) => Promise<string>
+    gridLayout: MonthlyDumpGridLayout,
+    captureGridImage: () => Promise<string>
   ): Promise<string> {
-    const validatedPhotos = z.array(monthlyDumpGridPhotoSchema).min(1).max(6).parse(photos);
+    const validatedLayout = monthlyDumpGridLayoutSchema.parse(gridLayout);
+    const expectedCount = MONTHLY_DUMP_GRID_PHOTO_COUNTS[validatedLayout];
+    z.array(monthlyDumpGridPhotoSchema).length(expectedCount).parse(photos);
     if (typeof captureGridImage !== 'function') {
       throw new Error('captureGridImage must be a function.');
     }
 
-    const localUri = await captureGridImage(validatedPhotos);
+    const localUri = await captureGridImage();
     z.string().min(1).parse(localUri);
     return localUri.startsWith('file://') ? localUri : `file://${localUri}`;
+  }
+
+  static async create2x3GridImage(
+    photos: MonthlyDumpGridPhoto[],
+    captureGridImage: () => Promise<string>
+  ): Promise<string> {
+    return this.createGridImage(photos, '2x3', captureGridImage);
   }
 
   static async saveCreatedGridImageToStorage(params: {
@@ -349,20 +365,22 @@ export class MonthlyDumpService {
     userId: string;
     month: string;
     photos: MonthlyDumpGridPhoto[];
-    captureGridImage: (photos: MonthlyDumpGridPhoto[]) => Promise<string>;
+    gridLayout: MonthlyDumpGridLayout;
+    captureGridImage: () => Promise<string>;
   }): Promise<MonthlyDumpSlide> {
     const schema = z.object({
       userId: userIdSchema,
       month: monthSchema,
       photos: z.array(monthlyDumpGridPhotoSchema).min(1).max(6),
-      captureGridImage: z.custom<(photos: MonthlyDumpGridPhoto[]) => Promise<string>>((val) => typeof val === 'function'),
+      gridLayout: monthlyDumpGridLayoutSchema,
+      captureGridImage: z.custom<() => Promise<string>>((val) => typeof val === 'function'),
     });
 
-    const { userId, month, photos, captureGridImage } = schema.parse(params);
+    const { userId, month, photos, gridLayout, captureGridImage } = schema.parse(params);
     if (typeof captureGridImage !== 'function') {
       throw new Error('captureGridImage must be a function.');
     }
-    const localGridUri = await this.create3x2GridImage(photos, captureGridImage);
+    const localGridUri = await this.createGridImage(photos, gridLayout, captureGridImage);
     const entryId = `custom-grid-${Date.now()}`;
 
     const optimisticSlide: MonthlyDumpSlide = {

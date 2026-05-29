@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, StatusBar } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { X } from 'lucide-react-native';
 import { useSharedValue, withTiming, Easing, runOnJS, cancelAnimation } from 'react-native-reanimated';
 import PhotoGridPicker, { PhotoGridPickerCompletePayload } from '@/components/monthly-dumps/photo-grid-picker';
+import MonthlyDumpImageSlide from '@/components/monthly-dumps/monthly-dump-image-slide';
+import MonthlyDumpStatusScreen from '@/components/monthly-dumps/monthly-dump-status-screen';
 import MonthlyDumpVideoSlide from '@/components/monthly-dumps/monthly-dump-video-slide';
 import MonthlyDumpProgressBarItem from '@/components/monthly-dumps/monthly-dump-progress-bar-item';
 import MonthlyDumpAudioSlide from '@/components/monthly-dumps/monthly-dump-audio-slide';
@@ -15,36 +17,53 @@ import MonthlyDumpGridPromptSlide from '@/components/monthly-dumps/monthly-dump-
 import { logger } from '@/lib/logger';
 import { MonthlyDumpService, MonthlyDumpSlide, CachedMonthlyDump } from '@/services/monthly-dump-service';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 type Slide = MonthlyDumpSlide | { type: 'grid_prompt' };
 
 export default function MonthlyDumpPage() {
   const { month } = useLocalSearchParams<{ month: string }>();
   const { user } = useAuth();
-  const { slides, isLoading } = useMonthlyDump(month);
+  const isValidMonth = typeof month === 'string' && /^\d{4}-\d{2}$/.test(month);
+  const requestedMonth = isValidMonth ? month : null;
+  const { slides, isLoading } = useMonthlyDump(requestedMonth);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showGridPicker, setShowGridPicker] = useState(false);
   const queryClient = useQueryClient();
   const router = useRouter();
 
   const progress = useSharedValue(0);
+  const hasImageSlides = useMemo(
+    () => slides.some((slide) => slide.type === 'image' && !!slide.url),
+    [slides]
+  );
 
   const allSlides = useMemo<Slide[]>(() => {
     const baseSlides = slides || [];
     return [...baseSlides, { type: 'grid_prompt' }];
   }, [slides]);
 
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [requestedMonth]);
+
+  useEffect(() => {
+    if (allSlides.length === 0) return;
+    if (currentIndex > allSlides.length - 1) {
+      setCurrentIndex(allSlides.length - 1);
+    }
+  }, [allSlides.length, currentIndex]);
+
   const monthTitle = useMemo(() => {
-    if (!month) return '';
+    if (!requestedMonth) return '';
     try {
-      const [year, monthValue] = month.split('-');
+      const [year, monthValue] = requestedMonth.split('-');
       const parsed = new Date(parseInt(year, 10), parseInt(monthValue, 10) - 1, 1);
       return parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     } catch {
-      return month;
+      return requestedMonth;
     }
-  }, [month]);
+  }, [requestedMonth]);
 
   useEffect(() => {
     const imageUrls = Array.from(
@@ -114,13 +133,14 @@ export default function MonthlyDumpPage() {
   };
 
   const customGridMutation = useMutation({
-    mutationFn: async ({ selectedPhotos, createGridImage }: PhotoGridPickerCompletePayload) => {
+    mutationFn: async ({ gridLayout, selectedPhotos, createGridImage }: PhotoGridPickerCompletePayload) => {
       if (!user?.id) throw new Error('User is required');
       if (!month) throw new Error('Month is required');
 
       const optimisticSlide = await MonthlyDumpService.enqueueCustomGridCreation({
         userId: user.id,
         month,
+        gridLayout,
         photos: selectedPhotos.map((photo) => ({
           id: String(photo.id),
           content_url: String(photo.content_url),
@@ -158,18 +178,15 @@ export default function MonthlyDumpPage() {
   });
 
   if (isLoading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="white" />
-      </View>
-    );
+    return <MonthlyDumpStatusScreen loading title="Preparing your monthly dump" subtitle="This usually only takes a moment." />;
   }
 
-  if (!month) {
+  if (!requestedMonth) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text style={{ color: 'white' }}>Invalid month parameter</Text>
-      </View>
+      <MonthlyDumpStatusScreen
+        title="Invalid month"
+        subtitle="Open the monthly dump from a valid month route, like 2026-05."
+      />
     );
   }
 
@@ -185,7 +202,7 @@ export default function MonthlyDumpPage() {
     );
   }
 
-  const currentSlide = allSlides[currentIndex];
+  const currentSlide = allSlides[currentIndex] ?? allSlides[0];
 
   return (
     <View style={styles.container}>
@@ -196,40 +213,36 @@ export default function MonthlyDumpPage() {
         onPress={handleTap}
         style={styles.contentContainer}
       >
-        {currentSlide.type === 'image' && currentSlide.url && (
-          <Image 
-            source={{ uri: currentSlide.url }} 
-            style={styles.media} 
-            contentFit="cover"
-            transition={300}
-            cachePolicy="disk"
-          />
-        )}
+        {currentSlide?.type === 'image' && currentSlide.url && <MonthlyDumpImageSlide url={currentSlide.url} />}
 
-        {currentSlide.type === 'video' && currentSlide.url && (
+        {currentSlide?.type === 'video' && currentSlide.url && (
           <MonthlyDumpVideoSlide url={currentSlide.url} />
         )}
 
-        {currentSlide.type === 'audio' && (
+        {currentSlide?.type === 'audio' && (
           <MonthlyDumpAudioSlide month={month || ''} />
         )}
 
-        {currentSlide.type === 'grid_prompt' && (
+        {currentSlide?.type === 'grid_prompt' && (
           <MonthlyDumpGridPromptSlide onCreateGrid={() => setShowGridPicker(true)} />
         )}
       </TouchableOpacity>
 
       {/* Top Controls */}
       <View style={styles.topControls}>
-        <View style={styles.progressBars}>
-          {allSlides.map((_, index) => (
-            <MonthlyDumpProgressBarItem key={index} index={index} currentIndex={currentIndex} progress={progress} />
-          ))}
-        </View>
+        {hasImageSlides ? (
+          <View style={styles.progressBars}>
+            {allSlides.map((_, index) => (
+              <MonthlyDumpProgressBarItem key={index} index={index} currentIndex={currentIndex} progress={progress} />
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.header}>
-          <View style={styles.userInfo}>
-            <Text style={styles.monthText}>{monthTitle}</Text>
+          <View style={styles.monthPill}>
+            <Text style={styles.monthText} numberOfLines={1}>
+              {monthTitle}
+            </Text>
           </View>
           <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
             <X color="white" size={28} />
@@ -245,48 +258,55 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'black',
   },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   contentContainer: {
     flex: 1,
   },
-  media: {
-    width: width,
-    height: height,
-  },
   topControls: {
     position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 10,
+    top: 42,
+    left: 16,
+    right: 16,
+    zIndex: 20,
   },
   progressBars: {
     flexDirection: 'row',
-    height: 3,
-    marginBottom: 15,
+    height: 5,
+    marginBottom: 14,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    gap: 12,
   },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  monthPill: {
+    flexShrink: 1,
+    alignSelf: 'flex-start',
+    maxWidth: '76%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(7, 17, 31, 0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
   },
   monthText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontFamily: 'Outfit-SemiBold',
     fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: 0.2,
+    textAlign: 'left',
   },
   closeButton: {
-    padding: 4,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(7, 17, 31, 0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
 });
