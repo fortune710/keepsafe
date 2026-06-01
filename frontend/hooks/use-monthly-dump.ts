@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './use-auth';
 import { CachedMonthlyDump, MonthlyDumpService, MonthlyDumpSlide } from '@/services/monthly-dump-service';
+import { monthSchema } from '@/lib/validations/monthly-dump';
 import { getDate, getDaysInMonth, subMonths, format } from 'date-fns';
 import { useMemo } from 'react';
 import { STORAGE_BUCKETS } from '@/constants/supabase';
@@ -60,11 +61,16 @@ export function useMonthlyDump(requestedMonth?: string | null): UseMonthlyDumpRe
 
   const { isEnabled, dumpMonth } = useMemo(() => {
     if (requestedMonth === null) {
-      return { isEnabled: false, dumpMonth: undefined };
+      return { isEnabled: false, dumpMonth: '' };
     }
 
-    if (requestedMonth) {
-      return { isEnabled: true, dumpMonth: requestedMonth };
+    if (requestedMonth !== undefined) {
+      const parsedMonth = monthSchema.safeParse(requestedMonth);
+      if (!parsedMonth.success) {
+        return { isEnabled: false, dumpMonth: '' };
+      }
+
+      return { isEnabled: true, dumpMonth: parsedMonth.data };
     }
 
     const today = new Date();

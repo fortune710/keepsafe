@@ -16,6 +16,7 @@ import MonthlyDumpAudioSlide from '@/components/monthly-dumps/monthly-dump-audio
 import MonthlyDumpGridPromptSlide from '@/components/monthly-dumps/monthly-dump-grid-prompt-slide';
 import { logger } from '@/lib/logger';
 import { MonthlyDumpService, MonthlyDumpSlide, CachedMonthlyDump } from '@/services/monthly-dump-service';
+import { monthSchema } from '@/lib/validations/monthly-dump';
 
 const { width } = Dimensions.get('window');
 
@@ -24,9 +25,9 @@ type Slide = MonthlyDumpSlide | { type: 'grid_prompt' };
 export default function MonthlyDumpPage() {
   const { month } = useLocalSearchParams<{ month: string }>();
   const { user } = useAuth();
-  const isValidMonth = typeof month === 'string' && /^\d{4}-\d{2}$/.test(month);
+  const isValidMonth = typeof month === 'string' && monthSchema.safeParse(month).success;
   const requestedMonth = isValidMonth ? month : null;
-  const { slides, isLoading } = useMonthlyDump(requestedMonth);
+  const { slides, isLoading, hasDump } = useMonthlyDump(requestedMonth);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showGridPicker, setShowGridPicker] = useState(false);
   const queryClient = useQueryClient();
@@ -40,8 +41,9 @@ export default function MonthlyDumpPage() {
 
   const allSlides = useMemo<Slide[]>(() => {
     const baseSlides = slides || [];
+    if (!hasDump) return baseSlides;
     return [...baseSlides, { type: 'grid_prompt' }];
-  }, [slides]);
+  }, [slides, hasDump]);
 
   useEffect(() => {
     setCurrentIndex(0);
