@@ -1,5 +1,4 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import PhotoGridPicker from '../photo-grid-picker';
