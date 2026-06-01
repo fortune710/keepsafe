@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/auth-provider';
 import { getPhonePromptState } from '@/services/phone-number-prompt-service';
@@ -6,27 +7,48 @@ import { TABLES } from '@/constants/supabase';
 import { useFeatureFlag, FEATURE_FLAGS } from '@/hooks/posthog/use-feature-flag';
 
 export function useManagePhoneSheet() {
-    const { user } = useAuthContext();
+    const { user, profile } = useAuthContext();
     const [showPhoneSheet, setShowPhoneSheet] = useState(false);
-    const { profile } = useAuthContext();
     const hidePhoneSheetFlag = useFeatureFlag(FEATURE_FLAGS.HIDE_PHONE_NUMBER_SHEET);
+    const {
+        data: pendingRecord,
+        isPending: isPendingPhoneUpdates,
+        isError: isPhoneUpdatesError
+    } = useQuery({
+        queryKey: ['phone_updates', user?.id],
+        enabled: !!user?.id,
+        queryFn: async () => {
+            if (!user?.id) {
+                throw new Error('Missing user id');
+            }
+
+            const { data } = await supabase
+                .from(TABLES.PHONE_NUMBER_UPDATES)
+                .select('id')
+                .eq('user_id', user.id)
+                .maybeSingle() as { data: { id: string } | null };
+
+            return data;
+        },
+    });
 
     useEffect(() => {
         let cancelled = false;
 
         const checkShouldShowPhonePrompt = async () => {
-            if (!user?.id) return;
-            if (profile?.phone_number) {
+            if (!user?.id) {
                 if (!cancelled) setShowPhoneSheet(false);
                 return;
             }
 
-            // If the user already has a pending OTP record, always show the sheet.
-            const { data: pendingRecord } = await supabase
-                .from(TABLES.PHONE_NUMBER_UPDATES)
-                .select('id')
-                .eq('user_id', user.id)
-                .maybeSingle() as { data: { id: string } | null };
+            if (isPendingPhoneUpdates || isPhoneUpdatesError) {
+                return;
+            }
+
+            if (profile?.phone_number) {
+                if (!cancelled) setShowPhoneSheet(false);
+                return;
+            }
 
             if (pendingRecord?.id) {
                 if (!cancelled) setShowPhoneSheet(true);
@@ -44,7 +66,7 @@ export function useManagePhoneSheet() {
         return () => {
             cancelled = true;
         };
-    }, [profile?.phone_number, user?.id]);
+    }, [isPendingPhoneUpdates, isPhoneUpdatesError, pendingRecord, profile?.phone_number, user?.id]);
 
     return {
         showPhoneSheet: hidePhoneSheetFlag ? false : showPhoneSheet,
