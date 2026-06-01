@@ -1,8 +1,9 @@
 /*
   # Initialize Monthly Dump Next Run
   
-  Sets the default `monthly_dump_next_run` for all existing profiles
-  to the 3rd to last day of the current month.
+  Sets the default monthly_dump_next_run for all existing profiles:
+  - To the 3rd-to-last day of the current month if that date hasn't passed yet
+  - Otherwise, to the 3rd-to-last day of the next month
 */
 
 UPDATE public.profiles

@@ -15,12 +15,15 @@ export const TABLES = {
   USER_STREAKS: 'user_streaks',
   PHONE_NUMBER_UPDATES: 'phone_number_updates',
   ENTRY_REPORTS: 'entry_reports',
+  MONTHLY_DUMPS: 'monthly_dumps',
 } as const;
 
 // Storage Bucket Names
 export const STORAGE_BUCKETS = {
   MEDIA: 'media',
   AVATARS: 'avatars',
+  MONTHLY_DUMPS: 'monthly_dumps',
+  STICKERS: 'stickers',
 } as const;
 
 // Entry Types
@@ -70,7 +73,7 @@ export const SCHEMA = {
     metadata: 'jsonb',
     created_at: 'timestamptz DEFAULT now()',
     updated_at: 'timestamptz DEFAULT now()',
-    
+
   },
   FRIENDSHIPS: {
     id: 'uuid PRIMARY KEY DEFAULT gen_random_uuid()',

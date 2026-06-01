@@ -11,7 +11,8 @@ class MonthlyDumpController(BaseController):
         filters = {
             "user_id": user_id,
             "month": month_date,
-            "timezone": timezone
+            "timezone": timezone,
+            "status": "completed"
         }
         return self.get(filters=filters, maybe_single=True)
 

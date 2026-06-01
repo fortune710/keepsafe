@@ -1,6 +1,6 @@
-from __future__ import annotations
 
-from typing import Any, Dict, Optional
+
+from typing import Any, Dict, Optional, List
 import json
 import logging
 import random
@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from services.queue_service import QueueService
 from services.supabase_client import get_supabase_client
 from services.monthly_dump_service import MonthlyDumpService, MonthlyDumpInputs
+from services.notification_enqueue_service import NotificationEnqueueService
 from controllers.monthly_dump_controller import MonthlyDumpController
 from database.tables import DatabaseTables
 from queue_constants import (
@@ -94,8 +95,75 @@ class MonthlyDumpQueueService:
             logger.info("No monthly dump messages available", extra={"queue": self.queue_name})
             return stats
 
+        # Group completed dump messages by month so notification enqueue happens
+        # before we acknowledge/delete the source queue message.
+        month_to_messages: Dict[str, List[Dict[str, Any]]] = {}
+
         for message in messages:
-            await self._process_message(message, stats)
+            # We need the month from the message data to group notifications
+            msg_str = message.get("message", "{}")
+            try:
+                msg_data = json.loads(msg_str) if isinstance(msg_str, str) else msg_str
+                msg_month = msg_data.get("month")
+            except Exception:
+                msg_month = None
+
+            user_id = await self._process_message(message, stats)
+            if not user_id or not msg_month:
+                continue
+
+            if msg_month not in month_to_messages:
+                month_to_messages[msg_month] = []
+
+            month_to_messages[msg_month].append({
+                "msg_id": message.get("msg_id"),
+                "user_id": user_id,
+            })
+
+        if not month_to_messages:
+            return stats
+
+        notification_enqueue_service = NotificationEnqueueService()
+        for msg_month, month_messages in month_to_messages.items():
+            user_ids = list(dict.fromkeys(
+                message["user_id"]
+                for message in month_messages
+                if message.get("user_id")
+            ))
+            if not user_ids:
+                continue
+
+            enqueue_success = await notification_enqueue_service.enqueue_monthly_dump_notifications(
+                user_ids,
+                msg_month,
+            )
+            if not enqueue_success:
+                logger.warning(
+                    "Failed to enqueue monthly dump notifications",
+                    extra={"queue": self.queue_name, "month": msg_month, "user_count": len(user_ids)},
+                )
+                stats["failed"] += len(month_messages)
+                continue
+
+            for message in month_messages:
+                msg_id = message.get("msg_id")
+                if msg_id is None:
+                    continue
+
+                try:
+                    self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
+                    stats["succeeded"] += 1
+                except Exception as delete_exc:  # noqa: BLE001
+                    logger.error(
+                        "Failed to delete monthly dump queue message after notification enqueue",
+                        extra={
+                            "queue": self.queue_name,
+                            "msg_id": msg_id,
+                            "month": msg_month,
+                            "error": str(delete_exc),
+                        },
+                    )
+                    stats["failed"] += 1
 
         logger.info(
             "Monthly dump queue processing complete",
@@ -103,7 +171,7 @@ class MonthlyDumpQueueService:
         )
         return stats
 
-    async def _process_message(self, message: Dict[str, Any], stats: Dict[str, int]) -> None:
+    async def _process_message(self, message: Dict[str, Any], stats: Dict[str, int]) -> Optional[str]:
         stats["processed"] += 1
         msg_id = message.get("msg_id")
         msg_str = message.get("message", "{}")
@@ -119,7 +187,7 @@ class MonthlyDumpQueueService:
             if msg_id is not None:
                 self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
             stats["failed"] += 1
-            return
+            return None
 
         monthly_dump_id = msg_data.get("monthly_dump_id")
         user_id = msg_data.get("user_id")
@@ -135,7 +203,7 @@ class MonthlyDumpQueueService:
             )
             self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
             stats["failed"] += 1
-            return
+            return None
 
         try:
             logger.info(
@@ -169,9 +237,7 @@ class MonthlyDumpQueueService:
                     "Monthly dump already completed, skipping processing",
                     extra={"monthly_dump_id": monthly_dump_id, "queue": self.queue_name},
                 )
-                self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
-                stats["succeeded"] += 1
-                return
+                return user_id
 
             persisted_seed = existing_dump.get("random_seed") if existing_dump else None
             if persisted_seed is not None:
@@ -198,8 +264,8 @@ class MonthlyDumpQueueService:
                 )
                 self.dump_controller.delete({"id": monthly_dump_id})
                 self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
-                stats["succeeded"] += 1
-                return
+                stats["failed"] += 1
+                return None
 
             # Ensure msg_data has the seed in case it goes to DLQ
             msg_data["random_seed"] = seed
@@ -238,8 +304,7 @@ class MonthlyDumpQueueService:
                 }
             )
 
-            self.queue_service.delete_message(queue_name=self.queue_name, message_id=msg_id)
-            stats["succeeded"] += 1
+            return user_id
         except Exception as exc:  # noqa: BLE001
             msg_data["last_error"] = str(exc)
             logger.exception(
@@ -252,6 +317,7 @@ class MonthlyDumpQueueService:
                 },
             )
             self._handle_failure(msg_id, msg_data, failure_count, stats)
+            return None
 
     def _handle_failure(
         self,

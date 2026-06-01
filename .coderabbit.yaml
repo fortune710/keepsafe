@@ -1,0 +1,3 @@
+path_filters:
+  - "!**/SKILL.md"
+  - ".agents/**.md"
