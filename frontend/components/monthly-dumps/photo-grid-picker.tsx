@@ -185,6 +185,7 @@ export default function PhotoGridPicker({ month, onComplete, onCancel }: PhotoGr
 
   const openSheet = () => {
     if (isSubmitting) return;
+    setFocusedCellIndex(null);
     setSheetVisible(true);
   };
 
@@ -443,7 +444,7 @@ export default function PhotoGridPicker({ month, onComplete, onCancel }: PhotoGr
             <View style={styles.removalPanel}>
               <View style={styles.sourceHeader}>
                 <View style={styles.sourceHeading}>
-                  <Text style={styles.sourceTitle}>Remove {removeCount} photos</Text>
+                  <Text style={styles.sourceTitle}>Remove {removeCount} photo{removeCount === 1 ? '' : 's'}</Text>
                   <Text style={styles.sourceSubtitle}>Tap the ones to drop before switching layout.</Text>
                 </View>
                 <TouchableOpacity

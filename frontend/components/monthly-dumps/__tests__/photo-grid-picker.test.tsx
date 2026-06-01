@@ -229,4 +229,28 @@ describe('PhotoGridPicker', () => {
     expect(payload.selectedPhotos).toHaveLength(6);
     expect(typeof payload.createGridImage).toBe('function');
   });
+
+  it('resets focused cell when opening entries tray so next empty cell is used', async () => {
+    const screen = renderPicker();
+
+    // 1. Fill the first cell
+    await fillCell(screen, 0);
+    expect(screen.getByText('filled-0')).toBeTruthy();
+
+    // 2. Tap the first cell to "focus" it (even if already focused, this ensures state)
+    fireEvent.press(screen.getByTestId('grid-cell-0'));
+    // Close the sheet that opened automatically
+    fireEvent.press(screen.getByTestId('monthly-dump-grid-close-button'));
+
+    // 3. Open entries from the bottom tray
+    fireEvent.press(screen.getByTestId('bottom-tray-open-entries'));
+
+    // 4. Select a photo
+    await waitFor(() => expect(screen.getByTestId('source-sheet')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('source-sheet-select-photo'));
+
+    // 5. Verify it filled cell 1, not cell 0 again
+    await waitFor(() => expect(screen.getByText('filled-1')).toBeTruthy());
+    expect(screen.getByText('filled-0')).toBeTruthy(); // Cell 0 should still be filled
+  });
 });
