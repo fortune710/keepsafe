@@ -3,11 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/auth-provider';
 import { getPhonePromptState } from '@/services/phone-number-prompt-service';
 import { TABLES } from '@/constants/supabase';
+import { useFeatureFlag, FEATURE_FLAGS } from '@/hooks/posthog/use-feature-flag';
 
 export function useManagePhoneSheet() {
     const { user } = useAuthContext();
     const [showPhoneSheet, setShowPhoneSheet] = useState(false);
     const { profile } = useAuthContext();
+    const hidePhoneSheetFlag = useFeatureFlag(FEATURE_FLAGS.HIDE_PHONE_NUMBER_SHEET);
 
     useEffect(() => {
         let cancelled = false;
@@ -45,7 +47,7 @@ export function useManagePhoneSheet() {
     }, [profile?.phone_number, user?.id]);
 
     return {
-        showPhoneSheet,
+        showPhoneSheet: hidePhoneSheetFlag ? false : showPhoneSheet,
         setShowPhoneSheet
     }
 }
