@@ -128,7 +128,7 @@ export default function CaptureScreen() {
   };
 
   const defaultAvatarUrl = getDefaultAvatarUrl(profile?.full_name || '');
-  const canShowRecap = !!month && (hasDump || isEnabled);
+  const canShowRecap = !!month && hasDump && isEnabled;
 
   const formatRecapChipMonth = (value?: string) => {
     if (!value) return '';
