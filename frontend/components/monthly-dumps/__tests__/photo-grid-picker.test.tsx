@@ -34,6 +34,32 @@ jest.mock('react-native-view-shot', () => {
   return React.forwardRef((props: any, ref: any) => React.createElement(View, { ref, ...props }));
 });
 
+jest.mock('react-native-reanimated', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: View,
+    FadeIn: { duration: jest.fn().mockReturnValue({}) },
+    FadeOut: { duration: jest.fn().mockReturnValue({}) },
+    LinearTransition: {
+      springify: () => ({
+        damping: () => ({ stiffness: () => ({}) }),
+      }),
+    },
+    useSharedValue: (val: any) => ({ value: val }),
+    useAnimatedStyle: (cb: any) => cb(),
+    withTiming: (val: any) => val,
+    runOnJS: (fn: any) => fn,
+    cancelAnimation: jest.fn(),
+    Easing: {
+      linear: (v: any) => v,
+      inOut: (v: any) => v,
+      cubic: (v: any) => v,
+    },
+  };
+});
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: jest.fn(),
 }));
@@ -252,5 +278,31 @@ describe('PhotoGridPicker', () => {
     // 5. Verify it filled cell 1, not cell 0 again
     await waitFor(() => expect(screen.getByText('filled-1')).toBeTruthy());
     expect(screen.getByText('filled-0')).toBeTruthy(); // Cell 0 should still be filled
+  });
+
+  it('pluralizes the removal title correctly in the layout reduction overlay', async () => {
+    const screen = renderPicker();
+
+    // 1. Fill 5 cells (more than the 2x2 requirement of 4)
+    for (let index = 0; index < 5; index += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await fillCell(screen, index);
+    }
+
+    // 2. Switch to 2x2 layout (requires 4)
+    fireEvent.press(screen.getByTestId('layout-switch-2x2'));
+
+    // 3. Verify it shows "Remove 1 photo"
+    await waitFor(() => expect(screen.getByText('Remove 1 photo')).toBeTruthy());
+
+    // 4. Cancel and fill one more cell (total 6)
+    fireEvent.press(screen.getByTestId('monthly-dump-grid-source-overlay-close-button'));
+    await fillCell(screen, 5);
+
+    // 5. Switch to 2x2 again
+    fireEvent.press(screen.getByTestId('layout-switch-2x2'));
+
+    // 6. Verify it shows "Remove 2 photos"
+    await waitFor(() => expect(screen.getByText('Remove 2 photos')).toBeTruthy());
   });
 });
