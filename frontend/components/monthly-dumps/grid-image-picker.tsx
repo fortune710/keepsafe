@@ -48,7 +48,6 @@ export default function GridImagePicker({ visible, month, onClose, onSelectPhoto
 
   useEffect(() => {
     if (visible) {
-      setActiveSource('entries');
       setShowSourceMenu(false);
     }
   }, [visible]);
