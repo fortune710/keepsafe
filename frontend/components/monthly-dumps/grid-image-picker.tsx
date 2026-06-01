@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   },
   sheetContainer: {
     height: SHEET_HEIGHT,
-    backgroundColor: 'rgba(8,16,30)',
+    backgroundColor: 'rgb(8,16,30)',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
