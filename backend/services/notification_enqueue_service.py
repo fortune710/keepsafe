@@ -295,13 +295,19 @@ class NotificationEnqueueService:
             )
             
             if not filtered_recipients:
-                logger.info(f"No recipients with push_notifications enabled for {month_name} dump batch")
+                logger.info(
+                    "No recipients with push_notifications enabled for dump batch",
+                    extra={"month_name": month_name, "filtered_recipients": len(filtered_recipients)},
+                )
                 return True
                 
             push_tokens = self._get_push_tokens_for_users(filtered_recipients)
             
             if not push_tokens:
-                logger.info(f"No push tokens found for {month_name} dump batch")
+                logger.info(
+                    "No push tokens found for dump batch",
+                    extra={"month_name": month_name, "push_tokens": len(push_tokens)},
+                )
                 return True
                 
             title = f"Your {month_name} Dump is Ready! 🎉"

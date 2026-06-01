@@ -6,13 +6,9 @@ from services.queues.monthly_dump_queue_service import MonthlyDumpQueueService
 from services.monthly_dump_service import MonthlyDumpResult
 
 
-@pytest.fixture
-def mock_supabase():
-    return MagicMock()
-
-
 @pytest.mark.asyncio
-async def test_monthly_dump_queue_processes_missing_entries_as_failed():
+@patch("services.queues.monthly_dump_queue_service.get_supabase_client", return_value=MagicMock())
+async def test_monthly_dump_queue_processes_missing_entries_as_failed(_mock_get_supabase_client):
     service = MonthlyDumpQueueService()
     
     # Mock queue messages
@@ -53,7 +49,8 @@ async def test_monthly_dump_queue_processes_missing_entries_as_failed():
 
 
 @pytest.mark.asyncio
-async def test_monthly_dump_queue_enqueues_notification_on_success():
+@patch("services.queues.monthly_dump_queue_service.get_supabase_client", return_value=MagicMock())
+async def test_monthly_dump_queue_enqueues_notification_on_success(_mock_get_supabase_client):
     service = MonthlyDumpQueueService()
     
     # Mock queue messages
