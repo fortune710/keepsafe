@@ -23,7 +23,7 @@
 
 2. When Calling backend APIs use the `apiFetch` helper (or `apiFetchStream` if streaming endpoint)
 
-3. Before making any calls to backend APIs, perform input validation with zod to ensure data is valid.
+3. Before making any calls to backend APIs, perform input validation with zod to ensure data is valid. Keep all validations in the `lib/validations` directory, and group them by feature (eg. `lib/validations/auth.ts` for Auth, `lib/validation/entries.ts` for Entries)
 
 ### Code Style
 1. Always evaulate negative conditions first eg.
