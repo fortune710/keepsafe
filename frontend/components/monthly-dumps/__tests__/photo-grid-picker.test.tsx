@@ -1,5 +1,4 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import PhotoGridPicker from '../photo-grid-picker';
@@ -33,6 +32,32 @@ jest.mock('react-native-view-shot', () => {
   const React = require('react');
   const { View } = require('react-native');
   return React.forwardRef((props: any, ref: any) => React.createElement(View, { ref, ...props }));
+});
+
+jest.mock('react-native-reanimated', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: View,
+    FadeIn: { duration: jest.fn().mockReturnValue({}) },
+    FadeOut: { duration: jest.fn().mockReturnValue({}) },
+    LinearTransition: {
+      springify: () => ({
+        damping: () => ({ stiffness: () => ({}) }),
+      }),
+    },
+    useSharedValue: (val: any) => ({ value: val }),
+    useAnimatedStyle: (cb: any) => cb(),
+    withTiming: (val: any) => val,
+    runOnJS: (fn: any) => fn,
+    cancelAnimation: jest.fn(),
+    Easing: {
+      linear: (v: any) => v,
+      inOut: (v: any) => v,
+      cubic: (v: any) => v,
+    },
+  };
 });
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -229,5 +254,55 @@ describe('PhotoGridPicker', () => {
     expect(payload.gridLayout).toBe('2x3');
     expect(payload.selectedPhotos).toHaveLength(6);
     expect(typeof payload.createGridImage).toBe('function');
+  });
+
+  it('resets focused cell when opening entries tray so next empty cell is used', async () => {
+    const screen = renderPicker();
+
+    // 1. Fill the first cell
+    await fillCell(screen, 0);
+    expect(screen.getByText('filled-0')).toBeTruthy();
+
+    // 2. Tap the first cell to "focus" it (even if already focused, this ensures state)
+    fireEvent.press(screen.getByTestId('grid-cell-0'));
+    // Close the sheet that opened automatically
+    fireEvent.press(screen.getByTestId('monthly-dump-grid-close-button'));
+
+    // 3. Open entries from the bottom tray
+    fireEvent.press(screen.getByTestId('bottom-tray-open-entries'));
+
+    // 4. Select a photo
+    await waitFor(() => expect(screen.getByTestId('source-sheet')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('source-sheet-select-photo'));
+
+    // 5. Verify it filled cell 1, not cell 0 again
+    await waitFor(() => expect(screen.getByText('filled-1')).toBeTruthy());
+    expect(screen.getByText('filled-0')).toBeTruthy(); // Cell 0 should still be filled
+  });
+
+  it('pluralizes the removal title correctly in the layout reduction overlay', async () => {
+    const screen = renderPicker();
+
+    // 1. Fill 5 cells (more than the 2x2 requirement of 4)
+    for (let index = 0; index < 5; index += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await fillCell(screen, index);
+    }
+
+    // 2. Switch to 2x2 layout (requires 4)
+    fireEvent.press(screen.getByTestId('layout-switch-2x2'));
+
+    // 3. Verify it shows "Remove 1 photo"
+    await waitFor(() => expect(screen.getByText('Remove 1 photo')).toBeTruthy());
+
+    // 4. Cancel and fill one more cell (total 6)
+    fireEvent.press(screen.getByTestId('monthly-dump-grid-source-overlay-close-button'));
+    await fillCell(screen, 5);
+
+    // 5. Switch to 2x2 again
+    fireEvent.press(screen.getByTestId('layout-switch-2x2'));
+
+    // 6. Verify it shows "Remove 2 photos"
+    await waitFor(() => expect(screen.getByText('Remove 2 photos')).toBeTruthy());
   });
 });

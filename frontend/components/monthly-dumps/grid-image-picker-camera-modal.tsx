@@ -51,11 +51,19 @@ export default function GridImagePickerCameraModal({
           ) : null}
 
           <View style={styles.cameraControls}>
-            <TouchableOpacity activeOpacity={0.85} onPress={onClose} style={styles.cameraCloseButton}>
+            <TouchableOpacity
+              accessibilityLabel="Close camera"
+              accessibilityRole="button"
+              activeOpacity={0.85}
+              onPress={onClose}
+              style={styles.cameraCloseButton}
+            >
               <X size={20} color="#F8FAFC" />
             </TouchableOpacity>
 
             <TouchableOpacity
+              accessibilityLabel="Capture photo"
+              accessibilityRole="button"
               activeOpacity={0.9}
               onPress={onCapture}
               disabled={!isCameraReady || isCameraCapturing}

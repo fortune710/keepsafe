@@ -4,44 +4,26 @@ import { supabase } from '@/lib/supabase';
 import { TABLES, STORAGE_BUCKETS } from '@/constants/supabase';
 import { convertToArrayBuffer } from '@/lib/utils';
 import { deviceStorage } from './device-storage';
+import {
+  monthSchema,
+  monthlyDumpGridLayoutSchema,
+  monthlyDumpGridPhotoSchema,
+  monthlyDumpSlideSchema,
+  type MonthlyDumpGridLayout,
+  type MonthlyDumpGridPhoto,
+  type MonthlyDumpResponse,
+  type MonthlyDumpSlide,
+} from '@/lib/validations/monthly-dump';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
 const MONTHLY_DUMP_CACHE_TTL_MINUTES = 31 * 24 * 60;
 const MONTHLY_DUMP_GRID_QUEUE_KEY = 'monthly_dump_grid_queue';
 
-const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
 const userIdSchema = z.string().min(1);
-const monthlyDumpGridLayoutSchema = z.enum(['2x2', '2x3']);
-export type MonthlyDumpGridLayout = z.infer<typeof monthlyDumpGridLayoutSchema>;
 const MONTHLY_DUMP_GRID_PHOTO_COUNTS: Record<MonthlyDumpGridLayout, number> = {
   '2x2': 4,
   '2x3': 6,
 };
-
-const monthlyDumpGridPhotoSchema = z.object({
-  id: z.string().min(1),
-  content_url: z.string().min(1),
-});
-
-const monthlyDumpSlideSchema = z.object({
-  type: z.enum(['image', 'video', 'audio']),
-  url: z.string().min(1),
-  duration_seconds: z.number().min(0).default(0),
-  entry_id: z.string().optional(),
-  storage_path: z.string().optional(),
-});
-
-export type MonthlyDumpSlide = z.infer<typeof monthlyDumpSlideSchema>;
-
-export interface MonthlyDumpResponse {
-  status: 'completed' | 'pending' | 'processing' | 'failed';
-  slides: MonthlyDumpSlide[];
-}
-
-export interface MonthlyDumpGridPhoto {
-  id: string;
-  content_url: string;
-}
 
 export interface CachedMonthlyDump {
   hasDump: boolean;
@@ -448,3 +430,10 @@ export class MonthlyDumpService {
     });
   }
 }
+
+export type {
+  MonthlyDumpGridLayout,
+  MonthlyDumpGridPhoto,
+  MonthlyDumpResponse,
+  MonthlyDumpSlide,
+} from '@/lib/validations/monthly-dump';

@@ -1,11 +1,9 @@
 import { useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { z } from 'zod';
 
 import { useAuth } from '@/hooks/use-auth';
 import { MonthlyDumpGridPhoto, MonthlyDumpService } from '@/services/monthly-dump-service';
-
-const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
+import { monthSchema } from '@/lib/validations/monthly-dump';
 
 interface UseMonthlyEntriesResult {
   photos: MonthlyDumpGridPhoto[];

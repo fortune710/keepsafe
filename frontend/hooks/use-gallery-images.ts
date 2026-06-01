@@ -1,11 +1,9 @@
 import { useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { z } from 'zod';
 import * as MediaLibrary from 'expo-media-library';
 
 import { MonthlyDumpGridPhoto } from '@/services/monthly-dump-service';
-
-const monthSchema = z.string().regex(/^\d{4}-\d{2}$/);
+import { monthSchema } from '@/lib/validations/monthly-dump';
 const PAGE_SIZE = 24;
 
 interface UseGalleryImagesResult {

@@ -48,7 +48,6 @@ export default function GridImagePicker({ visible, month, onClose, onSelectPhoto
 
   useEffect(() => {
     if (visible) {
-      setActiveSource('entries');
       setShowSourceMenu(false);
     }
   }, [visible]);
@@ -187,7 +186,7 @@ const styles = StyleSheet.create({
   },
   sheetContainer: {
     height: SHEET_HEIGHT,
-    backgroundColor: 'rgba(8,16,30)',
+    backgroundColor: 'rgb(8,16,30)',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
