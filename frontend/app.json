@@ -19,9 +19,9 @@
     "ios": {
       "supportsTablet": false,
       "associatedDomains": [
-        "applinks:keepsafe.fortunealebiosu.dev",
-        "applinks:www.keepsafe.fortunealebiosu.dev",
-        "applinks:app.keepsafe.fortunealebiosu.dev"
+        "applinks:keepsafe.fortunealebiosu.tech",
+        "applinks:www.keepsafe.fortunealebiosu.tech",
+        "applinks:app.keepsafe.fortunealebiosu.tech"
       ],
       "bundleIdentifier": "com.fortunethedev.keepsafe",
       "infoPlist": {
@@ -46,7 +46,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "keepsafe.fortunealebiosu.dev"
+              "host": "keepsafe.fortunealebiosu.tech"
             }
           ],
           "category": [
