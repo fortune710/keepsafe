@@ -34,7 +34,6 @@ import { CaptureHeader } from '@/components/capture/capture-header';
 import { ModeSelector } from '@/components/capture/mode-selector';
 import { MediaDisplay } from '@/components/capture/media-display';
 import { CaptureActions } from '@/components/capture/capture-actions';
-import { VaultButton } from '@/components/capture/vault-button';
 import MonthlyDumpBanner from '@/components/monthly-dumps/monthly-dump-banner';
 import { useMonthlyDump } from '@/hooks/use-monthly-dump';
 
@@ -277,8 +276,6 @@ export default function CaptureScreen() {
               toggleCameraFacing={toggleCameraFacing}
               minTouchTarget={responsive.minTouchTarget}
             />
-
-            <VaultButton />
           </View>
         </ScrollView>
       </SafeAreaView>

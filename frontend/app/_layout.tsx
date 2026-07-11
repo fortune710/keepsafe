@@ -15,7 +15,6 @@ import { useEffect } from 'react';
 import { initializeBackgroundTasks } from '@/lib/background-task-init';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppFonts } from '@/hooks/useFonts';
-import { Platform } from 'react-native';
 import { CaptureProvider } from '@/providers/capture-provider';
 import { posthog } from '@/constants/posthog';
 
@@ -51,8 +50,6 @@ export default function RootLayout() {
     return null;
   }
 
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-
   return (
     <ErrorBoundary>
       <Host>
@@ -72,25 +69,9 @@ export default function RootLayout() {
                           }}
                         />
                         <Stack.Screen name="index" />
-                        <Stack.Screen name="capture" />
+                        <Stack.Screen name="(tabs)" />
                         <Stack.Screen name="invite/[id]" />
-                        <Stack.Screen
-                          options={{
-                            animationDuration: 350,
-                            animation: 'fade_from_bottom'
-                          }}
-                          name="vault"
-                        />
-                        <Stack.Screen
-                          options={{
-                            animationDuration: 350,
-                            animation: platform === 'ios' ? 'ios_from_left' : 'default'
-                          }}
-                          name="calendar"
-                        />
-                        <Stack.Screen name="calendar/day" />
                         <Stack.Screen name="social" />
-                        <Stack.Screen name="friends" />
                         <Stack.Screen name="dreamscape" />
                         <Stack.Screen name="search" />
                         <Stack.Screen
@@ -100,7 +81,6 @@ export default function RootLayout() {
                             animation: "fade_from_bottom"
                           }}
                         />
-                        <Stack.Screen name="capture/details" />
                         <Stack.Screen name="+not-found" />
                       </Stack>
                       <StatusBar style="dark" />
