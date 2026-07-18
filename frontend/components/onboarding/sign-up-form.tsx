@@ -349,6 +349,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToSignIn }) => {
             </View>
           </View> */}
           <Text style={styles.headerTitle}>Create Account</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
         <Animated.View
@@ -528,7 +529,7 @@ const styles = StyleSheet.create({
   stepHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: verticalScale(40),
+    paddingTop: verticalScale(46),
     paddingBottom: verticalScale(20),
   },
   backButtonIOS: {
@@ -552,10 +553,15 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   headerTitle: {
+    flex: 1,
     fontSize: scale(18),
     fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
-    marginLeft: scale(36),
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: scale(36),
+    marginLeft: scale(16),
   },
   progressContainer: {
     flex: 1,
