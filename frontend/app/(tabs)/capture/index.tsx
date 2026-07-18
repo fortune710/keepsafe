@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useCameraPermissions } from 'expo-camera';
+import { StatusBar } from 'expo-status-bar';
 import Animated, {
   Easing,
   Extrapolation,
@@ -20,6 +21,8 @@ import { useTimezone } from '@/hooks/use-timezone';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useResponsive } from '@/hooks/use-responsive';
 import { logger } from '@/lib/logger';
+import { Colors } from '@/lib/constants';
+import { verticalScale } from 'react-native-size-matters';
 import PhoneNumberBottomSheet from '@/components/phone-number-bottom-sheet';
 import { useVaultPreloader } from '@/hooks/use-vault-preloader';
 import { useManagePhoneSheet } from '@/hooks/phone-number/use-manage-phone-sheet';
@@ -31,10 +34,12 @@ import { useAudioCapture } from '@/hooks/capture/use-audio-capture';
 
 // Refactored Components
 import { CaptureHeader } from '@/components/capture/capture-header';
-import { ModeSelector } from '@/components/capture/mode-selector';
+import {
+  CaptureModeSelector,
+  type CaptureUIMode,
+} from '@/components/capture/capture-mode-selector';
 import { MediaDisplay } from '@/components/capture/media-display';
 import { CaptureActions } from '@/components/capture/capture-actions';
-import { VaultButton } from '@/components/capture/vault-button';
 import MonthlyDumpBanner from '@/components/monthly-dumps/monthly-dump-banner';
 import { useMonthlyDump } from '@/hooks/use-monthly-dump';
 
@@ -44,11 +49,15 @@ export default function CaptureScreen() {
 
   const responsive = useResponsive();
   const { convertToLocalTimezone } = useTimezone();
-  const [selectedMode, setSelectedMode] = useState<'camera' | 'microphone'>('camera');
+  const [captureUIMode, setCaptureUIMode] = useState<CaptureUIMode>('photo');
+  const selectedMode: 'camera' | 'microphone' =
+    captureUIMode === 'audio' ? 'microphone' : 'camera';
   const [isRecapExpanded, setIsRecapExpanded] = useState(false);
   const [isRecapChipReady, setIsRecapChipReady] = useState(true);
   const recapBannerProgress = useSharedValue(0);
-  const recapChipRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recapChipRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const { month, hasDump, isEnabled } = useMonthlyDump();
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -72,14 +81,14 @@ export default function CaptureScreen() {
     videoDuration,
     isVideoRecording,
     setVideoDuration,
-    onCameraReady
+    onCameraReady,
   } = useVideoCapture({
     cameraRef,
     isCameraReady,
     cameraMode,
     captureMode: selectedMode,
     updateCameraMode: setCameraMode,
-    updateCameraReady: setIsCameraReady
+    updateCameraReady: setIsCameraReady,
   });
 
   const { takePicture } = usePhotoCapture({
@@ -92,7 +101,7 @@ export default function CaptureScreen() {
 
   const { toggleRecording } = useAudioCapture({
     cameraRef,
-    setVideoDuration
+    setVideoDuration,
   });
 
   const { handleUpload } = useMediaUpload(selectedMode);
@@ -103,14 +112,11 @@ export default function CaptureScreen() {
     useCallback(() => {
       unlockSave();
       logger.info('isSaveLocked', isSaveLocked);
-    }, [])
+    }, []),
   );
 
-  const {
-    isCapturing,
-    recordingDuration,
-    clearCapture
-  } = useMediaCapture();
+  const { isCapturing, recordingDuration, meteringLevel, clearCapture } =
+    useMediaCapture();
 
   // Cleanup audio recording when component unmounts (navigating away)
   useEffect(() => {
@@ -119,9 +125,23 @@ export default function CaptureScreen() {
     };
   }, []);
 
+  // Pre-configure the camera pipeline for the selected mode as soon as the user
+  // swipes/taps it, rather than waiting for the first capture attempt.
+  useEffect(() => {
+    if (captureUIMode === 'video' && cameraMode !== 'video') {
+      setCameraMode('video');
+    } else if (captureUIMode === 'photo' && cameraMode !== 'picture') {
+      setCameraMode('picture');
+    }
+  }, [captureUIMode, cameraMode]);
+
   const handleCameraCapture = async () => {
-    if (isVideoRecording) {
-      await stopVideo();
+    if (captureUIMode === 'video') {
+      if (isVideoRecording) {
+        await stopVideo();
+      } else {
+        await startVideo();
+      }
     } else {
       await takePicture();
     }
@@ -153,7 +173,10 @@ export default function CaptureScreen() {
     if (nextExpanded) {
       setIsRecapChipReady(false);
     } else {
-      const revealAfterMs = Math.max(0, RECAP_CLOSE_DURATION_MS - RECAP_CHIP_REVEAL_EARLY_MS);
+      const revealAfterMs = Math.max(
+        0,
+        RECAP_CLOSE_DURATION_MS - RECAP_CHIP_REVEAL_EARLY_MS,
+      );
       recapChipRevealTimerRef.current = setTimeout(() => {
         setIsRecapChipReady(true);
         recapChipRevealTimerRef.current = null;
@@ -161,15 +184,19 @@ export default function CaptureScreen() {
     }
 
     setIsRecapExpanded(nextExpanded);
-    recapBannerProgress.value = withTiming(nextExpanded ? 1 : 0, {
-      duration: RECAP_CLOSE_DURATION_MS,
-      easing: Easing.inOut(Easing.cubic),
-    }, (finished) => {
-      if (!finished) return;
-      if (!nextExpanded) {
-        runOnJS(setIsRecapChipReady)(true);
-      }
-    });
+    recapBannerProgress.value = withTiming(
+      nextExpanded ? 1 : 0,
+      {
+        duration: RECAP_CLOSE_DURATION_MS,
+        easing: Easing.inOut(Easing.cubic),
+      },
+      (finished) => {
+        if (!finished) return;
+        if (!nextExpanded) {
+          runOnJS(setIsRecapChipReady)(true);
+        }
+      },
+    );
   };
 
   useEffect(() => {
@@ -180,8 +207,18 @@ export default function CaptureScreen() {
   }, []);
 
   const recapBannerAnimatedStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(recapBannerProgress.value, [0, 0.2, 1], [0, 1, 1], Extrapolation.CLAMP);
-    const translateY = interpolate(recapBannerProgress.value, [0, 0.55, 1], [-24, 0, 0], Extrapolation.CLAMP);
+    const opacity = interpolate(
+      recapBannerProgress.value,
+      [0, 0.2, 1],
+      [0, 1, 1],
+      Extrapolation.CLAMP,
+    );
+    const translateY = interpolate(
+      recapBannerProgress.value,
+      [0, 0.55, 1],
+      [-24, 0, 0],
+      Extrapolation.CLAMP,
+    );
 
     return {
       opacity,
@@ -197,8 +234,13 @@ export default function CaptureScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.permissionContainer}>
-          <Text style={styles.permissionText}>We need camera permission to continue</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+          <Text style={styles.permissionText}>
+            We need camera permission to continue
+          </Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestPermission}
+          >
             <Text style={styles.permissionButtonText}>Continue</Text>
           </TouchableOpacity>
         </View>
@@ -207,64 +249,72 @@ export default function CaptureScreen() {
   }
 
   return (
-    <Animated.View
-      style={[{ flex: 1 }, styles.pageStyle]}
-      entering={SlideInUp}
-    >
-      <SafeAreaView style={styles.container}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+    <Animated.View style={[{ flex: 1 }, styles.pageStyle]} entering={SlideInUp}>
+      <StatusBar style={captureUIMode === 'audio' ? 'dark' : 'light'} />
+      <SafeAreaView
+        style={styles.container}
+        edges={['left', 'right', 'bottom']}
+      >
+        <View style={{ flex: 1 }}>
           <View style={styles.headerSection}>
             <View style={styles.headerTopLayer}>
-              <CaptureHeader
+              {/* <CaptureHeader
                 profile={profile}
                 defaultAvatarUrl={defaultAvatarUrl}
                 convertToLocalTimezone={convertToLocalTimezone}
                 onDatePress={toggleRecapBanner}
-                showRecapChip={canShowRecap && !isRecapExpanded && isRecapChipReady}
+                showRecapChip={
+                  canShowRecap && !isRecapExpanded && isRecapChipReady
+                }
                 recapChipText={`${formatRecapChipMonth(month)} Recap`}
-                highlightDateBorder={canShowRecap && !isRecapExpanded && isRecapChipReady}
-              />
+                highlightDateBorder={
+                  canShowRecap && !isRecapExpanded && isRecapChipReady
+                }
+              /> */}
             </View>
 
             <Animated.View
               pointerEvents={isRecapExpanded ? 'auto' : 'none'}
               style={[styles.bannerOverlay, recapBannerAnimatedStyle]}
             >
-              <MonthlyDumpBanner month={month} animationProgress={recapBannerProgress} />
+              <MonthlyDumpBanner
+                month={month}
+                animationProgress={recapBannerProgress}
+              />
             </Animated.View>
           </View>
 
-          <ModeSelector
+          <MediaDisplay
             selectedMode={selectedMode}
-            setSelectedMode={setSelectedMode}
-            minTouchTarget={responsive.minTouchTarget}
+            cameraInstance={cameraInstance}
+            cameraMode={cameraMode}
+            facing={facing}
+            cameraRef={cameraRef}
+            onCameraReady={onCameraReady}
+            isCameraReady={isCameraReady}
+            isVideoRecording={isVideoRecording}
+            videoDuration={videoDuration}
+            isCapturing={isCapturing}
+            recordingDuration={recordingDuration}
+            meteringLevel={meteringLevel}
+            toggleCameraFacing={toggleCameraFacing}
           />
 
           <View
             style={[
               styles.content,
               {
-                paddingHorizontal: responsive.contentPadding,
                 maxWidth: responsive.maxContentWidth,
               },
             ]}
           >
-            <MediaDisplay
-              selectedMode={selectedMode}
-              cameraInstance={cameraInstance}
-              cameraMode={cameraMode}
-              facing={facing}
-              cameraRef={cameraRef}
-              onCameraReady={onCameraReady}
-              isCameraReady={isCameraReady}
-              isVideoRecording={isVideoRecording}
-              videoDuration={videoDuration}
-              isCapturing={isCapturing}
-              recordingDuration={recordingDuration}
+            <CaptureModeSelector
+              selectedMode={captureUIMode}
+              onChange={setCaptureUIMode}
             />
 
             <CaptureActions
-              selectedMode={selectedMode}
+              captureUIMode={captureUIMode}
               handleUpload={handleUpload}
               isCapturing={isCapturing}
               isVideoRecording={isVideoRecording}
@@ -274,13 +324,10 @@ export default function CaptureScreen() {
               startVideo={startVideo}
               stopVideo={stopVideo}
               pendingVideoStartRef={pendingVideoStartRef}
-              toggleCameraFacing={toggleCameraFacing}
               minTouchTarget={responsive.minTouchTarget}
             />
-
-            <VaultButton />
           </View>
-        </ScrollView>
+        </View>
       </SafeAreaView>
 
       <PhoneNumberBottomSheet
@@ -294,10 +341,9 @@ export default function CaptureScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
-  pageStyle: {
-  },
+  pageStyle: {},
   headerSection: {
     position: 'relative',
     zIndex: 20,
@@ -321,6 +367,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignSelf: 'center',
     width: '100%',
+    paddingTop: verticalScale(8),
   },
   permissionContainer: {
     flex: 1,
@@ -348,4 +395,3 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-SemiBold',
   },
 });
-

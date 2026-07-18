@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { render, act, fireEvent, waitFor } from '@testing-library/react-native';
-import { SaveLockProvider, useSaveLock } from '../../../providers/save-lock-provider';
+import { SaveLockProvider, useSaveLock } from '../../../../providers/save-lock-provider';
 import { View, Text, Button } from 'react-native';
 
 // Verify the provider is exported correctly

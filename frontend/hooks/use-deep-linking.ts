@@ -22,8 +22,8 @@ export function useDeepLinking(): UseDeepLinkingResult {
         }
       } else if (path === '/capture') {
         router.push('/capture');
-      } else if (path === '/vault') {
-        router.push('/vault');
+      } else if (path === '/diary') {
+        router.push('/diary');
       } else if (path === '/calendar') {
         router.push('/calendar');
       } else if (path === '/friends') {

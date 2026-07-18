@@ -46,7 +46,7 @@ export default function ReportEntryScreen() {
       await deviceStorage.removeEntry(user.id, safeEntryId);
       toast('Entry reported. It has been removed from this device.');
       if (router.canGoBack()) return router.back();
-      return router.replace('/vault');
+      return router.replace('/diary');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to report this entry.';
       toast(errorMessage, 'error');

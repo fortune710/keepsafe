@@ -1,44 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+  Pressable,
+} from 'react-native';
 import { router } from 'expo-router';
-import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+} from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/lib/constants';
 import { Image } from 'expo-image';
 import { scale } from 'react-native-size-matters';
+import { AuthChoiceSheet } from '@/components/onboarding/auth-choice-sheet';
 
 const { width, height } = Dimensions.get('window');
 
-const VIDEO_HEIGHT = height * 0.55;
-
-// Module-level variable to track if the video has been played in this session
-let hasPlayedOnboardingVideo = false;
+const VIDEO_HEIGHT = height;
 
 export default function WelcomeScreen() {
-  const [videoFinished, setVideoFinished] = useState(hasPlayedOnboardingVideo);
+  const [authSheetVisible, setAuthSheetVisible] = useState(false);
 
   const player = useVideoPlayer(
-    require('@/assets/videos/onboarding-video.mp4'),
+    require('@/assets/videos/onboarding-image-new.mp4'),
     (player) => {
-      player.loop = false;
+      player.loop = true;
       player.muted = true;
-      if (hasPlayedOnboardingVideo) {
-        // Seek to the end (arbitrary large number to ensure we hit the end)
-        player.seekBy(10000);
-      } else {
-        player.play();
-      }
-    }
+      player.play();
+    },
   );
-
-  useEffect(() => {
-    const subscription = player.addListener('playToEnd', () => {
-      hasPlayedOnboardingVideo = true;
-      setVideoFinished(true);
-    });
-    return () => subscription.remove();
-  }, [player]);
 
   return (
     <View style={styles.container}>
@@ -50,58 +46,40 @@ export default function WelcomeScreen() {
           nativeControls={false}
           contentFit="cover"
         />
-        {/* Gradient overlay that fades into the background */}
-        <Animated.View
-          entering={FadeIn.duration(1000)}
-          style={styles.gradient}
-        >
-          <LinearGradient
-            colors={[
-              'rgba(240, 249, 255, 0)',
-              'rgba(240, 249, 255, 0.1)',
-              'rgba(240, 249, 255, 0.3)',
-              'rgba(240, 249, 255, 0.6)',
-              'rgba(240, 249, 255, 0.85)',
-              '#F0F9FF'
-            ]}
-            style={{ flex: 1 }}
-            locations={[0, 0.25, 0.45, 0.65, 0.85, 1]}
-          />
-        </Animated.View>
       </View>
 
       {/* Content below the video */}
       <View style={styles.contentContainer}>
-        {videoFinished && (
-          <>
-            <Animated.View entering={FadeInUp.delay(200).duration(800)} style={styles.logoContainer}>
-              <Image
-                style={{ width: scale(70), height: scale(70) }}
-                source={require('@/assets/images/keepsafe-logo-dark.png')}
-                contentFit="contain"
-              />
-              <Text style={styles.logo}>Keepsafe</Text>
-              <Text style={styles.tagline}>Your AI-powered digital diary.</Text>
-            </Animated.View>
+        <>
+          <Animated.View
+            entering={FadeInUp.delay(200).duration(800)}
+            style={styles.logoContainer}
+          >
+            <Image
+              style={{ width: scale(70), height: scale(70) }}
+              source={require('@/assets/images/keepsafe-logo-white.png')}
+              contentFit="contain"
+            />
+          </Animated.View>
 
-            <Animated.View entering={FadeInDown.delay(500).duration(800)} style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={styles.getStartedButton}
-                onPress={() => router.push('/onboarding/auth?mode=signup')}
-              >
-                <Text style={styles.buttonText}>Get Started</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.signInButton}
-                onPress={() => router.push('/onboarding/auth?mode=signin')}
-              >
-                <Text style={styles.signInButtonText}>Sign In</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </>
-        )}
+          <Animated.View
+            entering={FadeInDown.delay(500).duration(800)}
+            style={styles.buttonContainer}
+          >
+            <Pressable
+              style={styles.getStartedButton}
+              onPress={() => setAuthSheetVisible(true)}
+            >
+              <Text style={styles.buttonText}>Get Started</Text>
+            </Pressable>
+          </Animated.View>
+        </>
       </View>
+
+      <AuthChoiceSheet
+        visible={authSheetVisible}
+        onClose={() => setAuthSheetVisible(false)}
+      />
     </View>
   );
 }
@@ -111,10 +89,10 @@ const scaleFactor = 7;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#f8fcff',
   },
   videoContainer: {
-    width: width + (10 * scaleFactor),
+    width: width + 10 * scaleFactor,
     height: VIDEO_HEIGHT,
     position: 'absolute',
     top: 0,
@@ -136,7 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 32,
-    paddingTop: VIDEO_HEIGHT * 0.75,
+    paddingTop: VIDEO_HEIGHT * 0.08,
     paddingBottom: 60,
   },
   logoContainer: {
@@ -145,14 +123,14 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: scale(30),
     fontFamily: 'Outfit-Bold',
-    color: '#1E293B',
+    color: '#ffffff',
     marginBottom: 16,
     textAlign: 'center',
   },
   tagline: {
     fontSize: 18,
     fontFamily: 'Outfit-Regular',
-    color: '#64748B',
+    color: '#F1F5F9',
     textAlign: 'center',
     lineHeight: 26,
     maxWidth: width * 0.8,
@@ -165,14 +143,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#8B5CF6',
-    borderRadius: 16,
+    borderRadius: 36,
     paddingVertical: 16,
     gap: 8,
-    width: '100%'
+    width: '100%',
   },
   buttonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Outfit-SemiBold',
   },
   signInButton: {

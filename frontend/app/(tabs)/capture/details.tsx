@@ -1,5 +1,14 @@
 import { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { X, Sticker, UserPlus, UserPlus2 } from 'lucide-react-native';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
@@ -60,10 +69,9 @@ export default function DetailsScreen() {
     duration: duration ? Number(duration) : undefined,
     timestamp: new Date(),
     metadata: {
-      facing: facing as any
-    }
+      facing: facing as any,
+    },
   };
-
 
   const { user } = useAuthContext();
   const { saveEntry, isLoading } = useEntryOperations();
@@ -73,7 +81,8 @@ export default function DetailsScreen() {
   const { settings: privacySettings } = usePrivacySettings();
   const { location } = useDeviceLocation();
 
-  const showEveryoneDefault = privacySettings[PrivacySettings.AUTO_SHARE] ?? false;
+  const showEveryoneDefault =
+    privacySettings[PrivacySettings.AUTO_SHARE] ?? false;
   const showPrivateDefault = !showEveryoneDefault;
 
   // Type guard to ensure id is a defined string
@@ -84,7 +93,7 @@ export default function DetailsScreen() {
   // Convert friends data to the format expected by the UI
   // Filter out friends with undefined IDs to ensure type safety
   const realFriends: Friend[] = friends
-    .map(friendship => {
+    .map((friendship) => {
       const friendProfile = friendship.friend_profile;
       const id = friendProfile?.id;
       if (!isStringId(id)) {
@@ -93,8 +102,10 @@ export default function DetailsScreen() {
       return {
         id,
         name: friendProfile?.full_name || 'Unknown User',
-        username: friendProfile?.username ?? "",
-        avatar: friendProfile?.avatar_url || getDefaultAvatarUrl(friendProfile?.full_name ?? "", 'svg'),
+        username: friendProfile?.username ?? '',
+        avatar:
+          friendProfile?.avatar_url ||
+          getDefaultAvatarUrl(friendProfile?.full_name ?? '', 'svg'),
       };
     })
     .filter((friend): friend is Friend => friend !== null);
@@ -102,32 +113,36 @@ export default function DetailsScreen() {
   const [isPrivate, setIsPrivate] = useState(showPrivateDefault);
   const [isEveryone, setIsEveryone] = useState(showEveryoneDefault);
   const [selectedFriends, setSelectedFriends] = useState<string[]>(
-    showEveryoneDefault ? realFriends.map(friend => friend.id).filter(isStringId) : []
+    showEveryoneDefault
+      ? realFriends.map((friend) => friend.id).filter(isStringId)
+      : [],
   );
-
 
   const { toast } = useToast();
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   const [showAttachmentList, setShowAttachmentList] = useState<boolean>(false);
-  const [editorActiveTab, setEditorActiveTab] = useState<MediaCanvasItemType | undefined>(undefined);
-  const [pendingTextItemId, setPendingTextItemId] = useState<number | null>(null);
-  const [pendingTextValue, setPendingTextValue] = useState<string>("");
+  const [editorActiveTab, setEditorActiveTab] = useState<
+    MediaCanvasItemType | undefined
+  >(undefined);
+  const [pendingTextItemId, setPendingTextItemId] = useState<number | null>(
+    null,
+  );
+  const [pendingTextValue, setPendingTextValue] = useState<string>('');
 
-
-
-
-  const player = useVideoPlayer(uri as string, player => {
+  const player = useVideoPlayer(uri as string, (player) => {
     player.loop = false;
     // Don't auto-play video - let user control playback
     // player.play();
   });
 
-  const transformsRef = useRef<Record<string, { x: number; y: number; scale: number; rotation: number }>>({});
+  const transformsRef = useRef<
+    Record<string, { x: number; y: number; scale: number; rotation: number }>
+  >({});
 
-
-  const { isPlaying: videPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
-
+  const { isPlaying: videPlaying } = useEvent(player, 'playingChange', {
+    isPlaying: player.playing,
+  });
 
   const hasSelectedSharing = () => {
     return isPrivate || isEveryone || selectedFriends.length > 0;
@@ -137,10 +152,10 @@ export default function DetailsScreen() {
     setIsPrivate(false);
     setIsEveryone(false);
 
-    setSelectedFriends(prev =>
+    setSelectedFriends((prev) =>
       prev.includes(friendId)
-        ? prev.filter(id => id !== friendId)
-        : [...prev, friendId]
+        ? prev.filter((id) => id !== friendId)
+        : [...prev, friendId],
     );
   };
 
@@ -160,17 +175,27 @@ export default function DetailsScreen() {
     }
   };
 
-
-
-  const { viewShotRef, items, addText, addSticker, addMusic, addLocation, removeElement, updateTextItem } = useMediaCanvas();
+  const {
+    viewShotRef,
+    items,
+    addText,
+    addSticker,
+    addMusic,
+    addLocation,
+    removeElement,
+    updateTextItem,
+  } = useMediaCanvas();
 
   // Custom addText handler that handles pending text items
-  const handleAddText = (text: string, style: { color: string; fontFamily?: string; backgroundColor?: string }) => {
+  const handleAddText = (
+    text: string,
+    style: { color: string; fontFamily?: string; backgroundColor?: string },
+  ) => {
     // If there's a pending text item, remove it first
     if (pendingTextItemId !== null) {
       removeElement(pendingTextItemId);
       setPendingTextItemId(null);
-      setPendingTextValue("");
+      setPendingTextValue('');
     }
     // Add the new text item
     addText(text, style);
@@ -178,19 +203,19 @@ export default function DetailsScreen() {
 
   // Handle attachment type selection
   const handleAttachmentSelect = (type: MediaCanvasItemType) => {
-    if (type === "text") {
+    if (type === 'text') {
       // Auto-add text with default value
-      const defaultText = "Enter text";
+      const defaultText = 'Enter text';
       const defaultStyle = {
-        color: "#FFFFFF",
-        fontFamily: "Arial",
-        backgroundColor: "#000000",
+        color: '#FFFFFF',
+        fontFamily: 'Arial',
+        backgroundColor: '#000000',
       };
       const tempId = addText(defaultText, defaultStyle); // Returns the ID
       setPendingTextItemId(tempId);
       setPendingTextValue(defaultText);
       // Open editor with text tab
-      setEditorActiveTab("text");
+      setEditorActiveTab('text');
       setShowEditorPopover(true);
     } else {
       // For other types, just open the editor with the selected tab
@@ -202,11 +227,15 @@ export default function DetailsScreen() {
   // Handle editor popover close
   const handleEditorClose = (currentText?: string) => {
     // If there's a pending text item and it hasn't been changed or is empty, remove it
-    const textValue = currentText !== undefined ? currentText : pendingTextValue;
-    if (pendingTextItemId !== null && (textValue === "Enter text" || !textValue.trim())) {
+    const textValue =
+      currentText !== undefined ? currentText : pendingTextValue;
+    if (
+      pendingTextItemId !== null &&
+      (textValue === 'Enter text' || !textValue.trim())
+    ) {
       removeElement(pendingTextItemId);
       setPendingTextItemId(null);
-      setPendingTextValue("");
+      setPendingTextValue('');
     }
     setShowEditorPopover(false);
     setEditorActiveTab(undefined);
@@ -217,22 +246,30 @@ export default function DetailsScreen() {
     if (pendingTextItemId !== null) {
       setPendingTextValue(text);
       // Find the current style from the item
-      const currentItem = items.find(item => item.id === pendingTextItemId);
-      if (currentItem && currentItem.type === "text") {
-        updateTextItem(pendingTextItemId, text, currentItem.style || {
-          color: "#FFFFFF",
-          fontFamily: "Arial",
-          backgroundColor: "#000000",
-        });
+      const currentItem = items.find((item) => item.id === pendingTextItemId);
+      if (currentItem && currentItem.type === 'text') {
+        updateTextItem(
+          pendingTextItemId,
+          text,
+          currentItem.style || {
+            color: '#FFFFFF',
+            fontFamily: 'Arial',
+            backgroundColor: '#000000',
+          },
+        );
       }
     }
   };
 
   // Handle style changes in real-time
-  const handleStyleChange = (styleUpdates: { color?: string; fontFamily?: string; backgroundColor?: string }) => {
+  const handleStyleChange = (styleUpdates: {
+    color?: string;
+    fontFamily?: string;
+    backgroundColor?: string;
+  }) => {
     if (pendingTextItemId !== null) {
-      const currentItem = items.find(item => item.id === pendingTextItemId);
-      if (currentItem && currentItem.type === "text") {
+      const currentItem = items.find((item) => item.id === pendingTextItemId);
+      if (currentItem && currentItem.type === 'text') {
         const updatedStyle = {
           ...currentItem.style,
           ...styleUpdates,
@@ -240,14 +277,15 @@ export default function DetailsScreen() {
         updateTextItem(
           pendingTextItemId,
           currentItem.text ?? pendingTextValue,
-          updatedStyle as { color: string; fontFamily?: string; backgroundColor?: string }
+          updatedStyle as {
+            color: string;
+            fontFamily?: string;
+            backgroundColor?: string;
+          },
         );
       }
     }
   };
-
-
-
 
   const handleSave = async () => {
     if (!capture || !user || !hasSelectedSharing()) {
@@ -264,18 +302,21 @@ export default function DetailsScreen() {
     const tempId = Crypto.randomUUID();
 
     try {
-
       const entryAttachments: RenderedMediaCanvasItem[] = items.map((item) => {
         const attachments = transformsRef.current[item.id];
         return {
           ...item,
-          transforms: attachments
-        }
-      })
-      const showLocation = privacySettings[PrivacySettings.LOCATION_SHARE] ?? false;
-      const locationTag = showLocation && location?.city
-        ? [location.city, location.region ?? location.country].filter(Boolean).join(', ')
-        : null;
+          transforms: attachments,
+        };
+      });
+      const showLocation =
+        privacySettings[PrivacySettings.LOCATION_SHARE] ?? false;
+      const locationTag =
+        showLocation && location?.city
+          ? [location.city, location.region ?? location.country]
+              .filter(Boolean)
+              .join(', ')
+          : null;
 
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
@@ -290,7 +331,9 @@ export default function DetailsScreen() {
         location_tag: locationTag || null,
         is_private: isPrivate,
         shared_with_everyone: isEveryone,
-        metadata: capture.metadata ? JSON.parse(JSON.stringify(capture.metadata)) : null,
+        metadata: capture.metadata
+          ? JSON.parse(JSON.stringify(capture.metadata))
+          : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         profile: {
@@ -302,7 +345,7 @@ export default function DetailsScreen() {
           bio: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        }
+        },
       };
 
       // Add optimistic entry immediately
@@ -317,7 +360,7 @@ export default function DetailsScreen() {
         isEveryone,
         selectedFriends,
         attachments: entryAttachments,
-        tempId
+        tempId,
       });
 
       if (result.success) {
@@ -326,7 +369,7 @@ export default function DetailsScreen() {
             type: capture.type,
             is_private: isPrivate,
             is_everyone: isEveryone,
-            friends_count: selectedFriends.length
+            friends_count: selectedFriends.length,
           });
         } catch (error) {
           if (__DEV__) console.warn('Analytics capture failed:', error);
@@ -370,14 +413,14 @@ export default function DetailsScreen() {
     }
   };
 
-
   const getSaveButtonText = () => {
     if (isLoading) return 'Saving...';
     if (isSaveLocked) return 'Entry Saved';
     if (!hasSelectedSharing()) return 'Select Sharing Option';
     if (isPrivate) return 'Save Privately';
     if (isEveryone) return 'Share with Everyone';
-    if (selectedFriends.length > 0) return `Share with ${selectedFriends.length}`;
+    if (selectedFriends.length > 0)
+      return `Share with ${selectedFriends.length}`;
     return 'Save Entry';
   };
 
@@ -397,50 +440,52 @@ export default function DetailsScreen() {
           style={styles.cancelButton}
           onPress={() => setShowAttachmentList(!showAttachmentList)}
         >
-          {
-            showAttachmentList ? (
-              <UserPlus2 color="#64748B" size={24} />
-            ) : (
-              <Sticker color="#64748B" size={24} />
-            )
-          }
+          {showAttachmentList ? (
+            <UserPlus2 color="#64748B" size={24} />
+          ) : (
+            <Sticker color="#64748B" size={24} />
+          )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View
-          style={[styles.mediaContainer, capture?.type === 'audio' && styles.borderContainer]}
+          style={[
+            styles.mediaContainer,
+            capture?.type === 'audio' && styles.borderContainer,
+          ]}
         >
           {capture?.type === 'photo' && capture.uri ? (
             <MediaCanvas
               uri={capture.uri}
-              type='photo'
+              type="photo"
               ref={viewShotRef}
               items={items}
               transformsRef={transformsRef}
               removeElement={removeElement}
               facing={capture.metadata?.facing}
             />
-          ) :
-            capture?.type === 'video' ? (
-              <Pressable onPress={() => videPlaying ? player.pause() : player.play()}>
-                <VideoView
-                  style={styles.mediaPreview}
-                  player={player}
-                  contentFit='cover'
-                />
-              </Pressable>
-            ) :
-              capture?.type === 'audio' ? (
-                <AudioEntry entry={capture} />
-              ) : null}
+          ) : capture?.type === 'video' ? (
+            <Pressable
+              onPress={() => (videPlaying ? player.pause() : player.play())}
+            >
+              <VideoView
+                style={styles.mediaPreview}
+                player={player}
+                contentFit="cover"
+              />
+            </Pressable>
+          ) : capture?.type === 'audio' ? (
+            <AudioEntry entry={capture} />
+          ) : null}
         </Animated.View>
 
         <View style={styles.form}>
           {showAttachmentList ? (
-            <EntryAttachmentList
-              onSelectAttachment={handleAttachmentSelect}
-            />
+            <EntryAttachmentList onSelectAttachment={handleAttachmentSelect} />
           ) : (
             <EntryShareList
               isPrivate={isPrivate}
@@ -456,7 +501,8 @@ export default function DetailsScreen() {
           <TouchableOpacity
             style={[
               styles.saveButton,
-              (isLoading || isSaveLocked || !hasSelectedSharing()) && styles.saveButtonDisabled
+              (isLoading || isSaveLocked || !hasSelectedSharing()) &&
+                styles.saveButtonDisabled,
             ]}
             onPress={handleSave}
             disabled={isLoading || isSaveLocked || !hasSelectedSharing()}
@@ -485,7 +531,7 @@ export default function DetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -526,7 +572,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-
 
   audioWave: {
     flexDirection: 'row',
