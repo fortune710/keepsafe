@@ -1,24 +1,62 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Share, UserPlus } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
+import { UserAddIcon } from '@/components/icons/user-add-icon';
+import { ShareIcon } from '@/components/icons/share-icon';
+import { LinkIcon } from '@/components/icons/link-icon';
 import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
+import { useFriendInvitation } from '@/hooks/use-friend-invitation';
+import { useToast } from '@/hooks/use-toast';
 
-interface AddFriendsSectionProps {
-  showModal: () => void;
-}
+// Near-black, but not pure black, so the icons read as dark rather than harsh.
+const ICON_COLOR = '#0F172A';
 
-export default function AddFriendsSection({ showModal }: AddFriendsSectionProps) {
+export default function AddFriendsSection() {
+  const { copyInviteLink, shareInviteLink } = useFriendInvitation();
+  const { toast } = useToast();
+
+  const handleCopyLink = async () => {
+    const success = await copyInviteLink();
+    toast(
+      success ? 'Invite link copied to clipboard' : 'Failed to copy invite link',
+      success ? 'success' : 'error',
+    );
+  };
+
+  const handleShareLink = async () => {
+    try {
+      await shareInviteLink();
+    } catch {
+      toast('Failed to share invite link', 'error');
+    }
+  };
+
   return (
     <View style={styles.addFriendsSection}>
       <View style={styles.sectionHeader}>
-        <UserPlus color="#8B5CF6" size={16} />
+        <UserAddIcon color="#64748B" size={26} strokeWidth={1.25} />
         <Text style={styles.sectionTitle}>Find More Friends</Text>
       </View>
-      
-      <TouchableOpacity style={styles.shareButton} onPress={showModal}>
-        <Share color={Colors.white} size={scale(16)} />
-        <Text style={styles.shareButtonText}>Share Your Link</Text>
+
+      <TouchableOpacity style={styles.shareButton} onPress={handleShareLink}>
+        <View style={styles.shareButtonLeft}>
+          <View style={styles.iconCircle}>
+            <ShareIcon color={ICON_COLOR} size={scale(20)} strokeWidth={2} />
+          </View>
+          <Text style={styles.shareButtonText}>Share Your Link</Text>
+        </View>
+        <ChevronRight color={Colors.textMuted} size={20} />
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.copyButton} onPress={handleCopyLink}>
+        <View style={styles.copyButtonLeft}>
+          <View style={styles.iconCircle}>
+            <LinkIcon color={ICON_COLOR} size={scale(20)} strokeWidth={2.2} />
+          </View>
+          <Text style={styles.copyButtonText}>Copy Link</Text>
+        </View>
+        <ChevronRight color={Colors.textMuted} size={20} />
       </TouchableOpacity>
     </View>
   );
@@ -32,7 +70,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 4,
   },
   sectionTitle: {
     fontSize: moderateScale(14),
@@ -44,18 +82,51 @@ const styles = StyleSheet.create({
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primary,
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     // Ensure minimum touch target (iOS guideline: 44pt)
     minHeight: 44,
+    marginBottom: 0,
+  },
+  shareButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   shareButtonText: {
-    color: Colors.white,
+    color: Colors.text,
     fontSize: moderateScale(14),
     fontFamily: 'Outfit-Bold',
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: 10,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    paddingVertical: 12,
+    minHeight: 44,
+  },
+  copyButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  copyButtonText: {
+    color: Colors.text,
+    fontSize: moderateScale(14),
+    fontFamily: 'Outfit-Bold',
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

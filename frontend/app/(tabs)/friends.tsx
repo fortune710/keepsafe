@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, RefreshControl, StyleSheet } from 'react-native';
+import { RefreshControl, StyleSheet } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import InvitePopover from '@/components/invite-popover';
 import { useFriends } from '@/hooks/use-friends';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useSuggestedFriends } from '@/hooks/use-suggested-friends';
+import { useFriendInvitation } from '@/hooks/use-friend-invitation';
 import { useToast } from '@/hooks/use-toast';
 import { useResponsive } from '@/hooks/use-responsive';
 import { LocalNotificationService } from '@/services/local-notification-service';
 import { logger } from '@/lib/logger';
 import { useContactSearch, ContactSearchResult } from '@/hooks/use-contact-search';
 import { getDefaultAvatarUrl } from '@/lib/utils';
+import { Colors } from '@/lib/constants';
 
 // Import refactored components
 import { FriendsHeader } from '@/components/friends/friends-header';
@@ -50,10 +52,10 @@ export default function FriendsScreen() {
 
 
   const { suggestedFriends } = useSuggestedFriends();
+  const { shareInviteLink } = useFriendInvitation();
 
 
   // Local state
-  const [showInvitePopover, setShowInvitePopover] = useState(false);
   const [searchMode, setSearchMode] = useState<SearchMode>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -122,8 +124,12 @@ export default function FriendsScreen() {
     handleShareLink();
   };
 
-  const handleShareLink = () => {
-    setShowInvitePopover(true);
+  const handleShareLink = async () => {
+    try {
+      await shareInviteLink();
+    } catch {
+      showToast('Failed to share invite link', 'error');
+    }
   };
 
   const handleSearch = (query: string) => {
@@ -164,11 +170,17 @@ export default function FriendsScreen() {
   }));
 
 
+  const isSearching = searchMode !== null;
+
   return (
     <SafeAreaView style={styles.container}>
-      <FriendsHeader title="Friends" />
+      {!isSearching && (
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+          <FriendsHeader title="Friends" />
+        </Animated.View>
+      )}
 
-      <View style={styles.viewContainer}>
+      <Animated.View style={styles.viewContainer} layout={LinearTransition.duration(250)}>
         {error ? (
           <ErrorState
             title="Unable to Load Friends"
@@ -207,18 +219,11 @@ export default function FriendsScreen() {
             handleAcceptRequest={handleAcceptRequest}
             handleDeclineRequest={handleDeclineRequest}
             handleBlockFriend={handleBlockFriend}
-            handleShareLink={handleShareLink}
             refreshing={refreshing}
             handleRefresh={handleRefresh}
           />
         )}
-      </View>
-
-
-      <InvitePopover
-        isVisible={showInvitePopover}
-        onClose={() => setShowInvitePopover(false)}
-      />
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -226,7 +231,7 @@ export default function FriendsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   viewContainer: {
     flex: 1,
