@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Users } from 'lucide-react-native';
+import { UsersIcon } from './icons/users-icon';
 import FriendItem, { Friend } from './friend-item';
 import { FRIENDSHIP_STATUS } from '@/constants/supabase';
 import Badge from './ui/badge';
@@ -92,7 +93,7 @@ export default function FriendsSection({
       {connectedFriends.length > 0 && (
         <>
           <View style={styles.sectionHeader}>
-            <Users color="#10B981" size={16} />
+            <UsersIcon color="#64748B" size={26} strokeWidth={1.25} />
             <Text style={styles.sectionTitle}>
               Your Friends
             </Text>

@@ -9,30 +9,36 @@ type BackButtonPlacement = 'left' | 'right';
 interface PageHeaderProps {
   title: string;
   backButtonPlacement?: BackButtonPlacement;
+  hideBackButton?: boolean;
+  backgroundColor?: string;
 }
 
 export default function PageHeader({
   title,
   backButtonPlacement = 'right',
+  hideBackButton = false,
+  backgroundColor = '#F0F9FF',
 }: PageHeaderProps) {
   const isLeftPlacement = backButtonPlacement === 'left';
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor }]}>
       <Text style={styles.title}>{title}</Text>
-      <TouchableOpacity
-        style={[
-          styles.backButton,
-          isLeftPlacement ? styles.leftPlacement : styles.rightPlacement,
-        ]}
-        onPress={() => router.back()}
-      >
-        {isLeftPlacement ? (
-          <ChevronLeft color="#64748B" size={24} />
-        ) : (
-          <ChevronRight color="#64748B" size={24} />
-        )}
-      </TouchableOpacity>
+      {!hideBackButton && (
+        <TouchableOpacity
+          style={[
+            styles.backButton,
+            isLeftPlacement ? styles.leftPlacement : styles.rightPlacement,
+          ]}
+          onPress={() => router.back()}
+        >
+          {isLeftPlacement ? (
+            <ChevronLeft color="#64748B" size={24} />
+          ) : (
+            <ChevronRight color="#64748B" size={24} />
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -44,7 +50,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(12),
-    backgroundColor: '#F0F9FF',
   },
   title: {
     fontSize: 20,

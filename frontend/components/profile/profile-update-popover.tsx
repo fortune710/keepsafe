@@ -1,7 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView } from 'react-native';
-import Animated, { SlideInDown, SlideOutDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { X } from 'lucide-react-native';
 import { NameUpdateForm } from './name-update-form';
 import { UsernameUpdateForm } from './username-update-form';
@@ -9,10 +7,8 @@ import { BioUpdateForm } from './bio-update-form';
 import { AvatarUpdateForm } from './avatar-update-form';
 import { BirthdayUpdateForm } from './birthday-update-form';
 import { PhoneUpdateForm } from './phone-update-form';
-import { verticalScale } from 'react-native-size-matters';
-
-const { height } = Dimensions.get('window');
-const BASE_PADDING_BOTTOM = 80;
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { scale, verticalScale } from 'react-native-size-matters';
 
 type UpdateType = 'name' | 'username' | 'bio' | 'avatar' | 'birthday' | 'phone';
 
@@ -25,28 +21,18 @@ interface ProfileUpdatePopoverProps {
   onError?: (message: string) => void;
 }
 
-export default function ProfileUpdatePopover({ 
-  isVisible, 
-  updateType, 
-  currentValue = '', 
-  onClose, 
-  onSuccess, 
-  onError 
+/**
+ * Uses the shared `BottomSheet` component so it matches the style and layout
+ * used by the onboarding bottom sheets and the phone number bottom sheet.
+ */
+export default function ProfileUpdatePopover({
+  isVisible,
+  updateType,
+  currentValue = '',
+  onClose,
+  onSuccess,
+  onError
 }: ProfileUpdatePopoverProps) {
-  const keyboard = useAnimatedKeyboard();
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    paddingBottom: BASE_PADDING_BOTTOM + keyboard.height.value + 30,
-  }));
-
-  // Swipe down gesture to dismiss
-  const swipeDownGesture = Gesture.Pan()
-    .onEnd((event) => {
-      if (event.translationY > 100 && event.velocityY > 500) {
-        onClose();
-      }
-    });
-
   const getTitle = () => {
     switch (updateType) {
       case 'name': return 'Update Name';
@@ -78,95 +64,59 @@ export default function ProfileUpdatePopover({
     }
   };
 
-  if (!isVisible) return null;
-
   return (
-    <Animated.View 
-      style={styles.overlay}
-      testID="profile-update-popover"
-    >
-      <TouchableOpacity style={styles.backdrop} onPress={onClose} />
-      
-      <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View 
-          style={[styles.popover, animatedStyle]}
-          entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)} 
-          exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
-        >
-          <View style={styles.handle} />
-          
-          <View style={styles.header}>
-            <Text style={styles.title}>{getTitle()}</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X color="#64748B" size={20} />
-            </TouchableOpacity>
-          </View>
+    <BottomSheet visible={isVisible} onClose={onClose} maxHeight="90%">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.header}>
+          <Text style={styles.title} numberOfLines={1}>{getTitle()}</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={12}>
+            <X color="#64748B" size={20} />
+          </TouchableOpacity>
+        </View>
 
-          <ScrollView 
-            style={styles.scrollView}
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-          >
-            {renderForm()}
-          </ScrollView>
-        </Animated.View>
-      </GestureDetector>
-    </Animated.View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          {renderForm()}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  popover: {
-    position: 'absolute',
-    bottom: verticalScale(-30),
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: verticalScale(BASE_PADDING_BOTTOM),
-    maxHeight: height * 0.9, // Increased max height to allow for keyboard
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 20,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    paddingHorizontal: scale(20),
+    paddingBottom: verticalScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    flex: 1,
+    fontSize: scale(17),
+    fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
+    marginRight: scale(12),
   },
   closeButton: {
-    padding: 4,
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 0,
   },
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: scale(20),
+    paddingTop: verticalScale(16),
+    paddingBottom: verticalScale(20),
   },
 });

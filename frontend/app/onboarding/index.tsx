@@ -19,6 +19,7 @@ import { Colors } from '@/lib/constants';
 import { Image } from 'expo-image';
 import { scale } from 'react-native-size-matters';
 import { AuthChoiceSheet } from '@/components/onboarding/auth-choice-sheet';
+import { useAuthContext } from '@/providers/auth-provider';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,6 +27,18 @@ const VIDEO_HEIGHT = height;
 
 export default function WelcomeScreen() {
   const [authSheetVisible, setAuthSheetVisible] = useState(false);
+  const { user, session, loading } = useAuthContext();
+
+  // app/index.tsx's redirect only fires once, on initial mount - if the
+  // session hydrates or refreshes a moment after that check ran (e.g. the
+  // token refresh landing just after cold start), we'd otherwise be stuck
+  // showing onboarding despite having a valid session. Re-check here so an
+  // active session always forwards to the app.
+  useEffect(() => {
+    if (!loading && user && session) {
+      router.replace('/capture');
+    }
+  }, [loading, user, session]);
 
   const player = useVideoPlayer(
     require('@/assets/videos/onboarding-image-new.mp4'),

@@ -60,35 +60,23 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
   };
 
   const handleRemove = () => {
-    if (friend.status === 'pending') {
-      // For pending requests, show accept/decline options
-      Alert.alert(
-        'Friend Request',
-        `${friend.name} wants to connect with you`,
-        [
-          { text: 'Decline', style: 'destructive', onPress: () => onDecline?.(friend.id) },
-          { text: 'Accept', onPress: () => onAccept?.(friend.id) },
-        ]
-      );
-    } else {
-      // For connected friends, show options to remove or block
-      Alert.alert(
-        'Cancel Friend',
-        `What would you like to do with ${friend.name}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Remove Friend',
-            onPress: confirmRemove,
-          },
-          {
-            text: 'Block Friend',
-            style: 'destructive',
-            onPress: confirmBlock,
-          },
-        ]
-      );
-    }
+    // For connected friends, show options to remove or block
+    Alert.alert(
+      'Cancel Friend',
+      `What would you like to do with ${friend.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Friend',
+          onPress: confirmRemove,
+        },
+        {
+          text: 'Block Friend',
+          style: 'destructive',
+          onPress: confirmBlock,
+        },
+      ]
+    );
   };
 
   const handlePress = () => {
@@ -121,7 +109,6 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
       >
         <View style={styles.avatarContainer}>
           <Image source={{ uri: friend.avatar }} style={styles.avatar} />
-          <View style={[styles.avatarBorder, { borderColor: Colors.primary }]} />
         </View>
 
         <View style={styles.friendInfo}>
@@ -129,17 +116,32 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
           <Text style={styles.friendEmail}>{friend.username}</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={handleRemove}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          {friend.status === 'pending' ? (
-            <Plus color="#10B981" strokeWidth={3} size={18} />
-          ) : (
+        {friend.status === 'pending' ? (
+          <View style={styles.pendingActions}>
+            <TouchableOpacity
+              style={styles.declineButton}
+              onPress={() => onDecline?.(friend.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <X color="#EF4444" strokeWidth={3} size={16} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.acceptButton}
+              onPress={() => onAccept?.(friend.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Plus color="#10B981" strokeWidth={3} size={16} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.removeButton}
+            onPress={handleRemove}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <X color="#EF4444" strokeWidth={3} size={18} />
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </View>
     </Animated.View>
   );
@@ -160,16 +162,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-  },
-  avatarBorder: {
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    borderColor: Colors.primary
   },
   statusIndicator: {
     position: 'absolute',
@@ -203,9 +195,31 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   removeButton: {
-    padding: 8,
-    borderRadius: 8,
-    minWidth: 32,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: `${Colors.danger}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  declineButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: `${Colors.danger}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: `${Colors.success}15`,
     alignItems: 'center',
     justifyContent: 'center',
   },

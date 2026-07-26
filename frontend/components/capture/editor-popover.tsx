@@ -1,21 +1,10 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-} from "react-native";
-import Animated, {
-  SlideInDown,
-  SlideOutDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { View, StyleSheet } from "react-native";
 import { verticalScale } from "react-native-size-matters";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useMusicTag } from "@/hooks/use-music-tag";
 import { MediaCanvasItemType, MusicTag } from "@/types/capture";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import TextTab from "./editor/text-tab";
 import StickerTab from "./editor/sticker-tab";
 import MusicTab from "./editor/music-tab";
@@ -109,107 +98,62 @@ export default function EditorPopover({
   }
 
 
-  if (!isVisible) return null;
-
   return (
-    <Animated.View style={styles.overlay}>
-      <TouchableOpacity style={styles.backdrop} onPress={() => onClose(textInput)} />
-
-      <Animated.View
-        entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)}
-        exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
-        style={[styles.popover]}
-      >
-        {/* Handle */}
-        <View style={styles.handle} />
-
-        {/* Content */}
-        <View style={styles.tabContent}>
-          {activeTab === "text" ? (
-            <TextTab
-              textInput={textInput}
-              onTextChange={handleTextChange}
-              selectedColor={selectedStyle.color}
-              onColorChange={(color) => {
-                setSelectedStyle({ ...selectedStyle, color });
-                if (onStyleChange) {
-                  onStyleChange({ color });
-                }
-              }}
-              selectedFont={selectedStyle.fontFamily}
-              onFontChange={(font) => {
-                setSelectedStyle({ ...selectedStyle, fontFamily: font });
-                if (onStyleChange) {
-                  onStyleChange({ fontFamily: font });
-                }
-              }}
-              selectedBackgroundColor={selectedStyle.backgroundColor}
-              onBackgroundColorChange={(color) => {
-                setSelectedStyle({ ...selectedStyle, backgroundColor: color });
-                if (onStyleChange) {
-                  onStyleChange({ backgroundColor: color });
-                }
-              }}
-            />
-          ) : activeTab === "sticker" ? (
-            <StickerTab
-              onSelectSticker={confirmStickerSelection}
-            />
-          ) : activeTab === "music" ? (
-            <MusicTab
-              isLoading={isLoading}
-              musicQuery={musicTag}
-              onMusicQueryChange={setMusicTag}
-              musicTags={musicTags ?? []}
-              onSelectMusic={confirmMusicSelection}
-            />
-          ) : (
-            <LocationTab
-              onSelectLocation={confirmLocationSelection}
-            />
-          )}
-        </View>
-      </Animated.View>
-    </Animated.View>
+    <BottomSheet
+      visible={isVisible}
+      onClose={() => onClose(textInput)}
+      maxHeight="80%"
+    >
+      <View style={styles.tabContent}>
+        {activeTab === "text" ? (
+          <TextTab
+            textInput={textInput}
+            onTextChange={handleTextChange}
+            selectedColor={selectedStyle.color}
+            onColorChange={(color) => {
+              setSelectedStyle({ ...selectedStyle, color });
+              if (onStyleChange) {
+                onStyleChange({ color });
+              }
+            }}
+            selectedFont={selectedStyle.fontFamily}
+            onFontChange={(font) => {
+              setSelectedStyle({ ...selectedStyle, fontFamily: font });
+              if (onStyleChange) {
+                onStyleChange({ fontFamily: font });
+              }
+            }}
+            selectedBackgroundColor={selectedStyle.backgroundColor}
+            onBackgroundColorChange={(color) => {
+              setSelectedStyle({ ...selectedStyle, backgroundColor: color });
+              if (onStyleChange) {
+                onStyleChange({ backgroundColor: color });
+              }
+            }}
+          />
+        ) : activeTab === "sticker" ? (
+          <StickerTab
+            onSelectSticker={confirmStickerSelection}
+          />
+        ) : activeTab === "music" ? (
+          <MusicTab
+            isLoading={isLoading}
+            musicQuery={musicTag}
+            onMusicQueryChange={setMusicTag}
+            musicTags={musicTags ?? []}
+            onSelectMusic={confirmMusicSelection}
+          />
+        ) : (
+          <LocationTab
+            onSelectLocation={confirmLocationSelection}
+          />
+        )}
+      </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  popoverContent: {
-    //minHeight: verticalScale(470)
-  },
-  overlay: {
-    position: "absolute",
-    top: verticalScale(-50),
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  popover: {
-    position: "absolute",
-    bottom: verticalScale(-40),
-    left: 0,
-    right: 0,
-    backgroundColor: "white",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: verticalScale(40),
-    paddingHorizontal: 24,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 12,
-    marginBottom: 20,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",

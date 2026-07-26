@@ -6,6 +6,7 @@ import FriendsSection from '@/components/friends-section';
 import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
 import AddFriendsSection from '@/components/friends/add-friends-section';
 import { SearchMode, SuggestedFriend } from '@/types/friends';
+import { Colors } from '@/lib/constants';
 
 interface FriendsDefaultViewProps {
     allFriends: any[];
@@ -15,7 +16,6 @@ interface FriendsDefaultViewProps {
     handleAcceptRequest: (id: string) => void;
     handleDeclineRequest: (id: string) => void;
     handleBlockFriend: (id: string) => void;
-    handleShareLink: () => void;
     refreshing: boolean;
     handleRefresh: () => void;
 }
@@ -31,7 +31,6 @@ export function FriendsDefaultView({
     handleAcceptRequest,
     handleDeclineRequest,
     handleBlockFriend,
-    handleShareLink,
     refreshing,
     handleRefresh
 }: FriendsDefaultViewProps) {
@@ -79,7 +78,7 @@ export function FriendsDefaultView({
                 ) : null}
 
                 <SuggestedFriendsList friends={suggestedFriends} />
-                <AddFriendsSection showModal={handleShareLink} />
+                <AddFriendsSection />
             </View>
         </ScrollView>
     );
@@ -96,8 +95,10 @@ const styles = StyleSheet.create({
     searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'white',
+        backgroundColor: Colors.card,
         borderRadius: 16,
+        borderWidth: 1,
+        borderColor: Colors.border,
         paddingHorizontal: 16,
         paddingVertical: 12,
         marginTop: verticalScale(8),

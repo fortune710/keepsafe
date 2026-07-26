@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Bell, Users, Calendar, UserPlus } from 'lucide-react-native';
+import { Bell, Users, Calendar, UserPlus } from 'lucide-react-native';
+import { BackButton } from '@/components/back-button';
 import { NotificationSettings } from '@/types/notifications';
 import { useNotificationSettings } from '@/hooks/use-notification-settings';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { Colors } from '@/lib/constants';
 
 interface NotificationSetting {
   id: NotificationSettings;
@@ -13,8 +15,11 @@ interface NotificationSetting {
   description: string;
   icon: any;
   enabled: boolean;
-  color: string;
 }
+
+// Every setting icon shares this neutral slate color, matching the main
+// settings screen.
+const SETTING_ICON_COLOR = '#64748B';
 
 const DEFAULT_SETTINGS: NotificationSetting[] = [
   {
@@ -23,7 +28,6 @@ const DEFAULT_SETTINGS: NotificationSetting[] = [
     description: 'Receive notifications on your device',
     icon: Bell,
     enabled: true,
-    color: '#8B5CF6',
   },
   {
     id: NotificationSettings.FRIEND_ACTIVITY,
@@ -31,7 +35,6 @@ const DEFAULT_SETTINGS: NotificationSetting[] = [
     description: 'When friends share moments with you',
     icon: Users,
     enabled: true,
-    color: '#059669',
   },
   {
     id: NotificationSettings.ENTRY_REMINDER,
@@ -39,7 +42,6 @@ const DEFAULT_SETTINGS: NotificationSetting[] = [
     description: 'Daily prompts to capture moments',
     icon: Calendar,
     enabled: false,
-    color: '#F59E0B',
   },
   {
     id: NotificationSettings.FRIEND_REQUESTS,
@@ -47,7 +49,6 @@ const DEFAULT_SETTINGS: NotificationSetting[] = [
     description: 'When someone sends you a friend request or accepts your request',
     icon: UserPlus,
     enabled: true,
-    color: '#EF4444',
   },
 ];
 
@@ -62,12 +63,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft color="#64748B" size={24} />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Notifications</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -87,8 +83,8 @@ export default function NotificationsScreen() {
 
             return (
               <View key={setting.id} style={styles.settingItem}>
-                <View style={[styles.iconContainer, { backgroundColor: `${setting.color}15` }]}>
-                  <IconComponent color={setting.color} size={20} />
+                <View style={styles.iconContainer}>
+                  <IconComponent color={SETTING_ICON_COLOR} size={20} />
                 </View>
                 
                 <View style={styles.settingContent}>
@@ -121,7 +117,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -129,9 +125,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(12),
-  },
-  backButton: {
-    padding: 8,
   },
   title: {
     fontSize: 20,
@@ -158,27 +151,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   settingsContainer: {
-    backgroundColor: 'white',
     marginHorizontal: 20,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${SETTING_ICON_COLOR}15`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,

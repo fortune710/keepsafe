@@ -2,7 +2,7 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -51,4 +51,19 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     },
   },
 });
+
+// autoRefreshToken alone doesn't reliably refresh in the background on native -
+// the OS suspends JS execution, so the scheduled refresh timer can be missed
+// entirely while backgrounded. Tie it to AppState so the token is refreshed
+// as soon as the app becomes active, instead of getSession() silently
+// returning a session with an expired access token.
+if (Platform.OS !== 'web') {
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      supabase.auth.startAutoRefresh();
+    } else {
+      supabase.auth.stopAutoRefresh();
+    }
+  });
+}
 

@@ -1,6 +1,8 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { ChevronRight, Sparkles, Settings } from 'lucide-react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, LayoutChangeEvent } from 'react-native';
+import { Flame } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import Animated, { SlideInLeft, SlideOutLeft } from 'react-native-reanimated';
 import { useEntries } from '@/hooks/use-entries';
@@ -8,17 +10,27 @@ import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { verticalScale } from 'react-native-size-matters';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
-import { formatMonthYear, generateMonths, getDaysInMonth, hasEntries, getEntryCount, dayNames } from '@/lib/utils';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import StreakElement from '@/components/streaks/streak-element';
+import { formatMonthYear, formatDateWithoutYear, generateMonths, getDaysInMonth, hasEntries, dayNames, getDefaultAvatarUrl } from '@/lib/utils';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTimezone } from '@/hooks/use-timezone';
+import { Colors } from '@/lib/constants';
 
 export default function CalendarScreen() {
-  const { user } = useAuthContext();
+  const { user, profile } = useAuthContext();
   const { entries, isLoading } = useEntries(user?.id);
-  const { currentStreak, maxStreak, isLoading: streakLoading, checkAndUpdateStreak } = useStreakTracking(user?.id);
+  const { currentStreak, isLoading: streakLoading, checkAndUpdateStreak } = useStreakTracking(user?.id);
   const scrollViewRef = useRef<FlashListRef<Date>>(null);
   const { getLocalDateString } = useTimezone();
+  const insets = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  const handleHeaderLayout = (event: LayoutChangeEvent) => {
+    setHeaderHeight(event.nativeEvent.layout.height);
+  };
+
+  const today = new Date();
+  const todayWeekday = today.toLocaleDateString('en-US', { weekday: 'long' });
+  const todayDate = formatDateWithoutYear(today);
 
   // Process entries data for calendar display
   const entriesData = React.useMemo(() => {
@@ -69,97 +81,102 @@ export default function CalendarScreen() {
       exiting={SlideOutLeft}
       style={styles.container}
     >
+      <StatusBar style="dark" />
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Timeline</Text>
+        <View style={styles.body}>
+          {
+            isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+                <Text style={styles.loadingText}>Loading your entries...</Text>
+              </View>
+            ) :
+              <FlashList
+                contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 20 }]}
+                onLoad={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+                ref={scrollViewRef}
+                data={months}
+                renderItem={({ item: monthDate, index }) => {
+                  const days = getDaysInMonth(monthDate);
 
-          <View style={styles.rightIcons}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => router.push('/settings')}
-            >
-              <Settings color="#64748B" size={20} />
-            </TouchableOpacity>
+                  return (
+                    <View key={index} style={styles.monthCard}>
+                      <View style={styles.monthHeader}>
+                        <Text style={styles.monthTitle}>{formatMonthYear(monthDate)}</Text>
+                      </View>
 
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => router.back()}
-            >
-              <ChevronRight color="#64748B" size={20} />
+                      <View style={styles.calendar}>
+                        <View style={styles.dayNamesRow}>
+                          {dayNames.map(dayName => (
+                            <Text key={dayName} style={styles.dayName}>{dayName}</Text>
+                          ))}
+                        </View>
+
+                        <View style={styles.daysGrid}>
+                          {days.map((day, dayIndex) => (
+                            <TouchableOpacity
+                              key={dayIndex}
+                              style={styles.dayCell}
+                              disabled={day === null || !hasEntries(day, monthDate, entriesData)}
+                              onPress={() => day && handleDayPress(day, monthDate)}
+                            >
+                              {day && (
+                                <View style={styles.dayContent}>
+                                  {hasEntries(day, monthDate, entriesData) ? (
+                                    <View style={styles.dayNumberCircle}>
+                                      <Text style={styles.dayNumberActive}>{day}</Text>
+                                    </View>
+                                  ) : (
+                                    <Text style={styles.dayNumber}>{day}</Text>
+                                  )}
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                }}
+              />
+          }
+        </View>
+
+        <View
+          style={[styles.headerOverlay, { top: insets.top }]}
+          onLayout={handleHeaderLayout}
+        >
+          <View style={styles.header}>
+            <View style={styles.dateStack}>
+              <Text style={styles.weekday}>{todayWeekday}</Text>
+              <Text style={styles.title}>{todayDate}</Text>
+            </View>
+
+            {/* TODO: gate behind `currentStreak > 0` once the design is approved -
+                kept persistent for now so the badge is visible for review. */}
+            <View style={styles.streakBadge}>
+              <Flame color="#F59E0B" size={14} fill="#F59E0B" />
+              <Text style={styles.streakBadgeText}>
+                {currentStreak} {currentStreak === 1 ? 'day' : 'days'} strong
+              </Text>
+            </View>
+
+            <TouchableOpacity onPress={() => router.push('/settings')}>
+              <Image
+                source={{ uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || '') }}
+                style={styles.avatar}
+              />
             </TouchableOpacity>
           </View>
         </View>
 
-        {
-          isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#8B5CF6" />
-              <Text style={styles.loadingText}>Loading your entries...</Text>
-            </View>
-          ) :
-            <FlashList
-              contentContainerStyle={styles.scrollContent}
-              onLoad={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-              ref={scrollViewRef}
-              ListFooterComponent={
-                <StreakElement
-                  isLoading={streakLoading}
-                  currentStreak={currentStreak}
-                  maxStreak={maxStreak}
-                />
-              }
-              data={months}
-              renderItem={({ item: monthDate, index }) => {
-                const days = getDaysInMonth(monthDate);
-
-                return (
-                  <View key={index} style={styles.monthCard}>
-                    <View style={styles.monthHeader}>
-                      <Text style={styles.monthTitle}>{formatMonthYear(monthDate)}</Text>
-                    </View>
-
-                    <View style={styles.calendar}>
-                      <View style={styles.dayNamesRow}>
-                        {dayNames.map(dayName => (
-                          <Text key={dayName} style={styles.dayName}>{dayName}</Text>
-                        ))}
-                      </View>
-
-                      <View style={styles.daysGrid}>
-                        {days.map((day, dayIndex) => (
-                          <TouchableOpacity
-                            key={dayIndex}
-                            style={styles.dayCell}
-                            disabled={day === null || !hasEntries(day, monthDate, entriesData)}
-                            onPress={() => day && handleDayPress(day, monthDate)}
-                          >
-                            {day && (
-                              <View style={styles.dayContent}>
-                                <Text style={styles.dayNumber}>{day}</Text>
-                                {hasEntries(day, monthDate, entriesData) && (
-                                  <View style={styles.entryIndicatorContainer}>
-                                    <View
-                                      style={[
-                                        styles.entryIndicator,
-                                        getEntryCount(day, monthDate, entriesData) > 1 && styles.multipleEntries
-                                      ]}
-                                    />
-                                    {getEntryCount(day, monthDate, entriesData) > 1 && (
-                                      <Text style={styles.entryCount}>{getEntryCount(day, monthDate, entriesData)}</Text>
-                                    )}
-                                  </View>
-                                )}
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-                  </View>
-                );
-              }}
-            />
-        }
+        {/* Fade where the header ends and the scrollable list begins, so
+            content passing beneath melts away instead of cutting off sharply. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={[Colors.background, 'rgba(248, 252, 255, 0)']}
+          style={[styles.headerFade, { top: insets.top + headerHeight }]}
+        />
       </SafeAreaView>
     </Animated.View>
   );
@@ -168,29 +185,67 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
+  },
+  body: {
+    flex: 1,
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: verticalScale(12),
-    backgroundColor: '#F0F9FF',
+    gap: 12,
+    backgroundColor: Colors.background,
   },
-  title: {
-    fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
-    color: '#1E293B',
+  headerFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 28,
+    zIndex: 9,
+  },
+  dateStack: {
     flex: 1,
   },
-  rightIcons: {
+  weekday: {
+    fontSize: 13,
+    fontFamily: 'Outfit-Regular',
+    color: '#94A3B8',
+    marginBottom: 2,
+  },
+  title: {
+    fontSize: 22,
+    fontFamily: 'Outfit-Bold',
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
   },
-  iconButton: {
-    padding: 8,
+  streakBadgeText: {
+    fontSize: 13,
+    fontFamily: 'Outfit-SemiBold',
+    color: '#B45309',
   },
   loadingContainer: {
     paddingVertical: 40,
@@ -211,27 +266,29 @@ const styles = StyleSheet.create({
   },
   monthCard: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    marginBottom: 20,
+    borderRadius: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#EDF2F7',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
     overflow: 'hidden',
   },
   monthHeader: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.brandTranslucent,
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    paddingTop: 20,
+    paddingBottom: 12,
   },
   monthTitle: {
     fontSize: 18,
     fontFamily: 'Outfit-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   calendar: {
     padding: 16,
@@ -270,27 +327,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Jost-Medium',
     color: '#1E293B',
   },
-  entryIndicatorContainer: {
-    position: 'absolute',
-    bottom: 2,
+  dayNumberCircle: {
+    minWidth: 32,
+    minHeight: 32,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  entryIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#8B5CF6',
-  },
-  multipleEntries: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  entryCount: {
-    fontSize: 10,
-    fontFamily: 'Jost-SemiBold',
-    color: '#8B5CF6',
-    marginTop: 1,
+  dayNumberActive: {
+    fontSize: 16,
+    fontFamily: 'Jost-Medium',
+    color: 'white',
   },
 
 });

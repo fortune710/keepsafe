@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, UserX } from 'lucide-react-native';
+import { UserX } from 'lucide-react-native';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useToast } from '@/hooks/use-toast';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { router } from 'expo-router';
 import { getDefaultAvatarUrl } from '@/lib/utils';
+import { Colors } from '@/lib/constants';
+import { BackButton } from '@/components/back-button';
 
 export default function BlockedUsersScreen() {
   const { profile } = useAuthContext();
@@ -21,12 +23,7 @@ export default function BlockedUsersScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View className="flex flex-row items-center justify-between px-5 py-4" style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBack}
-        >
-          <ArrowLeft color="#64748B" size={24} />
-        </TouchableOpacity>
+        <BackButton onPress={handleBack} />
         <Text style={styles.title}>Blocked Users</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -116,7 +113,7 @@ export default function BlockedUsersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -124,10 +121,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(12),
-    backgroundColor: '#F0F9FF',
-  },
-  backButton: {
-    padding: 8,
+    backgroundColor: Colors.background,
   },
   title: {
     fontSize: 20,

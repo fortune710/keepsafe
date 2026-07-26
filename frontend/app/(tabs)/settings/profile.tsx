@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, ChevronRight, User, AtSign, MessageSquare, Camera, Calendar, Phone } from 'lucide-react-native';
+import { ChevronRight, User, AtSign, MessageSquare, Camera, Calendar, Phone } from 'lucide-react-native';
+import { BackButton } from '@/components/back-button';
 import { useAuthContext } from '@/providers/auth-provider';
 import ProfileUpdatePopover from '@/components/profile/profile-update-popover';
 import { useToast } from '@/hooks/use-toast';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { Colors } from '@/lib/constants';
 
 
 type UpdateType = 'name' | 'username' | 'bio' | 'avatar' | 'birthday' | 'phone';
@@ -16,8 +18,11 @@ interface ProfileOption {
   title: string;
   icon: any;
   value: string;
-  color: string;
 }
+
+// Every option icon shares this neutral slate color, matching the main
+// settings screen.
+const OPTION_ICON_COLOR = '#64748B';
 
 export default function ProfileScreen() {
   const { profile } = useAuthContext();
@@ -31,35 +36,30 @@ export default function ProfileScreen() {
       title: 'Full Name',
       icon: User,
       value: profile?.full_name || 'Not set',
-      color: '#8B5CF6',
     },
     {
       id: 'username',
       title: 'Username',
       icon: AtSign,
       value: profile?.username || 'Not set',
-      color: '#059669',
     },
     {
       id: 'bio',
       title: 'Bio',
       icon: MessageSquare,
       value: profile?.bio || 'Tell us about yourself',
-      color: '#F59E0B',
     },
     {
       id: 'birthday',
       title: 'Birthday',
       icon: Calendar,
       value: profile?.birthday || 'Not set', // This would come from profile data
-      color: '#EF4444',
     },
     {
       id: 'phone',
       title: 'Phone Number',
       icon: Phone,
       value: profile?.phone_number || 'Not set',
-      color: '#6366F1',
     },
   ];
 
@@ -92,12 +92,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
 
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft color="#64748B" size={24} />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Edit Profile</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -112,7 +107,7 @@ export default function ProfileScreen() {
               style={styles.profilePhoto}
             />
             <View style={styles.cameraOverlay}>
-              <Camera color="white" size={20} />
+              <Camera color="white" size={14} />
             </View>
           </TouchableOpacity>
           <Text style={styles.avatarHint}>Tap to change photo</Text>
@@ -127,10 +122,10 @@ export default function ProfileScreen() {
                 style={styles.optionItem}
                 onPress={() => handleOptionPress(option.id)}
               >
-                <View style={[styles.iconContainer, { backgroundColor: `${option.color}15` }]}>
-                  <IconComponent color={option.color} size={20} />
+                <View style={styles.iconContainer}>
+                  <IconComponent color={OPTION_ICON_COLOR} size={20} />
                 </View>
-                
+
                 <View style={styles.optionContent}>
                   <Text style={styles.optionTitle}>{option.title}</Text>
                   <Text style={[
@@ -140,8 +135,8 @@ export default function ProfileScreen() {
                     {option.value}
                   </Text>
                 </View>
-                
-                <ChevronRight color="#CBD5E1" size={20} />
+
+                <ChevronRight color="#94A3B8" size={20} />
               </TouchableOpacity>
             );
           })}
@@ -163,7 +158,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -171,9 +166,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(12),
-  },
-  backButton: {
-    padding: 8,
   },
   title: {
     fontSize: 20,
@@ -185,15 +177,8 @@ const styles = StyleSheet.create({
   },
   avatarSection: {
     alignItems: 'center',
-    backgroundColor: 'white',
     margin: 20,
-    borderRadius: 20,
     paddingVertical: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   avatarContainer: {
     position: 'relative',
@@ -209,9 +194,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     backgroundColor: '#8B5CF6',
-    borderRadius: 16,
-    padding: 8,
-    borderWidth: 3,
+    borderRadius: 12,
+    padding: 5,
+    borderWidth: 2,
     borderColor: 'white',
   },
   avatarHint: {
@@ -220,28 +205,20 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   optionsContainer: {
-    backgroundColor: 'white',
     marginHorizontal: 20,
     marginBottom: 20,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${OPTION_ICON_COLOR}15`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,

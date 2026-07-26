@@ -8,10 +8,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, FileText, ChevronRight } from 'lucide-react-native';
+import { FileText, ChevronRight } from 'lucide-react-native';
+import { BackButton } from '@/components/back-button';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { logger } from '@/lib/logger';
 import { LEGAL_DOCUMENTS, type LegalDocId } from '@/constants/legal';
+import { Colors } from '@/lib/constants';
+
+// Every option icon shares this neutral slate color, matching the main
+// settings screen.
+const OPTION_ICON_COLOR = '#64748B';
 
 type LegalDocument = LegalDocId;
 
@@ -26,19 +32,16 @@ export default function LegalScreen() {
       id: 'terms' as LegalDocument,
       title: 'Terms of Service',
       description: 'Our terms and conditions for using Keepsafe',
-      color: '#059669',
     },
     {
       id: 'eula' as LegalDocument,
       title: 'End User License Agreement',
       description: 'License agreement for the Keepsafe application',
-      color: '#8B5CF6',
     },
     {
       id: 'privacy' as LegalDocument,
       title: 'Privacy Policy',
       description: 'How we collect, use, and protect your data',
-      color: '#DC2626',
     },
   ];
 
@@ -84,8 +87,7 @@ export default function LegalScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
+        <BackButton
           onPress={() => {
             if (selectedDoc) {
               setSelectedDoc(null);
@@ -93,9 +95,7 @@ export default function LegalScreen() {
               router.back();
             }
           }}
-        >
-          <ArrowLeft color="#64748B" size={24} />
-        </TouchableOpacity>
+        />
         <Text style={styles.title}>
           {selectedDoc
             ? legalDocuments.find((d) => d.id === selectedDoc)?.title
@@ -113,13 +113,8 @@ export default function LegalScreen() {
                 style={styles.documentItem}
                 onPress={() => setSelectedDoc(doc.id)}
               >
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: `${doc.color}15` },
-                  ]}
-                >
-                  <FileText color={doc.color} size={20} />
+                <View style={styles.iconContainer}>
+                  <FileText color={OPTION_ICON_COLOR} size={20} />
                 </View>
                 <View style={styles.documentInfo}>
                   <Text style={styles.documentItemTitle}>{doc.title}</Text>
@@ -127,7 +122,7 @@ export default function LegalScreen() {
                     {doc.description}
                   </Text>
                 </View>
-                <ChevronRight color="#CBD5E1" size={20} />
+                <ChevronRight color="#94A3B8" size={20} />
               </TouchableOpacity>
             ))}
           </View>
@@ -144,7 +139,7 @@ export default function LegalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -152,9 +147,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(12),
-  },
-  backButton: {
-    padding: 8,
   },
   title: {
     fontSize: scale(16),
@@ -165,27 +157,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   documentsSection: {
-    backgroundColor: 'white',
     margin: 20,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${OPTION_ICON_COLOR}15`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
