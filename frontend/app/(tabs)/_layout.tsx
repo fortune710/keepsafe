@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Colors } from '@/lib/constants';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { CalendarIcon } from '@/components/icons/calendar-icon';
@@ -12,6 +13,26 @@ import { SettingsIcon } from '@/components/icons/settings-icon';
 const TAB_BAR_RADIUS = scale(32);
 const TAB_ICON_SIZE = scale(27);
 
+const TAB_BAR_STYLE = {
+  position: 'absolute' as const,
+  marginHorizontal: scale(10),
+  left: scale(100),
+  right: scale(100),
+  bottom: verticalScale(28),
+  height: verticalScale(64),
+  borderRadius: TAB_BAR_RADIUS,
+  backgroundColor: 'transparent',
+  overflow: 'hidden' as const,
+  elevation: 8,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.12,
+  shadowRadius: 16,
+  display: 'flex' as const,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+};
+
 export default function TabsLayout() {
   return (
     <Tabs
@@ -21,25 +42,7 @@ export default function TabsLayout() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
-        tabBarStyle: {
-          position: 'absolute',
-          marginHorizontal: scale(10),
-          left: scale(100),
-          right: scale(100),
-          bottom: verticalScale(28),
-          height: verticalScale(64),
-          borderRadius: TAB_BAR_RADIUS,
-          backgroundColor: 'transparent',
-          overflow: 'hidden',
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.12,
-          shadowRadius: 16,
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-        },
+        tabBarStyle: TAB_BAR_STYLE,
         tabBarBackground: () => (
           <View style={StyleSheet.absoluteFill}>
             <BlurView
@@ -76,10 +79,14 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="capture"
-        options={{
-          tabBarIcon: ({ color }) => (
-            <CaptureIcon color={color} size={TAB_ICON_SIZE} />
-          ),
+        options={({ route }) => {
+          const focusedRouteName = getFocusedRouteNameFromRoute(route) ?? 'index';
+          return {
+            tabBarIcon: ({ color }) => (
+              <CaptureIcon color={color} size={TAB_ICON_SIZE} />
+            ),
+            tabBarStyle: focusedRouteName === 'details' ? { display: 'none' } : TAB_BAR_STYLE,
+          };
         }}
       />
       <Tabs.Screen
@@ -92,10 +99,14 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="settings"
-        options={{
-          tabBarIcon: ({ color }) => (
-            <SettingsIcon color={color} size={TAB_ICON_SIZE} />
-          ),
+        options={({ route }) => {
+          const focusedRouteName = getFocusedRouteNameFromRoute(route) ?? 'index';
+          return {
+            tabBarIcon: ({ color }) => (
+              <SettingsIcon color={color} size={TAB_ICON_SIZE} />
+            ),
+            tabBarStyle: focusedRouteName === 'index' ? TAB_BAR_STYLE : { display: 'none' },
+          };
         }}
       />
     </Tabs>
