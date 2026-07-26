@@ -4,6 +4,7 @@ import { Circle, Mic } from 'lucide-react-native';
 import { GalleryIcon } from '@/components/icons/gallery-icon';
 import { scale } from 'react-native-size-matters';
 import { CaptureUIMode } from '@/components/capture/capture-mode-selector';
+import { Colors } from '@/lib/constants';
 
 interface CaptureActionsProps {
   captureUIMode: CaptureUIMode;
@@ -42,22 +43,27 @@ export const CaptureActions = ({
   return (
     <>
       <View style={styles.actionContainer}>
-        <TouchableOpacity
-          style={[
-            styles.uploadButton,
-            {
+        {isCameraFamily ? (
+          <TouchableOpacity
+            style={[
+              styles.uploadButton,
+              {
+                minWidth: minTouchTarget,
+                minHeight: minTouchTarget,
+              },
+            ]}
+            onPress={handleUpload}
+          >
+            <GalleryIcon color="#94A3B8" size={26} />
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={{
               minWidth: minTouchTarget,
               minHeight: minTouchTarget,
-            },
-          ]}
-          onPress={handleUpload}
-          disabled={!isCameraFamily}
-        >
-          <GalleryIcon
-            color={isCameraFamily ? '#94A3B8' : '#E5E7EB'}
-            size={26}
+            }}
           />
-        </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[
@@ -82,11 +88,11 @@ export const CaptureActions = ({
                 <View style={styles.stopIcon} />
               ) : (
                 <Circle
-                  color={captureUIMode === 'video' ? '#EF4444' : 'white'}
-                  stroke="black"
-                  strokeWidth={0.3}
+                  color="#E2E8F0"
+                  stroke="#E2E8F0"
+                  strokeWidth={0.5}
                   size={scale(80)}
-                  fill={captureUIMode === 'video' ? '#EF4444' : 'white'}
+                  fill="white"
                 />
               )
             ) : isCapturing ? (
@@ -125,35 +131,28 @@ const styles = StyleSheet.create({
     height: 60,
     backgroundColor: '#F8FAFC',
     borderRadius: 30,
+    borderWidth: 1,
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   captureButton: {
-    width: scale(92),
-    height: scale(92),
+    width: scale(87),
+    height: scale(87),
     borderRadius: 999,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: 'transparent',
+    borderWidth: scale(4),
+    borderColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    minWidth: 92,
-    minHeight: 92,
+    minWidth: 87,
+    minHeight: 87,
   },
   recordingButton: {
-    backgroundColor: '#EF4444',
+    borderColor: '#EF4444',
   },
   disabledButton: {
-    backgroundColor: '#95a5a6',
-    shadowColor: '#95a5a6',
+    borderColor: '#95a5a6',
   },
   captureButtonInner: {
     width: scale(76),
