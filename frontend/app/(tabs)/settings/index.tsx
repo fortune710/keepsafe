@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { ChevronRight, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
+import { UserIcon } from '@/components/icons/user-icon';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +11,10 @@ import { supabase } from '@/lib/supabase';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
 import { logger } from '@/lib/logger';
+import { Colors } from '@/lib/constants';
+
+// Every settings icon/row shares the Sign Out row's neutral slate color.
+const SETTINGS_ICON_COLOR = '#64748B';
 
 interface SettingsItem {
   id: string;
@@ -16,17 +22,15 @@ interface SettingsItem {
   subtitle?: string;
   icon: any;
   route: string;
-  color: string;
 }
 
-const settingsItems: SettingsItem[] = [
+const accountSettingsItems: SettingsItem[] = [
   {
     id: 'profile',
     title: 'Profile',
     subtitle: 'Edit your personal information',
-    icon: User,
+    icon: UserIcon,
     route: '/settings/profile',
-    color: '#8B5CF6',
   },
   {
     id: 'notifications',
@@ -34,7 +38,6 @@ const settingsItems: SettingsItem[] = [
     subtitle: 'Manage your notification preferences',
     icon: Bell,
     route: '/settings/notifications',
-    color: '#059669',
   },
   {
     id: 'privacy',
@@ -42,7 +45,6 @@ const settingsItems: SettingsItem[] = [
     subtitle: 'Control your privacy settings',
     icon: Shield,
     route: '/settings/privacy',
-    color: '#DC2626',
   },
   // {
   //   id: 'storage',
@@ -50,15 +52,16 @@ const settingsItems: SettingsItem[] = [
   //   subtitle: 'Manage your data and storage',
   //   icon: HardDrive,
   //   route: '/settings/storage',
-  //   color: '#7C2D12',
   // },
+];
+
+const helpItems: SettingsItem[] = [
   {
     id: 'about',
     title: 'About',
     subtitle: 'App version and information',
     icon: Info,
     route: '/settings/about',
-    color: '#1E40AF',
   },
 ];
 
@@ -95,25 +98,39 @@ export default function SettingsScreen() {
     }
   };
 
+  const renderSettingsItem = (item: SettingsItem) => {
+    const IconComponent = item.icon;
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.settingsItem}
+        onPress={() => router.push(item.route as any)}
+      >
+        <View style={styles.iconContainer}>
+          <IconComponent color={SETTINGS_ICON_COLOR} size={20} />
+        </View>
 
+        <View style={styles.itemContent}>
+          <Text style={styles.itemTitle}>{item.title}</Text>
+          {item.subtitle && (
+            <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
+          )}
+        </View>
+
+        <ChevronRight color="#94A3B8" size={20} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView
       style={styles.container}
     >
+      <StatusBar style="dark" />
       <GestureDetector gesture={swipeDownGesture}>
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title}>Settings</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel="Close settings"
-              accessibilityHint="Returns to the previous screen"
-            >
-              <ChevronRight color="#64748B" size={24} />
-            </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -137,37 +154,20 @@ export default function SettingsScreen() {
               />
             </TouchableOpacity>
 
+            <Text style={styles.groupLabel}>Account Settings</Text>
             <View style={styles.settingsSection}>
-              {settingsItems.map((item) => {
-                const IconComponent = item.icon;
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.settingsItem}
-                    onPress={() => router.push(item.route as any)}
-                  >
-                    <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
-                      <IconComponent color={item.color} size={20} />
-                    </View>
-
-                    <View style={styles.itemContent}>
-                      <Text style={styles.itemTitle}>{item.title}</Text>
-                      {item.subtitle && (
-                        <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
-                      )}
-                    </View>
-
-                    <ChevronRight color="#CBD5E1" size={20} />
-                  </TouchableOpacity>
-                );
-              })}
+              {accountSettingsItems.map(renderSettingsItem)}
             </View>
 
+            <Text style={styles.groupLabel}>Help</Text>
+            <View style={styles.settingsSection}>
+              {helpItems.map(renderSettingsItem)}
+            </View>
 
             <View style={styles.settingsSection}>
-              <TouchableOpacity style={[styles.settingsItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
-                <View style={[styles.iconContainer, { backgroundColor: '#64748B15' }]}>
-                  <LogOut color="#64748B" size={20} />
+              <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
+                <View style={styles.iconContainer}>
+                  <LogOut color={SETTINGS_ICON_COLOR} size={20} />
                 </View>
 
                 <View style={styles.itemContent}>
@@ -188,18 +188,13 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
-  },
-  closeButton: {
-    position: 'absolute',
-    right: 20,
-    top: 16,
+    backgroundColor: Colors.background,
   },
   header: {
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   title: {
     fontSize: 20,
@@ -213,16 +208,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
-    margin: 20,
+    marginTop: 4,
+    marginHorizontal: 20,
+    marginBottom: 20,
     borderRadius: 20,
     paddingVertical: verticalScale(12),
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   profileInfo: {
     flex: 1,
@@ -232,6 +222,8 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+    borderWidth: 2,
+    borderColor: Colors.primary,
   },
   profileName: {
     fontSize: 18,
@@ -250,30 +242,29 @@ const styles = StyleSheet.create({
     fontFamily: 'Jost-Regular',
     color: '#64748B',
   },
-  settingsSection: {
-    backgroundColor: 'white',
+  groupLabel: {
+    fontSize: 14,
+    fontFamily: 'Outfit-SemiBold',
+    fontWeight: '600',
+    color: '#64748B',
     marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  settingsSection: {
+    marginHorizontal: 20,
+    marginBottom: 10,
   },
   settingsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${SETTINGS_ICON_COLOR}15`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,

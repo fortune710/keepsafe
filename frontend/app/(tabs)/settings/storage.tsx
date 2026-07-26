@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, HardDrive, Image, Mic, Trash2, Download } from 'lucide-react-native';
+import { HardDrive, Image, Mic, Trash2, Download } from 'lucide-react-native';
+import { BackButton } from '@/components/back-button';
+import { Colors } from '@/lib/constants';
+
+// Every option icon shares this neutral slate color, matching the main
+// settings screen.
+const OPTION_ICON_COLOR = '#64748B';
 
 interface StorageData {
   type: string;
   icon: any;
   size: string;
   count: number;
-  color: string;
 }
 
 const storageData: StorageData[] = [
@@ -17,14 +22,12 @@ const storageData: StorageData[] = [
     icon: Image,
     size: '2.4 GB',
     count: 1247,
-    color: '#8B5CF6',
   },
   {
     type: 'Audio',
     icon: Mic,
     size: '156 MB',
     count: 89,
-    color: '#059669',
   },
 ];
 
@@ -59,12 +62,7 @@ export default function StorageScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft color="#64748B" size={24} />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Storage & Data</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -96,13 +94,13 @@ export default function StorageScreen() {
         <View style={styles.breakdownSection}>
           <Text style={styles.sectionTitle}>Storage Breakdown</Text>
           
-          <View style={styles.breakdownContainer}>
+          <View>
             {storageData.map((item) => {
               const IconComponent = item.icon;
               return (
                 <View key={item.type} style={styles.breakdownItem}>
-                  <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
-                    <IconComponent color={item.color} size={20} />
+                  <View style={styles.iconContainer}>
+                    <IconComponent color={OPTION_ICON_COLOR} size={20} />
                   </View>
                   
                   <View style={styles.breakdownContent}>
@@ -121,8 +119,8 @@ export default function StorageScreen() {
           <Text style={styles.sectionTitle}>Storage Actions</Text>
           
           <TouchableOpacity style={styles.actionButton} onPress={handleOptimizeStorage}>
-            <View style={[styles.iconContainer, { backgroundColor: '#059669' + '15' }]}>
-              <Download color="#059669" size={20} />
+            <View style={styles.iconContainer}>
+              <Download color={OPTION_ICON_COLOR} size={20} />
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>Optimize Storage</Text>
@@ -131,8 +129,8 @@ export default function StorageScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={handleClearCache}>
-            <View style={[styles.iconContainer, { backgroundColor: '#F59E0B' + '15' }]}>
-              <Trash2 color="#F59E0B" size={20} />
+            <View style={styles.iconContainer}>
+              <Trash2 color={OPTION_ICON_COLOR} size={20} />
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>Clear Cache</Text>
@@ -148,7 +146,7 @@ export default function StorageScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -156,10 +154,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
-  },
-  backButton: {
-    padding: 8,
+    backgroundColor: Colors.background,
   },
   title: {
     fontSize: 20,
@@ -215,27 +210,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-  breakdownContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
   breakdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${OPTION_ICON_COLOR}15`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -267,16 +252,8 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   actionContent: {
     flex: 1,

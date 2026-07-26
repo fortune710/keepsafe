@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Shield, Eye, Lock, Trash2, Download } from 'lucide-react-native';
+import { Shield, Eye, Lock, Trash2, Download } from 'lucide-react-native';
+import { BackButton } from '@/components/back-button';
 import { PrivacySettings } from '@/types/privacy';
 import { usePrivacySettings } from '@/hooks/use-privacy-settings';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { useAuthContext } from '@/providers/auth-provider';
 import { supabase } from '@/lib/supabase';
-import { BACKEND_URL } from '@/lib/constants';
+import { BACKEND_URL, Colors } from '@/lib/constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { logger } from '@/lib/logger';
@@ -19,8 +20,11 @@ interface PrivacySetting {
   description: string;
   icon: any;
   enabled: boolean;
-  color: string;
 }
+
+// Every option icon shares this neutral slate color, matching the main
+// settings screen.
+const OPTION_ICON_COLOR = '#64748B';
 
 const DEFAULT_SETTINGS: PrivacySetting[] = [
   {
@@ -29,7 +33,6 @@ const DEFAULT_SETTINGS: PrivacySetting[] = [
     description: 'Automatically share new captures with friends',
     icon: Shield,
     enabled: false,
-    color: '#059669',
   },
   {
     id: PrivacySettings.LOCATION_SHARE,
@@ -37,7 +40,6 @@ const DEFAULT_SETTINGS: PrivacySetting[] = [
     description: 'Include location data in your moments',
     icon: Lock,
     enabled: true,
-    color: '#F59E0B',
   },
 ];
 
@@ -350,12 +352,7 @@ export default function PrivacyScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft color="#64748B" size={24} />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Privacy & Security</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -363,13 +360,13 @@ export default function PrivacyScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>Privacy Settings</Text>
-          <View style={styles.settingsContainer}>
+          <View>
             {settings.map((setting) => {
               const IconComponent = setting.icon;
               return (
                 <View key={setting.id} style={styles.settingItem}>
-                  <View style={[styles.iconContainer, { backgroundColor: `${setting.color}15` }]}>
-                    <IconComponent color={setting.color} size={20} />
+                  <View style={styles.iconContainer}>
+                    <IconComponent color={OPTION_ICON_COLOR} size={20} />
                   </View>
 
                   <View style={styles.settingContent}>
@@ -396,8 +393,8 @@ export default function PrivacyScreen() {
               style={styles.settingItem}
               onPress={() => router.push('/settings/blocked-users')}
             >
-              <View style={[styles.iconContainer, { backgroundColor: `#DC262615` }]}>
-                <Trash2 color="#DC2626" size={20} />
+              <View style={styles.iconContainer}>
+                <Trash2 color={OPTION_ICON_COLOR} size={20} />
               </View>
 
               <View style={styles.settingContent}>
@@ -417,8 +414,8 @@ export default function PrivacyScreen() {
             onPress={handleExportData}
             disabled={isExporting}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#0EA5E915' }]}>
-              <Download color="#0EA5E9" size={20} />
+            <View style={styles.iconContainer}>
+              <Download color={OPTION_ICON_COLOR} size={20} />
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>
@@ -442,8 +439,8 @@ export default function PrivacyScreen() {
             onPress={handleDeleteAccount}
             disabled={isDeleting}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#DC262615' }]}>
-              <Trash2 color="#DC2626" size={20} />
+            <View style={styles.iconContainer}>
+              <Trash2 color={OPTION_ICON_COLOR} size={20} />
             </View>
             <View style={styles.actionContent}>
               <Text style={[styles.actionTitle, { color: '#DC2626' }]}>
@@ -463,7 +460,7 @@ export default function PrivacyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -471,9 +468,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(12),
-  },
-  backButton: {
-    padding: 8,
   },
   title: {
     fontSize: 20,
@@ -500,27 +494,17 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 20,
   },
-  settingsContainer: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${OPTION_ICON_COLOR}15`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -559,16 +543,8 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 10,
+    marginBottom: 2,
   },
   actionContent: {
     flex: 1,
