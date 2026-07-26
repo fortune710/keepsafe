@@ -2,15 +2,20 @@ import { useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Dimensions,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { X, Sticker, UserPlus, UserPlus2 } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
+import { X, Sticker, UserPlus2 } from 'lucide-react-native';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { BackButton } from '@/components/back-button';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
 import { useSaveLock } from '@/providers/save-lock-provider';
 import { useDeviceLocation } from '@/hooks/use-device-location';
@@ -22,9 +27,8 @@ import { PrivacySettings } from '@/types/privacy';
 import { MediaCapture } from '@/types/media';
 import { posthog } from '@/constants/posthog';
 
-import { moderateScale, verticalScale } from 'react-native-size-matters';
+import { scale, verticalScale } from 'react-native-size-matters';
 import * as Crypto from 'expo-crypto';
-import Animated from 'react-native-reanimated';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { useEvent } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -47,6 +51,11 @@ interface Friend {
   avatar: string;
   username: string;
 }
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Matches the ~0.63 camera preview height on the capture page, minus a bit
+// to account for this card's own padding/border and the caption below it.
+const PHOTO_CARD_HEIGHT = SCREEN_HEIGHT * 0.5;
 
 /**
  * Render the details screen for reviewing a captured media item, editing attachments,
@@ -121,7 +130,10 @@ export default function DetailsScreen() {
   const { toast } = useToast();
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
-  const [showAttachmentList, setShowAttachmentList] = useState<boolean>(false);
+  const [activeSheet, setActiveSheet] = useState<
+    'attachments' | 'friends' | null
+  >(null);
+  const [caption, setCaption] = useState<string>('');
   const [editorActiveTab, setEditorActiveTab] = useState<
     MediaCanvasItemType | undefined
   >(undefined);
@@ -203,6 +215,7 @@ export default function DetailsScreen() {
 
   // Handle attachment type selection
   const handleAttachmentSelect = (type: MediaCanvasItemType) => {
+    setActiveSheet(null);
     if (type === 'text') {
       // Auto-add text with default value
       const defaultText = 'Enter text';
@@ -326,7 +339,7 @@ export default function DetailsScreen() {
         shared_with: [user.id, ...selectedFriends],
         attachments: entryAttachments,
         content_url: capture.uri,
-        text_content: null,
+        text_content: caption || null,
         music_tag: null,
         location_tag: locationTag || null,
         is_private: isPrivate,
@@ -353,7 +366,7 @@ export default function DetailsScreen() {
 
       const result = await saveEntry({
         capture,
-        textContent: '',
+        textContent: caption,
         musicTag: '',
         locationTag: locationTag || undefined,
         isPrivate,
@@ -426,78 +439,79 @@ export default function DetailsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => router.back()}
-        >
-          <X color="#64748B" size={24} />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
 
-        <Text style={styles.title}>Add Details</Text>
+        <View style={styles.modeButtons}>
+          <BlurView intensity={90} tint="light" style={styles.modeButtonsBlur} />
+          <View style={styles.modeButtonsSheen} pointerEvents="none" />
+          <View style={styles.modeButtonsBorder} pointerEvents="none" />
 
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => setShowAttachmentList(!showAttachmentList)}
-        >
-          {showAttachmentList ? (
-            <UserPlus2 color="#64748B" size={24} />
-          ) : (
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              activeSheet === 'attachments' && styles.modeButtonActive,
+            ]}
+            onPress={() => setActiveSheet('attachments')}
+          >
             <Sticker color="#64748B" size={24} />
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              activeSheet === 'friends' && styles.modeButtonActive,
+            ]}
+            onPress={() => setActiveSheet('friends')}
+          >
+            <UserPlus2 color="#64748B" size={24} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView
+      <KeyboardAvoidingView
         style={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Animated.View
-          style={[
-            styles.mediaContainer,
-            capture?.type === 'audio' && styles.borderContainer,
-          ]}
-        >
-          {capture?.type === 'photo' && capture.uri ? (
-            <MediaCanvas
-              uri={capture.uri}
-              type="photo"
-              ref={viewShotRef}
-              items={items}
-              transformsRef={transformsRef}
-              removeElement={removeElement}
-              facing={capture.metadata?.facing}
-            />
-          ) : capture?.type === 'video' ? (
-            <Pressable
-              onPress={() => (videPlaying ? player.pause() : player.play())}
-            >
-              <VideoView
-                style={styles.mediaPreview}
-                player={player}
-                contentFit="cover"
+        <View style={styles.photoFrame}>
+          <View style={styles.photoInner}>
+            {capture?.type === 'photo' && capture.uri ? (
+              <MediaCanvas
+                uri={capture.uri}
+                type="photo"
+                ref={viewShotRef}
+                items={items}
+                transformsRef={transformsRef}
+                removeElement={removeElement}
+                facing={capture.metadata?.facing}
               />
-            </Pressable>
-          ) : capture?.type === 'audio' ? (
-            <AudioEntry entry={capture} />
-          ) : null}
-        </Animated.View>
+            ) : capture?.type === 'video' ? (
+              <Pressable
+                onPress={() => (videPlaying ? player.pause() : player.play())}
+              >
+                <VideoView
+                  style={styles.mediaPreview}
+                  player={player}
+                  contentFit="cover"
+                />
+              </Pressable>
+            ) : capture?.type === 'audio' ? (
+              <AudioEntry entry={capture} />
+            ) : null}
+          </View>
+
+          <TextInput
+            style={styles.captionInput}
+            placeholder="Write a caption..."
+            placeholderTextColor="#94A3B8"
+            value={caption}
+            onChangeText={setCaption}
+            multiline
+          />
+        </View>
 
         <View style={styles.form}>
-          {showAttachmentList ? (
-            <EntryAttachmentList onSelectAttachment={handleAttachmentSelect} />
-          ) : (
-            <EntryShareList
-              isPrivate={isPrivate}
-              isEveryone={isEveryone}
-              selectedFriends={selectedFriends}
-              handlePrivateToggle={handlePrivateToggle}
-              handleEveryoneToggle={handleEveryoneToggle}
-              handleFriendToggle={handleFriendToggle}
-              friends={realFriends}
-            />
-          )}
-
           <TouchableOpacity
             style={[
               styles.saveButton,
@@ -510,7 +524,53 @@ export default function DetailsScreen() {
             <Text style={styles.saveButtonText}>{getSaveButtonText()}</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
+
+      <BottomSheet
+        visible={activeSheet === 'attachments'}
+        onClose={() => setActiveSheet(null)}
+      >
+        <View style={styles.sheetBody}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Add Attachment</Text>
+            <TouchableOpacity
+              style={styles.sheetCloseButton}
+              onPress={() => setActiveSheet(null)}
+              hitSlop={12}
+            >
+              <X color="#64748B" size={20} />
+            </TouchableOpacity>
+          </View>
+          <EntryAttachmentList onSelectAttachment={handleAttachmentSelect} />
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={activeSheet === 'friends'}
+        onClose={() => setActiveSheet(null)}
+      >
+        <View style={styles.sheetBody}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Share With</Text>
+            <TouchableOpacity
+              style={styles.sheetCloseButton}
+              onPress={() => setActiveSheet(null)}
+              hitSlop={12}
+            >
+              <X color="#64748B" size={20} />
+            </TouchableOpacity>
+          </View>
+          <EntryShareList
+            isPrivate={isPrivate}
+            isEveryone={isEveryone}
+            selectedFriends={selectedFriends}
+            handlePrivateToggle={handlePrivateToggle}
+            handleEveryoneToggle={handleEveryoneToggle}
+            handleFriendToggle={handleFriendToggle}
+            friends={realFriends}
+          />
+        </View>
+      </BottomSheet>
 
       <EditorPopover
         isVisible={showEditorPopover}
@@ -540,39 +600,94 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: verticalScale(8),
   },
-  title: {
-    fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
-    fontWeight: '600',
-    color: '#1E293B',
+  modeButtons: {
+    flexDirection: 'row',
+    borderRadius: 999,
+    overflow: 'hidden',
   },
-  cancelButton: {
-    padding: moderateScale(5),
-    alignSelf: 'flex-start',
+  modeButtonsBlur: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  modeButtonsSheen: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modeButtonsBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.35)',
+  },
+  modeButton: {
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(10),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeButtonActive: {
+    backgroundColor: Colors.brandTranslucent,
   },
   scrollContent: {
     flex: 1,
   },
-  mediaContainer: {
+  photoFrame: {
     backgroundColor: 'white',
     margin: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
+    borderRadius: scale(12),
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: scale(12),
+    paddingBottom: verticalScale(20),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
   },
+  photoInner: {
+    height: PHOTO_CARD_HEIGHT,
+    borderRadius: scale(6),
+    overflow: 'hidden',
+  },
+  captionInput: {
+    marginTop: verticalScale(14),
+    paddingHorizontal: scale(4),
+    fontSize: 15,
+    fontFamily: 'Jost-Regular',
+    color: '#1E293B',
+    minHeight: verticalScale(24),
+  },
+  sheetBody: {
+    paddingHorizontal: scale(20),
+    paddingTop: verticalScale(8),
+    paddingBottom: verticalScale(16),
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: verticalScale(16),
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontFamily: 'Outfit-SemiBold',
+    color: '#1E293B',
+  },
+  sheetCloseButton: {
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
+    backgroundColor: Colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   mediaPreview: {
     width: '100%',
-    height: verticalScale(250),
+    height: PHOTO_CARD_HEIGHT,
   },
-  borderContainer: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-
   audioWave: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -661,10 +776,14 @@ const styles = StyleSheet.create({
   },
 
   saveButton: {
-    backgroundColor: '#8B5CF6',
-    borderRadius: 12,
-    paddingVertical: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#8B5CF6',
+    borderRadius: 36,
+    paddingVertical: 16,
+    gap: 8,
+    width: '100%',
     marginTop: 16,
   },
   saveButtonDisabled: {
