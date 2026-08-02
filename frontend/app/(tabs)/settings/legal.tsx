@@ -105,7 +105,7 @@ export default function LegalScreen() {
       </View>
 
       {!selectedDoc ? (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
           <View style={styles.documentsSection}>
             {legalDocuments.map((doc) => (
               <TouchableOpacity
@@ -126,7 +126,7 @@ export default function LegalScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </ScrollView>
+        </View>
       ) : (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {renderDocumentContent(selectedDoc)}

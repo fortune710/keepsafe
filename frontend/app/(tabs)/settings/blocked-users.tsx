@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { UserX } from 'lucide-react-native';
+import { UserX, X } from 'lucide-react-native';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useToast } from '@/hooks/use-toast';
-import { scale, verticalScale } from 'react-native-size-matters';
+import { moderateScale, scale, verticalScale } from 'react-native-size-matters';
 import { router } from 'expo-router';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { Colors } from '@/lib/constants';
@@ -28,14 +28,7 @@ export default function BlockedUsersScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Blocked Friends</Text>
-          <Text style={styles.sectionDescription}>
-            These users can no longer view your content or interact with you.
-          </Text>
-        </View>
-
+      <View style={styles.content}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading blocked users...</Text>
@@ -97,15 +90,19 @@ export default function BlockedUsersScreen() {
                     <Text style={styles.userName}>{friend.friend_profile?.full_name || 'Unknown User'}</Text>
                     <Text style={styles.userDetail}>{friend.friend_profile?.username}</Text>
                   </View>
-                  <TouchableOpacity style={styles.unblockButton} onPress={handleUnblock}>
-                    <Text style={styles.unblockText}>Unblock</Text>
+                  <TouchableOpacity
+                    style={styles.unblockButton}
+                    onPress={handleUnblock}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <X color={Colors.danger} strokeWidth={3} size={18} />
                   </TouchableOpacity>
                 </View>
               );
             })}
           </View>
         )}
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -130,23 +127,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  section: {
-    paddingHorizontal: scale(20),
-    paddingTop: verticalScale(8),
-    paddingBottom: verticalScale(8),
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    fontFamily: 'Jost-Regular',
-    color: '#64748B',
-    lineHeight: 20,
   },
   loadingContainer: {
     paddingVertical: 40,
@@ -177,29 +157,22 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: scale(20),
+    paddingTop: verticalScale(8),
     paddingBottom: verticalScale(24),
   },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: verticalScale(10),
+    paddingLeft: scale(2),
   },
   avatarContainer: {
-    marginRight: 12,
+    marginRight: 16,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#E5E7EB',
   },
   avatarPlaceholder: {
@@ -216,28 +189,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
-    color: '#1F2933',
+    fontSize: moderateScale(14),
+    fontFamily: 'Outfit-Bold',
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
   },
   userDetail: {
-    fontSize: 14,
-    fontFamily: 'Jost-Regular',
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: moderateScale(12),
+    fontFamily: 'Jost-SemiBold',
+    color: Colors.textMuted,
   },
   unblockButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#10B981',
-    backgroundColor: '#ECFDF5',
-  },
-  unblockText: {
-    fontSize: 13,
-    fontFamily: 'Outfit-SemiBold',
-    color: '#047857',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: `${Colors.danger}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronRight, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
@@ -133,7 +133,7 @@ export default function SettingsScreen() {
             <Text style={styles.title}>Settings</Text>
           </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
             <TouchableOpacity
               style={styles.profileSection}
               onPress={() => router.push('/settings/profile')}
@@ -178,7 +178,7 @@ export default function SettingsScreen() {
                 <View style={{ width: 20 }} />
               </TouchableOpacity>
             </View>
-          </ScrollView>
+          </View>
         </View>
       </GestureDetector>
     </SafeAreaView>

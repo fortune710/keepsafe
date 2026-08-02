@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { HardDrive, Image, Mic, Trash2, Download } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -67,7 +67,7 @@ export default function StorageScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.usageSection}>
           <Text style={styles.sectionTitle}>Storage Usage</Text>
           
@@ -138,7 +138,7 @@ export default function StorageScreen() {
             </View>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

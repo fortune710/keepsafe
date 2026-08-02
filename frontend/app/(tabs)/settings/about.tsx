@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Heart, ExternalLink, Mail, Shield, ChevronRight } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -27,7 +27,7 @@ export default function AboutScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.appSection}>
           <Text style={styles.appName}>Keepsafe</Text>
           <Text style={styles.appTagline}>Your most treasured moments, all in one place</Text>
@@ -69,7 +69,7 @@ export default function AboutScreen() {
             <Text style={styles.creditsText}>by the Keepsafe team</Text>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Sparkles, Play } from 'lucide-react-native';
+import { Play } from 'lucide-react-native';
+import { SparklesIcon } from '@/components/icons/sparkles';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/lib/constants';
 import { scale } from 'react-native-size-matters';
@@ -28,7 +29,7 @@ export default function MonthlyDumpBanner({ month, animationProgress }: MonthlyD
     try {
       const [year, monthValue] = monthStr.split('-');
       const date = new Date(parseInt(year, 10), parseInt(monthValue, 10) - 1);
-      return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+      return date.toLocaleString('default', { month: 'long' });
     } catch {
       return monthStr;
     }
@@ -114,10 +115,10 @@ export default function MonthlyDumpBanner({ month, animationProgress }: MonthlyD
             <BlurView intensity={40} tint="dark" style={styles.blur}>
               <View style={styles.content}>
                 <Animated.View style={[styles.iconContainer, sideButtonsAnimatedStyle]}>
-                  <Sparkles size={iconSize} color="#C084FC" fill="#C084FC" />
+                  <SparklesIcon size={iconSize} color="#C084FC" />
                 </Animated.View>
                 <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-                  <Text style={styles.title} numberOfLines={1}>Your {formatMonth(month || '')} dump is ready!</Text>
+                  <Text style={styles.title} numberOfLines={1}>Your {formatMonth(month || '')} highlights are ready!</Text>
                 </Animated.View>
                 <Animated.View style={[styles.playButton, sideButtonsAnimatedStyle]}>
                   <Play size={iconSize} color="white" fill="white" />

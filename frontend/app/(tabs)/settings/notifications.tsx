@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { Bell, Users, Calendar, UserPlus } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -68,7 +68,7 @@ export default function NotificationsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notification Preferences</Text>
           <Text style={styles.sectionDescription}>
@@ -109,7 +109,7 @@ export default function NotificationsScreen() {
             You can change these settings anytime. Some notifications may still appear for important account security updates.
           </Text>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

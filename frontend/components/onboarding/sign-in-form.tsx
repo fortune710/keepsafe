@@ -11,7 +11,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, X } from 'lucide-react-native';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '@/providers/auth-provider';
@@ -97,7 +97,21 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToSignUp }) => {
           </TouchableOpacity>
         )}
         <Text style={styles.headerTitle}>Login</Text>
-        <View style={styles.headerSpacer} />
+        {Platform.OS === 'ios' ? (
+          <TouchableOpacity
+            style={styles.closeButtonIOS}
+            onPress={() => router.replace('/')}
+          >
+            <X color="#64748B" size={24} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.closeButtonCircle}
+            onPress={() => router.replace('/')}
+          >
+            <X color="#64748B" size={20} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <Animated.View entering={FadeInDown.delay(200)} style={styles.content}>
@@ -218,9 +232,25 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     textAlign: 'center',
   },
-  headerSpacer: {
-    width: scale(36),
+  closeButtonIOS: {
+    padding: scale(4),
     marginLeft: scale(16),
+  },
+  closeButtonCircle: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginLeft: scale(16),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   content: {
     paddingHorizontal: scale(16),

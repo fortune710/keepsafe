@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Shield, Eye, Lock, Trash2, Download } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -357,7 +357,7 @@ export default function PrivacyScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>Privacy Settings</Text>
           <View>
@@ -452,7 +452,7 @@ export default function PrivacyScreen() {
             </View>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

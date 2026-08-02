@@ -3,6 +3,7 @@ import { Modal, View, Pressable, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedKeyboard,
   withTiming,
   withDelay,
   Easing,
@@ -13,6 +14,8 @@ import { scale, verticalScale } from 'react-native-size-matters';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_GAP = verticalScale(8);
+// Extra breathing room between the sheet and the keyboard when it's open.
+const KEYBOARD_GAP = verticalScale(12);
 
 interface BottomSheetProps {
   visible: boolean;
@@ -28,10 +31,12 @@ export function BottomSheet({
   maxHeight = '70%',
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const keyboard = useAnimatedKeyboard();
   const [modalVisible, setModalVisible] = useState(false);
 
   const backdropOpacity = useSharedValue(0);
   const sheetTranslateY = useSharedValue(SCREEN_HEIGHT);
+  const restingMarginBottom = insets.bottom - (SHEET_GAP + 10);
 
   useEffect(() => {
     if (visible) {
@@ -67,9 +72,22 @@ export function BottomSheet({
     opacity: backdropOpacity.value,
   }));
 
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: sheetTranslateY.value }],
-  }));
+  // `marginBottom` is a layout property - animating it directly off
+  // `keyboard.height` (which changes every frame while the keyboard
+  // animates) forces a Yoga relayout each frame and looks janky. Keep the
+  // resting margin static and fold the keyboard's rise into `translateY`
+  // instead, which is compositor-only and stays smooth.
+  const sheetStyle = useAnimatedStyle(() => {
+    const keyboardHeight = keyboard.height.value;
+    const keyboardOffset =
+      keyboardHeight > 0
+        ? Math.max(0, keyboardHeight + KEYBOARD_GAP - restingMarginBottom)
+        : 0;
+
+    return {
+      transform: [{ translateY: sheetTranslateY.value - keyboardOffset }],
+    };
+  });
 
   return (
     <Modal
@@ -89,10 +107,7 @@ export function BottomSheet({
             style={[
               styles.sheet,
               sheetStyle,
-              {
-                maxHeight,
-                marginBottom: insets.bottom - (SHEET_GAP + 10),
-              },
+              { maxHeight, marginBottom: restingMarginBottom },
             ]}
           >
             <View style={styles.handle} />

@@ -1,90 +1,67 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Check } from 'lucide-react-native';
+import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { useProfileOperations } from '@/hooks/use-profile-operations';
 import { useAuthContext } from '@/providers/auth-provider';
 import { PhoneNumberInput } from '@/components/profile/phone-number-input';
+import type { UpdateFormHandle, UpdateFormState } from './form-handle';
 
 interface PhoneUpdateFormProps {
   currentValue: string;
   onSuccess?: (message: string) => void;
   onError?: (message: string) => void;
   onClose: () => void;
+  onStateChange?: (state: UpdateFormState) => void;
 }
 
-export function PhoneUpdateForm({ currentValue, onSuccess, onError, onClose }: PhoneUpdateFormProps) {
-  const { profile } = useAuthContext();
-  const phoneNumber = profile?.phone_number ?? '';
-  const [fullPhoneNumber, setFullPhoneNumber] = useState('');
-  const [isValid, setIsValid] = useState(false);
-  
-  const { updateProfile, isLoading } = useProfileOperations();
+export const PhoneUpdateForm = forwardRef<UpdateFormHandle, PhoneUpdateFormProps>(
+  ({ currentValue, onSuccess, onError, onClose, onStateChange }, ref) => {
+    const { profile } = useAuthContext();
+    const phoneNumber = profile?.phone_number ?? '';
+    const [fullPhoneNumber, setFullPhoneNumber] = useState('');
+    const [isValid, setIsValid] = useState(false);
 
-  const handleSave = async () => {
-    const result = await updateProfile({
-      phone_number: fullPhoneNumber
-    });
-    
-    if (result.success) {
-      onSuccess && onSuccess(result.message);
-      onClose();
-    } else {
-      onError && onError(result.message);
-    }
-  };
+    const { updateProfile, isLoading } = useProfileOperations();
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.inputContainer}>
-        <PhoneNumberInput
-          initialValue={currentValue || phoneNumber}
-          onChange={(payload) => {
-            setFullPhoneNumber(payload.fullPhoneNumber);
-            setIsValid(payload.isValid);
-          }}
-        />
+    const handleSave = async () => {
+      const result = await updateProfile({
+        phone_number: fullPhoneNumber
+      });
+
+      if (result.success) {
+        onSuccess && onSuccess(result.message);
+        onClose();
+      } else {
+        onError && onError(result.message);
+      }
+    };
+
+    useImperativeHandle(ref, () => ({ save: handleSave }));
+
+    useEffect(() => {
+      onStateChange?.({ isValid, isLoading });
+    }, [isValid, isLoading, onStateChange]);
+
+    return (
+      <View style={styles.container}>
+        <View style={styles.inputContainer}>
+          <PhoneNumberInput
+            initialValue={currentValue || phoneNumber}
+            onChange={(payload) => {
+              setFullPhoneNumber(payload.fullPhoneNumber);
+              setIsValid(payload.isValid);
+            }}
+          />
+        </View>
       </View>
+    );
+  }
+);
 
-      <TouchableOpacity 
-        style={[
-          styles.saveButton,
-          (!isValid || isLoading) && styles.saveButtonDisabled
-        ]} 
-        onPress={handleSave}
-        disabled={!isValid || isLoading}
-      >
-        <Check color="white" size={20} />
-        <Text style={styles.saveButtonText}>
-          {isLoading ? 'Saving...' : 'Save Changes'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+PhoneUpdateForm.displayName = 'PhoneUpdateForm';
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
+    marginBottom: 8,
   },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#8B5CF6',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  inputContainer: {},
 });
-

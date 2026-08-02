@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, User, AtSign, MessageSquare, Camera, Calendar, Phone } from 'lucide-react-native';
+import { ChevronRight, AtSign, MessageSquare, Camera, Phone } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
+import { UserIcon } from '@/components/icons/user-icon';
+import { CalendarIcon } from '@/components/icons/calendar-icon';
 import { useAuthContext } from '@/providers/auth-provider';
 import ProfileUpdatePopover from '@/components/profile/profile-update-popover';
 import { useToast } from '@/hooks/use-toast';
@@ -34,7 +36,7 @@ export default function ProfileScreen() {
     {
       id: 'name',
       title: 'Full Name',
-      icon: User,
+      icon: UserIcon,
       value: profile?.full_name || 'Not set',
     },
     {
@@ -52,7 +54,7 @@ export default function ProfileScreen() {
     {
       id: 'birthday',
       title: 'Birthday',
-      icon: Calendar,
+      icon: CalendarIcon,
       value: profile?.birthday || 'Not set', // This would come from profile data
     },
     {
@@ -97,7 +99,7 @@ export default function ProfileScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.avatarSection}>
           <TouchableOpacity style={styles.avatarContainer} onPress={handleAvatarPress}>
             <Image 
@@ -141,7 +143,7 @@ export default function ProfileScreen() {
             );
           })}
         </View>
-      </ScrollView>
+      </View>
 
       <ProfileUpdatePopover
         isVisible={activePopover !== null}
@@ -177,8 +179,11 @@ const styles = StyleSheet.create({
   },
   avatarSection: {
     alignItems: 'center',
-    margin: 20,
-    paddingVertical: 32,
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
   },
   avatarContainer: {
     position: 'relative',
