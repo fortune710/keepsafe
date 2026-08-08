@@ -5,6 +5,7 @@ from schedulers.entry_ingestion_scheduler import EntryIngestionScheduler
 from schedulers.notification_scheduler import NotificationScheduler
 from schedulers.monthly_dump_scheduler import MonthlyDumpScheduler
 from schedulers.monthly_dump_enqueue_scheduler import MonthlyDumpEnqueueScheduler
+from schedulers.time_capsule_scheduler import TimeCapsuleScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class SchedulerManager:
             EntryIngestionScheduler(),
             MonthlyDumpScheduler(),
             MonthlyDumpEnqueueScheduler(),
+            TimeCapsuleScheduler(),
         ]
 
     def start(self) -> None:

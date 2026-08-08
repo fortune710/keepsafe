@@ -13,6 +13,7 @@ class DeviceStorage {
   private operationLock: Promise<any> = Promise.resolve();
   private isWeb = Platform.OS === 'web';
   private listeners: Record<string, Set<(payload?: any) => void>> = {};
+  private memoryCache = new Map<string, StorageItem<unknown>>();
 
   private async withLock<T>(operation: () => Promise<T>): Promise<T> {
     const nextOperation = this.operationLock.then(operation);
@@ -53,6 +54,8 @@ class DeviceStorage {
       await AsyncStorage.setItem(key, serializedValue);
     }
 
+    this.memoryCache.set(key, item);
+
     if (key.startsWith('entries_')) {
       const userId = key.replace('entries_', '');
       this.emit('entriesChanged', { userId });
@@ -61,6 +64,14 @@ class DeviceStorage {
 
   async getItem<T>(key: string): Promise<T | null> {
     try {
+      const cachedItem = this.memoryCache.get(key) as StorageItem<T> | undefined;
+      if (cachedItem) {
+        if (!cachedItem.expiresAt || Date.now() <= cachedItem.expiresAt) {
+          return cachedItem.data;
+        }
+        this.memoryCache.delete(key);
+      }
+
       let serializedValue: string | null;
 
       if (this.isWeb) {
@@ -81,6 +92,7 @@ class DeviceStorage {
         return null;
       }
 
+      this.memoryCache.set(key, item);
       return item.data;
     } catch (error) {
       console.error('Error getting item from storage:', error);
@@ -95,6 +107,8 @@ class DeviceStorage {
       await AsyncStorage.removeItem(key);
     }
 
+    this.memoryCache.delete(key);
+
     if (key.startsWith('entries_')) {
       const userId = key.replace('entries_', '');
       this.emit('entriesChanged', { userId });
@@ -107,6 +121,7 @@ class DeviceStorage {
     } else {
       await AsyncStorage.clear();
     }
+    this.memoryCache.clear();
   }
 
   async getAllKeys(): Promise<readonly string[]> {
@@ -160,6 +175,42 @@ class DeviceStorage {
 
   async getEntries(userId: string): Promise<any[] | null> {
     return await this.getItem<any[]>(`entries_${userId}`);
+  }
+
+  peekEntries(userId: string): any[] | null {
+    return this.peekItem<any[]>(`entries_${userId}`);
+  }
+
+  async setDiaryEntries(userId: string, diaryId: string, entries: any[]): Promise<void> {
+    await this.setItem(`diary_entries_${userId}_${diaryId}`, entries);
+  }
+
+  async getDiaryEntries(userId: string, diaryId: string): Promise<any[] | null> {
+    return await this.getItem<any[]>(`diary_entries_${userId}_${diaryId}`);
+  }
+
+  peekDiaryEntries(userId: string, diaryId: string): any[] | null {
+    return this.peekItem<any[]>(`diary_entries_${userId}_${diaryId}`);
+  }
+
+  async setDiaries(userId: string, diaries: any[]): Promise<void> {
+    await this.setItem(`diaries_${userId}`, diaries);
+  }
+
+  async getDiaries<T>(userId: string): Promise<T[] | null> {
+    return await this.getItem<T[]>(`diaries_${userId}`);
+  }
+
+  peekDiaries<T>(userId: string): T[] | null {
+    return this.peekItem<T[]>(`diaries_${userId}`);
+  }
+
+  private peekItem<T>(key: string): T | null {
+    const item = this.memoryCache.get(key) as StorageItem<T> | undefined;
+    if (!item) return null;
+    if (!item.expiresAt || Date.now() <= item.expiresAt) return item.data;
+    this.memoryCache.delete(key);
+    return null;
   }
 
   async addEntry(userId: string, entry: any): Promise<void> {

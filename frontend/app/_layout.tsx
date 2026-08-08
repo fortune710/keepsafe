@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAppFonts } from '@/hooks/useFonts';
 import { CaptureProvider } from '@/providers/capture-provider';
 import { posthog } from '@/constants/posthog';
+import { useNotificationNavigation } from '@/hooks/use-notification-navigation';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,6 +28,7 @@ export default function RootLayout() {
 
   // Initialize deep linking
   useDeepLinking();
+  useNotificationNavigation();
 
   // Initialize background tasks
   useEffect(() => {

@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: moderateScale(14),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '600',
     color: '#64748B',
     marginLeft: 8,
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   shareButtonText: {
     color: Colors.text,
     fontSize: moderateScale(14),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontWeight: '600',
     marginLeft: 10,
   },
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   copyButtonText: {
     color: Colors.text,
     fontSize: moderateScale(14),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontWeight: '600',
     marginLeft: 10,
   },

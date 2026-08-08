@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Pressable, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
@@ -14,8 +14,9 @@ import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
 import { useResponsive } from '@/hooks/use-responsive';
-import { ChevronLeft, Sparkles, Users } from 'lucide-react-native';
+import { ChevronLeft, Filter } from 'lucide-react-native';
 import { Colors } from '@/lib/constants';
+import { CircleIconButton } from '@/components/ui/circle-icon-button';
 import NewEntriesIndicator from '@/components/new-entries-indicator';
 import { useToast } from '@/hooks/use-toast';
 import { EntryWithProfile } from '@/types/entries';
@@ -31,15 +32,37 @@ import { getDefaultAvatarUrl } from '@/lib/utils';
 import EmptyFriendVault from '@/components/vault/empty-friend-vault';
 import { deviceStorage } from '@/services/device-storage';
 import { posthog } from '@/constants/posthog';
+import { DiaryOpeningTransition } from '@/components/vault/diary-opening-transition';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
 
-export default function VaultScreen() {
+export default function DiaryEntriesScreen() {
   const { profile, user } = useAuthContext();
   const router = useRouter();
-  const params = useLocalSearchParams<{ friendId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    friendId?: string | string[];
+    diaryId?: string | string[];
+    color?: string | string[];
+    style?: string | string[];
+    transitionX?: string | string[];
+    transitionY?: string | string[];
+    transitionWidth?: string | string[];
+    transitionHeight?: string | string[];
+  }>();
   const selectedFriendId = Array.isArray(params.friendId) ? params.friendId[0] : params.friendId;
+  const selectedDiaryId = Array.isArray(params.diaryId) ? params.diaryId[0] : params.diaryId;
+  const transitionColor = Array.isArray(params.color) ? params.color[0] : params.color;
+  const transitionStyle = Array.isArray(params.style) ? params.style[0] : params.style;
+  const transitionSource = useMemo(() => {
+    const readNumber = (value?: string | string[]) => Number(Array.isArray(value) ? value[0] : value);
+    const x = readNumber(params.transitionX);
+    const y = readNumber(params.transitionY);
+    const width = readNumber(params.transitionWidth);
+    const height = readNumber(params.transitionHeight);
+    if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+    return { x, y, width, height };
+  }, [params.transitionHeight, params.transitionWidth, params.transitionX, params.transitionY]);
   const responsive = useResponsive();
   const { toast } = useToast();
   const { friends, blockFriend: blockFriendAction } = useFriends(profile?.id);
@@ -55,7 +78,7 @@ export default function VaultScreen() {
     unseenEntryIds,
     markEntriesAsSeen,
     loadMore,
-  } = useUserEntries(selectedFriendId);
+  } = useUserEntries(selectedFriendId, selectedDiaryId);
   const { selectedEntryId, popupType, isPopupVisible, hidePopup } = usePopupParams();
   const reportedPostIdSet = new Set(reportedPostIds);
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
@@ -314,6 +337,14 @@ export default function VaultScreen() {
     );
   };
 
+  const openingTransition = (
+    <DiaryOpeningTransition
+      color={transitionColor || '#F59E0B'}
+      diaryStyle={transitionStyle}
+      source={transitionSource}
+    />
+  );
+
   if (error) {
     return (
       <View style={styles.errorContainer}>
@@ -322,6 +353,7 @@ export default function VaultScreen() {
         <TouchableOpacity style={styles.retryButton} onPress={refetch}>
           <Text style={styles.retryButtonText}>Try Again</Text>
         </TouchableOpacity>
+        {openingTransition}
       </View>
     );
   }
@@ -331,6 +363,7 @@ export default function VaultScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#8B5CF6" />
         <Text style={styles.loadingText}>Loading your entries...</Text>
+        {openingTransition}
       </View>
     );
   }
@@ -346,47 +379,33 @@ export default function VaultScreen() {
         >
           <Text style={styles.captureButtonText}>Start Capturing</Text>
         </TouchableOpacity>
+        {openingTransition}
       </View>
     );
   }
 
   return (
-    <Animated.View style={styles.container}>
-      <View style={styles.content}>
-        <EntryPage>
+    <EntryPage>
+      <Animated.View style={styles.container}>
+        <View style={styles.header}>
           <Pressable
-            style={styles.backButton}
+            style={styles.headerBackButton}
             onPress={() => router.back()}
             accessibilityLabel="Go back"
             accessibilityHint="Returns to the previous screen"
           >
             <ChevronLeft color="#64748B" size={24} />
           </Pressable>
-          <Pressable
-            style={styles.sparklesButton}
-            onPress={() => router.push('/search')}
-            accessibilityLabel="Open search"
-            accessibilityHint="Navigates to the search screen"
-          >
-            <Sparkles color="#64748B" size={24} />
-          </Pressable>
-          <Pressable
-            style={styles.friendFilterFab}
+          <CircleIconButton
             onPress={() => setIsFriendFilterVisible(true)}
-            accessibilityRole="button"
             accessibilityLabel={friendFilterAccessibilityLabel}
             accessibilityHint="Opens the friend filter menu"
           >
-            {selectedFriend ? (
-              <>{selectedFriend.avatar}</>
-            ) : (
-              <View accessible={false}>
-                <Users color="#64748B" size={24} />
-              </View>
-            )}
-          </Pressable>
+            <Filter color={selectedFriend ? '#8B5CF6' : '#64748B'} size={18} />
+          </CircleIconButton>
+        </View>
 
-
+        <View style={styles.content}>
           <FlashList
             ref={flashListRef}
             data={Object.keys(filteredEntriesByDate)}
@@ -453,59 +472,59 @@ export default function VaultScreen() {
               );
             }}
           />
-        </EntryPage>
-      </View>
+        </View>
 
-      {unseenEntryIds.size > 0 && (
-        <NewEntriesIndicator
-          count={unseenEntryIds.size}
-          onPress={scrollToTop}
-          visible={unseenEntryIds.size > 0}
+        {unseenEntryIds.size > 0 && (
+          <NewEntriesIndicator
+            count={unseenEntryIds.size}
+            onPress={scrollToTop}
+            visible={unseenEntryIds.size > 0}
+          />
+        )}
+
+        {isPopupVisible && selectedEntryId && (
+          <>
+            {popupType === 'reactions' && (
+              <EntryReactionsPopup
+                isVisible={true}
+                entryId={selectedEntryId}
+                onClose={hidePopup}
+              />
+            )}
+            {popupType === 'comments' && (
+              <EntryCommentsPopup
+                isVisible={true}
+                entryId={selectedEntryId}
+                onClose={hidePopup}
+              />
+            )}
+          </>
+        )}
+
+        {selectedMusic && (
+          <AudioPreviewPopover
+            music={selectedMusic}
+            isVisible={isMusicPlayerVisible}
+            onClose={closeMusicPlayer}
+          />
+        )}
+
+        <FriendFilterPopover
+          isVisible={isFriendFilterVisible}
+          onClose={() => setIsFriendFilterVisible(false)}
+          options={friendOptions}
+          selectedFriendId={selectedFriendId}
+          onSelect={handleFriendFilterSelect}
         />
-      )}
-
-      {isPopupVisible && selectedEntryId && (
-        <>
-          {popupType === 'reactions' && (
-            <EntryReactionsPopup
-              isVisible={true}
-              entryId={selectedEntryId}
-              onClose={hidePopup}
-            />
-          )}
-          {popupType === 'comments' && (
-            <EntryCommentsPopup
-              isVisible={true}
-              entryId={selectedEntryId}
-              onClose={hidePopup}
-            />
-          )}
-        </>
-      )}
-
-      {selectedMusic && (
-        <AudioPreviewPopover
-          music={selectedMusic}
-          isVisible={isMusicPlayerVisible}
-          onClose={closeMusicPlayer}
-        />
-      )}
-
-      <FriendFilterPopover
-        isVisible={isFriendFilterVisible}
-        onClose={() => setIsFriendFilterVisible(false)}
-        options={friendOptions}
-        selectedFriendId={selectedFriendId}
-        onSelect={handleFriendFilterSelect}
-      />
-    </Animated.View>
+      </Animated.View>
+      {openingTransition}
+    </EntryPage>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F9FF',
   },
   contentContainer: {
     paddingVertical: verticalScale(30),
@@ -516,38 +535,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginVertical: verticalScale(24)
   },
-  backButton: {
-    padding: scale(10),
-    position: 'absolute',
-    top: verticalScale(50),
-    left: scale(20),
-    backgroundColor: Colors.white,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 100,
-    zIndex: 9999,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(16),
+    paddingTop: verticalScale(50),
+    paddingBottom: verticalScale(12),
   },
-  sparklesButton: {
+  headerBackButton: {
     padding: scale(10),
-    position: 'absolute',
-    top: verticalScale(50),
-    right: scale(20),
     backgroundColor: Colors.white,
     borderColor: Colors.border,
     borderWidth: 1,
     borderRadius: 100,
-    zIndex: 9999,
-  },
-  friendFilterFab: {
-    padding: scale(10),
-    position: 'absolute',
-    bottom: verticalScale(30),
-    right: scale(20),
-    backgroundColor: Colors.white,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 100,
-    zIndex: 9999,
   },
   friendAvatar: {
     width: scale(24),

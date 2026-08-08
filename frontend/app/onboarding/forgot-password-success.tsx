@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: scale(24),
-        fontFamily: 'Outfit-Bold',
+        fontFamily: 'Figtree-Bold',
         color: '#1E293B',
         marginBottom: 12,
         textAlign: 'center',
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
         color: '#64748B',
         textAlign: 'center',
         lineHeight: 22,
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         paddingHorizontal: 16,
         marginBottom: 16,
     },
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#94A3B8',
         textAlign: 'center',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
     },
     buttonContainer: {
         width: '100%',
@@ -124,6 +124,6 @@ const styles = StyleSheet.create({
     backToLoginButtonText: {
         color: 'white',
         fontSize: 18,
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
     },
 });

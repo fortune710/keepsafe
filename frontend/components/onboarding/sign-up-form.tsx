@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: scale(18),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
   },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: scale(20),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: verticalScale(8),
     textAlign: 'left',
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'left',
     marginBottom: verticalScale(24),
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   inputContainer: {
     marginBottom: verticalScale(20),
@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   inputError: {
     borderColor: '#EF4444',
@@ -673,12 +673,12 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontSize: scale(12),
     marginTop: 4,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   buttonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   termsContainer: {
     marginTop: verticalScale(24),
@@ -690,11 +690,11 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 18,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   termsLink: {
     color: '#8B5CF6',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   reviewContainer: {
     alignItems: 'center',
@@ -723,13 +723,13 @@ const styles = StyleSheet.create({
     fontSize: scale(11),
     color: '#94A3B8',
     marginBottom: verticalScale(4),
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   detailValue: {
     fontSize: scale(16),
     color: '#1E293B',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

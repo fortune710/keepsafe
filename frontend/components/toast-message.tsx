@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
-    fontFamily: 'Outfit-SemiBold'
+    fontFamily: 'Figtree-SemiBold'
   },
   successText: {
     color: 'white',

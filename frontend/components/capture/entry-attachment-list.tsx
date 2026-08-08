@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     },
     attachmentName: {
         fontSize: 12,
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#64748B',
         fontWeight: '500',
         textAlign: 'center',

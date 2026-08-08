@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   title: {
     color: '#F8FAFC',
     fontSize: scale(12),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontWeight: '700',
     marginBottom: 2,
   },

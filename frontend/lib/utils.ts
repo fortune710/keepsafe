@@ -256,6 +256,7 @@ export const getEntriesForDate = (
     is_private: entry.is_private,
     profile: entry.profile,
     user_id: entry.user_id,
+    diary_id: entry.diary_id,
     shared_with: entry.shared_with,
     shared_with_everyone: entry.shared_with_everyone,
     metadata: entry.metadata,

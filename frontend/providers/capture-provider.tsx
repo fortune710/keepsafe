@@ -9,6 +9,8 @@ interface CaptureContextType {
   setRecordingDuration: React.Dispatch<React.SetStateAction<number>>;
   meteringLevel: number;
   setMeteringLevel: (value: number) => void;
+  pendingLocationAttachment: string | null;
+  setPendingLocationAttachment: (value: string | null) => void;
 }
 
 const CaptureContext = createContext<CaptureContextType | undefined>(undefined);
@@ -18,6 +20,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
   const [isVideoRecording, setIsVideoRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [meteringLevel, setMeteringLevel] = useState(0);
+  const [pendingLocationAttachment, setPendingLocationAttachment] = useState<string | null>(null);
 
   return (
     <CaptureContext.Provider
@@ -30,6 +33,8 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         setRecordingDuration,
         meteringLevel,
         setMeteringLevel,
+        pendingLocationAttachment,
+        setPendingLocationAttachment,
       }}
     >
       {children}

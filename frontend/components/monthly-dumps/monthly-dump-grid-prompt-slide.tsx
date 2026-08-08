@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   eyebrowText: {
     color: '#F8FAFC',
     fontSize: 12,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     letterSpacing: 0.9,
     textTransform: 'uppercase',
   },
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
     fontSize: 34,
     lineHeight: 40,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontWeight: '700',
     textAlign: 'center',
     letterSpacing: -0.6,
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     color: '#C7D2E1',
     fontSize: 16,
     lineHeight: 24,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     textAlign: 'center',
     marginBottom: 24,
     paddingHorizontal: 12,
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   detailChipText: {
     color: '#E2E8F0',
     fontSize: 13,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     letterSpacing: 0.1,
   },
   gridButton: {
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   gridButtonText: {
     color: '#F8FAFC',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '600',
     letterSpacing: 0.2,
   },

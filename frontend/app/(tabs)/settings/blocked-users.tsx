@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
   emptyState: {
@@ -143,13 +143,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginTop: 12,
   },
   emptyDescription: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     marginTop: 4,
     textAlign: 'center',
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#FFFFFF',
   },
   userInfo: {
@@ -190,14 +190,14 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: moderateScale(14),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 2,
   },
   userDetail: {
     fontSize: moderateScale(12),
-    fontFamily: 'Jost-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: Colors.textMuted,
   },
   unblockButton: {

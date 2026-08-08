@@ -158,7 +158,7 @@ const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
               body: {
                 color: isAssistant ? styles.assistantText.color : styles.userText.color,
                 fontSize: styles.messageText.fontSize,
-                fontFamily: 'Outfit-Regular',
+                fontFamily: 'Figtree-Regular',
               },
               paragraph: {
                 marginTop: 0,
@@ -172,13 +172,13 @@ const SearchMessage: React.FC<SearchMessageProps> = ({ message }) => {
               },
               heading1: {
                 fontSize: 18,
-                fontFamily: 'Outfit-Bold',
+                fontFamily: 'Figtree-Bold',
                 marginBottom: 6,
                 color: isAssistant ? styles.assistantText.color : styles.userText.color,
               },
               heading2: {
                 fontSize: 16,
-                fontFamily: 'Outfit-Bold',
+                fontFamily: 'Figtree-Bold',
                 marginBottom: 4,
                 color: isAssistant ? styles.assistantText.color : styles.userText.color,
               },
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   headerSpacer: {
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     paddingHorizontal: 16,
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1F2933',
     marginBottom: 8,
   },
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   sampleQueryText: {
     fontSize: 12,
     color: '#4F46E5',
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
   },
   messagesListContent: {
     paddingHorizontal: 16,
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: scale(14),
     fontWeight: '600',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   assistantText: {
     color: '#1F2933',
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     fontSize: 14,
     color: '#111827',
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -531,19 +531,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 11,
     color: '#9CA3AF',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   placeholderText: {
     fontSize: 13,
     color: '#9CA3AF',
     paddingVertical: 8,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   errorText: {
     fontSize: 12,
     color: '#DC2626',
     marginBottom: 4,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   searchMessageContainer: {
     width: '100%',
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   resultPreviewType: {
     fontSize: 12,
     color: '#4B5563',
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     textTransform: 'capitalize',
   },
   fullscreenOverlay: {
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     color: '#E5E7EB',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   loadingContainer: {
     flexDirection: 'row',

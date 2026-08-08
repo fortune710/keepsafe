@@ -55,29 +55,31 @@ export const CaptureActions = ({
   return (
     <>
       <View style={styles.actionContainer}>
-        {isCameraFamily ? (
-          <TouchableOpacity
-            style={[
-              styles.uploadButton,
-              {
+        <View style={[styles.sideActionSlot, styles.sideActionSlotStart]}>
+          {isCameraFamily ? (
+            <TouchableOpacity
+              style={[
+                styles.uploadButton,
+                {
+                  minWidth: minTouchTarget,
+                  minHeight: minTouchTarget,
+                },
+              ]}
+              onPress={handleUpload}
+              accessibilityRole="button"
+              accessibilityLabel="Open gallery"
+            >
+              <GalleryIcon color="#94A3B8" size={26} />
+            </TouchableOpacity>
+          ) : (
+            <View
+              style={{
                 minWidth: minTouchTarget,
                 minHeight: minTouchTarget,
-              },
-            ]}
-            onPress={handleUpload}
-            accessibilityRole="button"
-            accessibilityLabel="Open gallery"
-          >
-            <GalleryIcon color="#94A3B8" size={26} />
-          </TouchableOpacity>
-        ) : (
-          <View
-            style={{
-              minWidth: minTouchTarget,
-              minHeight: minTouchTarget,
-            }}
-          />
-        )}
+              }}
+            />
+          )}
+        </View>
 
         <TouchableOpacity
           style={[
@@ -125,16 +127,18 @@ export const CaptureActions = ({
           </View>
         </TouchableOpacity>
 
-        <View
-          style={[
-            styles.uploadButton,
-            {
-              minWidth: minTouchTarget,
-              minHeight: minTouchTarget,
-              opacity: 0,
-            },
-          ]}
-        />
+        <View style={[styles.sideActionSlot, styles.sideActionSlotEnd]}>
+          <View
+            style={[
+              styles.uploadButton,
+              {
+                minWidth: minTouchTarget,
+                minHeight: minTouchTarget,
+                opacity: 0,
+              },
+            ]}
+          />
+        </View>
       </View>
     </>
   );
@@ -144,9 +148,18 @@ const styles = StyleSheet.create({
   actionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 40,
     marginBottom: 20,
+  },
+  sideActionSlot: {
+    flex: 1,
+  },
+  sideActionSlotStart: {
+    alignItems: 'flex-start',
+  },
+  sideActionSlotEnd: {
+    alignItems: 'flex-end',
   },
   uploadButton: {
     width: 60,

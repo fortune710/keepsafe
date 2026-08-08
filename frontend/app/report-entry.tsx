@@ -46,7 +46,7 @@ export default function ReportEntryScreen() {
       await deviceStorage.removeEntry(user.id, safeEntryId);
       toast('Entry reported. It has been removed from this device.');
       if (router.canGoBack()) return router.back();
-      return router.replace('/diary');
+      return router.replace('/diary/entries');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to report this entry.';
       toast(errorMessage, 'error');
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(24),
     fontSize: scale(15),
     color: '#475569',
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     textAlign: 'center',
   },
   reasonsContainer: {
@@ -123,11 +123,11 @@ const styles = StyleSheet.create({
   reasonText: {
     fontSize: scale(15),
     color: Colors.text,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   reasonTextSelected: {
     color: '#991B1B',
-    fontFamily: 'Jost-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   confirmButton: {
     backgroundColor: '#DC2626',
@@ -142,6 +142,6 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: Colors.white,
     fontSize: scale(16),
-    fontFamily: 'Jost-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

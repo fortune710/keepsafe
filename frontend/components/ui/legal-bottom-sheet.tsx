@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: scale(17),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginRight: scale(12),
   },
@@ -84,20 +84,20 @@ const styles = StyleSheet.create({
   },
   lastUpdated: {
     fontSize: scale(13),
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#94A3B8',
     marginBottom: verticalScale(16),
   },
   sectionTitle: {
     fontSize: scale(15),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginTop: verticalScale(16),
     marginBottom: verticalScale(6),
   },
   sectionText: {
     fontSize: scale(13.5),
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#475569',
     lineHeight: verticalScale(20),
   },

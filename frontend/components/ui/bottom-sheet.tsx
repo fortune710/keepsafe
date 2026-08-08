@@ -21,6 +21,7 @@ interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  height?: number | `${number}%`;
   maxHeight?: number | `${number}%`;
 }
 
@@ -28,6 +29,7 @@ export function BottomSheet({
   visible,
   onClose,
   children,
+  height,
   maxHeight = '70%',
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
@@ -107,7 +109,7 @@ export function BottomSheet({
             style={[
               styles.sheet,
               sheetStyle,
-              { maxHeight, marginBottom: restingMarginBottom },
+              { height, maxHeight, marginBottom: restingMarginBottom },
             ]}
           >
             <View style={styles.handle} />

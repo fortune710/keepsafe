@@ -77,12 +77,16 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="diary"
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
-              <DiaryIcon color={color} size={TAB_ICON_SIZE} />
-            </View>
-          ),
+        options={({ route }) => {
+          const focusedRouteName = getFocusedRouteNameFromRoute(route) ?? 'index';
+          return {
+            tabBarIcon: ({ color, focused }) => (
+              <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
+                <DiaryIcon color={color} size={TAB_ICON_SIZE} />
+              </View>
+            ),
+            tabBarStyle: focusedRouteName === 'index' ? TAB_BAR_STYLE : { display: 'none' },
+          };
         }}
       />
       <Tabs.Screen

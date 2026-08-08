@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     color: '#C7D2E1',
     fontSize: 15,
     lineHeight: 22,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     textAlign: 'center',
     maxWidth: 320,
   },
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#F8FAFC',
     fontSize: 15,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '600',
   },
 });

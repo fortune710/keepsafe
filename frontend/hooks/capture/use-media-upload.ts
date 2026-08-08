@@ -16,7 +16,7 @@ import { useMediaCapture } from "@/hooks/use-media-capture";
  * Triggers navigation via `router.push` and logs debug information about the capture.
  * May indirectly trigger media permission requests and hardware access via `useMediaCapture`.
  */
-export function useMediaUpload(selectedMode: 'camera' | 'microphone') {
+export function useMediaUpload(selectedMode: 'camera' | 'microphone', isTimeCapsule = false) {
 
     const {
         uploadMedia
@@ -35,7 +35,8 @@ export function useMediaUpload(selectedMode: 'camera' | 'microphone') {
                     captureId: capture.id,
                     type: capture.type,
                     uri: encodeURIComponent(capture.uri),
-                    duration: capture.duration?.toString()
+                    duration: capture.duration?.toString(),
+                    timeCapsule: isTimeCapsule ? 'true' : undefined,
                 }
             });
         }

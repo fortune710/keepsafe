@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: scale(17),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginRight: scale(12),
   },

@@ -34,7 +34,6 @@ export function usePushNotifications(userId?: string): UsePushNotificationsResul
     useState<Notifications.PermissionStatus | null>(null);
   
   const notificationListener = useRef<Notifications.Subscription>(null);
-  const responseListener = useRef<Notifications.Subscription>(null);
 
   useEffect(() => {
     // Register for push notifications on mount
@@ -46,18 +45,9 @@ export function usePushNotifications(userId?: string): UsePushNotificationsResul
       setNotification(notification);
     });
 
-    // Listen for notification responses (when user taps notification)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification response:', response);
-      // Handle notification tap here (e.g., navigate to specific screen)
-    });
-
     return () => {
       if (notificationListener.current) {
         notificationListener.current.remove();
-      }
-      if (responseListener.current) {
-        responseListener.current?.remove();
       }
     };
   }, []);

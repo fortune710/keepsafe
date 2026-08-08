@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
 import { SparklesIcon } from '@/components/icons/sparkles';
@@ -28,6 +28,7 @@ import { usePhotoCapture } from '@/hooks/capture/use-photo-capture';
 import { useCameraControl } from '@/hooks/capture/use-camera-control';
 import { useMediaUpload } from '@/hooks/capture/use-media-upload';
 import { useAudioCapture } from '@/hooks/capture/use-audio-capture';
+import { useCaptureContext } from '@/providers/capture-provider';
 
 // Refactored Components
 import {
@@ -44,6 +45,7 @@ export default function CaptureScreen() {
   const RECAP_CHIP_REVEAL_EARLY_MS = 140;
 
   const responsive = useResponsive();
+  const { timeCapsule, locationAttachment } = useLocalSearchParams<{ timeCapsule?: string; locationAttachment?: string }>();
   const insets = useSafeAreaInsets();
   const [captureUIMode, setCaptureUIMode] = useState<CaptureUIMode>('photo');
   const selectedMode: 'camera' | 'microphone' =
@@ -63,6 +65,7 @@ export default function CaptureScreen() {
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
   const { unlockSave, isSaveLocked } = useSaveLock();
+  const { setPendingLocationAttachment } = useCaptureContext();
   const { showPhoneSheet, setShowPhoneSheet } = useManagePhoneSheet();
 
   //Media Hooks
@@ -82,6 +85,7 @@ export default function CaptureScreen() {
     isCameraReady,
     cameraMode,
     captureMode: selectedMode,
+    isTimeCapsule: timeCapsule === 'true',
     updateCameraMode: setCameraMode,
     updateCameraReady: setIsCameraReady,
   });
@@ -92,14 +96,16 @@ export default function CaptureScreen() {
     cameraMode,
     facing,
     updateCameraMode: setCameraMode,
+    isTimeCapsule: timeCapsule === 'true',
   });
 
   const { toggleRecording } = useAudioCapture({
     cameraRef,
     setVideoDuration,
+    isTimeCapsule: timeCapsule === 'true',
   });
 
-  const { handleUpload } = useMediaUpload(selectedMode);
+  const { handleUpload } = useMediaUpload(selectedMode, timeCapsule === 'true');
 
   // Release save lock when capture screen mounts (after navigating back from details)
   useVaultPreloader();
@@ -112,6 +118,11 @@ export default function CaptureScreen() {
 
   const { isCapturing, recordingDuration, meteringLevel, clearCapture } =
     useMediaCapture();
+
+  useEffect(() => {
+    if (!locationAttachment) return;
+    setPendingLocationAttachment(locationAttachment);
+  }, [locationAttachment, setPendingLocationAttachment]);
 
   // Cleanup audio recording when component unmounts (navigating away)
   useEffect(() => {
@@ -377,7 +388,7 @@ const styles = StyleSheet.create({
   recapChipText: {
     color: 'white',
     fontSize: 12,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     flexShrink: 1,
   },
   bannerOverlay: {
@@ -409,7 +420,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 24,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   permissionButton: {
     backgroundColor: Colors.primary,
@@ -420,6 +431,6 @@ const styles = StyleSheet.create({
   permissionButtonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

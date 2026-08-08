@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   countryCodeText: {
     fontSize: 16,
     color: '#1E293B',
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     minWidth: scale(28),
   },
   divider: {
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: '#1E293B',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     padding: 0,
   },
   errorMessage: {

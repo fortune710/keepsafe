@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import { getContentType, getFileExtension, isBase64File, isLocalFile } from '@/lib/utils';
 import { RenderedMediaCanvasItem } from '@/types/capture';
 import { scheduleEntryProcessing } from '@/services/background-task-manager';
+import { TimeCapsuleDraft } from '@/components/capture/time-capsule-config';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type EntryInsert = Database['public']['Tables']['entries']['Insert'];
@@ -33,6 +34,7 @@ interface UseEntryOperationsResult {
     selectedFriends: string[];
     attachments: RenderedMediaCanvasItem[];
     tempId?: string;
+    timeCapsule?: TimeCapsuleDraft | null;
   }) => Promise<ShareResult>;
   uploadMedia: (file: File | string, userId: string, fileName: string, contentType: string) => Promise<string | null>;
 }
@@ -203,6 +205,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
     selectedFriends: string[];
     attachments: RenderedMediaCanvasItem[];
     tempId?: string;
+    timeCapsule?: TimeCapsuleDraft | null;
   }): Promise<ShareResult> => {
     setIsLoading(true);
 
@@ -243,6 +246,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
         selectedFriends: entryData.selectedFriends,
         attachments: entryData.attachments,
         idempotencyKey,
+        timeCapsule: entryData.timeCapsule || null,
       };
 
       // Schedule background processing

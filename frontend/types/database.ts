@@ -59,6 +59,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          diary_id: string
           type: 'photo' | 'video' | 'audio'
           shared_with: string[] | null,
           attachments: RenderedMediaCanvasItem[];
@@ -75,6 +76,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          diary_id: string
           type: 'photo' | 'video' | 'audio',
           shared_with?: string[],
           attachments: RenderedMediaCanvasItem[];
@@ -91,6 +93,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          diary_id?: string
           type?: 'photo' | 'video' | 'audio'
           content_url?: string | null
           text_content?: string | null
@@ -101,6 +104,34 @@ export interface Database {
           metadata?: Json | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      diaries: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          color: string
+          cover_color: string
+          style: string
+          is_default: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          color?: string
+          cover_color?: string
+          style?: string
+          is_default?: boolean
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          color?: string
+          cover_color?: string
+          style?: string
         }
       }
       friendships: {
@@ -454,6 +485,43 @@ export interface Database {
           created_at?: string
         }
       }
+      time_capsules: {
+        Row: {
+          id: string
+          entry_id: string
+          user_id: string
+          reveal_type: 'date' | 'condition'
+          unlock_at: string | null
+          condition_label: string | null
+          status: 'locked' | 'pending_release' | 'unlocked'
+          release_requested_at: string | null
+          release_available_at: string | null
+          unlocked_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          entry_id: string
+          user_id: string
+          reveal_type: 'date' | 'condition'
+          unlock_at?: string | null
+          condition_label?: string | null
+          status?: 'locked' | 'pending_release' | 'unlocked'
+          release_requested_at?: string | null
+          release_available_at?: string | null
+          unlocked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          status?: 'locked' | 'pending_release' | 'unlocked'
+          release_requested_at?: string | null
+          release_available_at?: string | null
+          unlocked_at?: string | null
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -464,6 +532,18 @@ export interface Database {
           p_user_id: string;
           p_phone_number: string;
           p_raw_otp: string;
+        };
+        Returns: Json;
+      };
+      request_time_capsule_release: {
+        Args: {
+          p_capsule_id: string;
+        };
+        Returns: Json;
+      };
+      cancel_time_capsule_release: {
+        Args: {
+          p_capsule_id: string;
         };
         Returns: Json;
       };

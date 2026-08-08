@@ -179,14 +179,14 @@ const styles = StyleSheet.create({
   },
   friendName: {
     fontSize: moderateScale(14),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 2,
   },
   friendEmail: {
     fontSize: moderateScale(12),
-    fontFamily: 'Jost-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: Colors.textMuted,
   },
   statusText: {

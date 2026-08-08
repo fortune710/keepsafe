@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: scale(18),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
   },
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: scale(20),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: verticalScale(24),
     textAlign: 'left',
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   inputError: {
     borderColor: '#EF4444',
@@ -286,12 +286,12 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontSize: scale(12),
     marginTop: 4,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   authButtonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   forgotPasswordButton: {
     width: '100%',
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: '#8B5CF6',
     fontSize: scale(16),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   bottomContainer: {
     position: 'absolute',
@@ -314,11 +314,11 @@ const styles = StyleSheet.create({
   switchText: {
     fontSize: scale(16),
     color: '#64748B',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   switchLink: {
     color: '#8B5CF6',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   buttonActions: {
     flexDirection: 'column',
