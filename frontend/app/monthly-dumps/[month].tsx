@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   monthText: {
     color: '#F8FAFC',
     fontSize: 15,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '700',
     letterSpacing: 0.2,
     textAlign: 'left',

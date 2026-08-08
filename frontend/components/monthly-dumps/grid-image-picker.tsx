@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   sourceMenuButtonText: {
     color: '#F8FAFC',
     fontSize: 14,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   trayCloseButton: {
     width: 40,
@@ -293,6 +293,6 @@ const styles = StyleSheet.create({
   sourceMenuOptionText: {
     color: '#F8FAFC',
     fontSize: 14,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
   },
 });

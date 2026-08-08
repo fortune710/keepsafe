@@ -69,12 +69,19 @@ export function CaptureModeSelector({
       {containerWidth > 0 && (
         <ScrollView
           ref={scrollRef}
+          style={styles.scrollView}
           horizontal
           showsHorizontalScrollIndicator={false}
+          automaticallyAdjustContentInsets={false}
+          contentInsetAdjustmentBehavior="never"
           decelerationRate="fast"
-          snapToInterval={ITEM_WIDTH}
-          snapToAlignment="start"
-          contentContainerStyle={{ paddingHorizontal: sideInset }}
+          disableIntervalMomentum
+          snapToOffsets={MODES.map((_, index) => index * ITEM_WIDTH)}
+          contentContainerStyle={{
+            paddingLeft: sideInset,
+            paddingRight: sideInset,
+            alignItems: 'center',
+          }}
           onMomentumScrollEnd={handleMomentumScrollEnd}
           scrollEventThrottle={16}
         >
@@ -104,20 +111,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: verticalScale(4),
   },
+  scrollView: {
+    width: '100%',
+  },
   item: {
     width: ITEM_WIDTH,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
     fontSize: scale(13),
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     color: '#94A3B8',
     letterSpacing: 0.5,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   labelActive: {
     fontSize: scale(15),
     color: '#8B5CF6',
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
   },
 });

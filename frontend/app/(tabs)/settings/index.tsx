@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ChevronRight, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
@@ -133,7 +133,7 @@ export default function SettingsScreen() {
             <Text style={styles.title}>Settings</Text>
           </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
             <TouchableOpacity
               style={styles.profileSection}
               onPress={() => router.push('/settings/profile')}
@@ -178,7 +178,7 @@ export default function SettingsScreen() {
                 <View style={{ width: 20 }} />
               </TouchableOpacity>
             </View>
-          </ScrollView>
+          </View>
         </View>
       </GestureDetector>
     </SafeAreaView>
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -227,24 +227,24 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 4,
   },
   profileUsername: {
     fontSize: 14,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     color: '#8B5CF6',
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 13,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
   groupLabel: {
     fontSize: 14,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '600',
     color: '#64748B',
     marginHorizontal: 20,
@@ -274,13 +274,13 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   itemSubtitle: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
 });

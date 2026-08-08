@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     fontSize: scale(12),
     color: '#1E293B',
     fontWeight: '500',
-    fontFamily: 'Jost-SemiBold'
+    fontFamily: 'Figtree-SemiBold'
   },
   entryCard: {
     backgroundColor: '#fdfdfd',
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     fontSize: scale(14),
     fontWeight: '600',
     color: Colors.text,
-    fontFamily: 'Jost-SemiBold'
+    fontFamily: 'Figtree-SemiBold'
   },
   authorNameContainer: {
     width: '65%',

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Shield, Eye, Lock, Trash2, Download } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -357,7 +357,7 @@ export default function PrivacyScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.dataSection}>
           <Text style={styles.sectionTitle}>Privacy Settings</Text>
           <View>
@@ -452,7 +452,7 @@ export default function PrivacyScreen() {
             </View>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -484,13 +484,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     lineHeight: 20,
   },
@@ -514,13 +514,13 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   settingDescription: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
   dataSection: {
@@ -551,13 +551,13 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   actionDescription: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
 });

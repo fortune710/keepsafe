@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#1E293B',
-    fontFamily: 'Outfit-SemiBold'
+    fontFamily: 'Figtree-SemiBold'
   },
   closeButton: {
     padding: 4,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     fontSize: 16,
     fontWeight: '500',
-    fontFamily: 'Outfit-Medium'
+    fontFamily: 'Figtree-Medium'
   },
   handle: {
     width: 40,

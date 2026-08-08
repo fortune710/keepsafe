@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
-import { X, Sticker, UserPlus2 } from 'lucide-react-native';
+import { X, Sticker, UserPlus2, Hourglass } from 'lucide-react-native';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { BackButton } from '@/components/back-button';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
@@ -22,6 +22,8 @@ import { useDeviceLocation } from '@/hooks/use-device-location';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useFriends } from '@/hooks/use-friends';
 import { useUserEntries } from '@/hooks/use-user-entries';
+import { useTimeCapsules } from '@/hooks/use-time-capsules';
+import TimeCapsuleConfig, { TimeCapsuleDraft, tomorrowIso } from '@/components/capture/time-capsule-config';
 import { usePrivacySettings } from '@/hooks/use-privacy-settings';
 import { PrivacySettings } from '@/types/privacy';
 import { MediaCapture } from '@/types/media';
@@ -44,6 +46,7 @@ import AudioEntry from '@/components/audio/audio-entry';
 import EntryShareList from '@/components/friends/entry-share-list';
 import EntryAttachmentList from '@/components/capture/entry-attachment-list';
 import { MediaCanvasItemType } from '@/types/capture';
+import { useCaptureContext } from '@/providers/capture-provider';
 
 interface Friend {
   id: string;
@@ -69,7 +72,7 @@ const PHOTO_CARD_HEIGHT = SCREEN_HEIGHT * 0.5;
  */
 export default function DetailsScreen() {
   const params = useLocalSearchParams();
-  const { captureId, type, uri, duration, facing } = params;
+  const { captureId, type, uri, duration, facing, timeCapsule } = params;
 
   const capture: MediaCapture = {
     id: captureId as string,
@@ -87,8 +90,10 @@ export default function DetailsScreen() {
   const { isSaveLocked, lockSave } = useSaveLock();
   const { friends } = useFriends(user?.id);
   const { addOptimisticEntry, replaceOptimisticEntry } = useUserEntries();
+  const { addOptimisticCapsule, removeOptimisticCapsule } = useTimeCapsules();
   const { settings: privacySettings } = usePrivacySettings();
   const { location } = useDeviceLocation();
+  const { pendingLocationAttachment, setPendingLocationAttachment } = useCaptureContext();
 
   const showEveryoneDefault =
     privacySettings[PrivacySettings.AUTO_SHARE] ?? false;
@@ -131,8 +136,11 @@ export default function DetailsScreen() {
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
   const [activeSheet, setActiveSheet] = useState<
-    'attachments' | 'friends' | null
+    'attachments' | 'friends' | 'timeCapsule' | null
   >(null);
+  const [timeCapsuleDraft, setTimeCapsuleDraft] = useState<TimeCapsuleDraft | null>(
+    timeCapsule === 'true' ? { revealType: 'date', unlockAt: tomorrowIso() } : null,
+  );
   const [caption, setCaption] = useState<string>('');
   const [editorActiveTab, setEditorActiveTab] = useState<
     MediaCanvasItemType | undefined
@@ -197,6 +205,15 @@ export default function DetailsScreen() {
     removeElement,
     updateTextItem,
   } = useMediaCanvas();
+  const didAttachPromptLocation = useRef(false);
+
+  useEffect(() => {
+    if (!pendingLocationAttachment || didAttachPromptLocation.current) return;
+    didAttachPromptLocation.current = true;
+    addLocation(pendingLocationAttachment);
+  }, [addLocation, pendingLocationAttachment]);
+
+  useEffect(() => () => setPendingLocationAttachment(null), [setPendingLocationAttachment]);
 
   // Custom addText handler that handles pending text items
   const handleAddText = (
@@ -221,7 +238,7 @@ export default function DetailsScreen() {
       const defaultText = 'Enter text';
       const defaultStyle = {
         color: '#FFFFFF',
-        fontFamily: 'Arial',
+        fontFamily: 'Figtree-Regular',
         backgroundColor: '#000000',
       };
       const tempId = addText(defaultText, defaultStyle); // Returns the ID
@@ -266,7 +283,7 @@ export default function DetailsScreen() {
           text,
           currentItem.style || {
             color: '#FFFFFF',
-            fontFamily: 'Arial',
+            fontFamily: 'Figtree-Regular',
             backgroundColor: '#000000',
           },
         );
@@ -324,17 +341,17 @@ export default function DetailsScreen() {
       });
       const showLocation =
         privacySettings[PrivacySettings.LOCATION_SHARE] ?? false;
-      const locationTag =
-        showLocation && location?.city
-          ? [location.city, location.region ?? location.country]
-              .filter(Boolean)
-              .join(', ')
-          : null;
+      const locationTag = showLocation
+        ? pendingLocationAttachment || (location?.city
+          ? [location.city, location.region ?? location.country].filter(Boolean).join(', ')
+          : null)
+        : null;
 
       // Create optimistic entry for immediate UI update
       const optimisticEntry = {
         id: tempId,
         user_id: user.id,
+        diary_id: user.id,
         type: capture.type as 'photo' | 'video' | 'audio',
         shared_with: [user.id, ...selectedFriends],
         attachments: entryAttachments,
@@ -361,8 +378,28 @@ export default function DetailsScreen() {
         },
       };
 
-      // Add optimistic entry immediately
-      addOptimisticEntry(optimisticEntry);
+      // A time capsule entry must not appear in the main feed even optimistically - add it
+      // to the Time Capsule tab's cache instead, as `locked`.
+      if (timeCapsuleDraft) {
+        addOptimisticCapsule({
+          id: Crypto.randomUUID(),
+          entry_id: tempId,
+          user_id: user.id,
+          reveal_type: timeCapsuleDraft.revealType,
+          unlock_at: timeCapsuleDraft.revealType === 'date' ? timeCapsuleDraft.unlockAt : null,
+          condition_label:
+            timeCapsuleDraft.revealType === 'condition' ? timeCapsuleDraft.conditionLabel : null,
+          status: 'locked',
+          release_requested_at: null,
+          release_available_at: null,
+          unlocked_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          entry: optimisticEntry as any,
+        });
+      } else {
+        addOptimisticEntry(optimisticEntry);
+      }
 
       const result = await saveEntry({
         capture,
@@ -374,6 +411,7 @@ export default function DetailsScreen() {
         selectedFriends,
         attachments: entryAttachments,
         tempId,
+        timeCapsule: timeCapsuleDraft,
       });
 
       if (result.success) {
@@ -390,7 +428,9 @@ export default function DetailsScreen() {
 
         // Create notification message based on sharing options
         let notificationBody = '';
-        if (isPrivate) {
+        if (timeCapsuleDraft) {
+          notificationBody = 'Sealed in your Time Capsule';
+        } else if (isPrivate) {
           notificationBody = 'Entry saved privately';
         } else if (isEveryone) {
           notificationBody = 'Entry shared with everyone';
@@ -413,14 +453,22 @@ export default function DetailsScreen() {
           router.replace('/capture');
         }
       } else {
-        // Remove optimistic entry on failure
-        replaceOptimisticEntry(tempId);
+        // Remove the optimistic entry/capsule on failure
+        if (timeCapsuleDraft) {
+          removeOptimisticCapsule(tempId);
+        } else {
+          replaceOptimisticEntry(tempId);
+        }
         toast(result.message, 'error');
       }
     } catch (error) {
-      // Remove optimistic entry on error
+      // Remove the optimistic entry/capsule on error
       if (tempId) {
-        replaceOptimisticEntry(tempId);
+        if (timeCapsuleDraft) {
+          removeOptimisticCapsule(tempId);
+        } else {
+          replaceOptimisticEntry(tempId);
+        }
       }
       toast('Failed to share', 'error');
     }
@@ -466,6 +514,16 @@ export default function DetailsScreen() {
             onPress={() => setActiveSheet('friends')}
           >
             <UserPlus2 color="#64748B" size={24} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              activeSheet === 'timeCapsule' && styles.modeButtonActive,
+            ]}
+            onPress={() => setActiveSheet('timeCapsule')}
+          >
+            <Hourglass color={timeCapsuleDraft ? '#8B5CF6' : '#64748B'} size={24} />
           </TouchableOpacity>
         </View>
       </View>
@@ -572,6 +630,25 @@ export default function DetailsScreen() {
         </View>
       </BottomSheet>
 
+      <BottomSheet
+        visible={activeSheet === 'timeCapsule'}
+        onClose={() => setActiveSheet(null)}
+      >
+        <View style={styles.sheetBody}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Time Capsule</Text>
+            <TouchableOpacity
+              style={styles.sheetCloseButton}
+              onPress={() => setActiveSheet(null)}
+              hitSlop={12}
+            >
+              <X color="#64748B" size={20} />
+            </TouchableOpacity>
+          </View>
+          <TimeCapsuleConfig value={timeCapsuleDraft} onChange={setTimeCapsuleDraft} />
+        </View>
+      </BottomSheet>
+
       <EditorPopover
         isVisible={showEditorPopover}
         onClose={handleEditorClose}
@@ -656,7 +733,7 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(14),
     paddingHorizontal: scale(4),
     fontSize: 15,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#1E293B',
     minHeight: verticalScale(24),
   },
@@ -673,7 +750,7 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   sheetCloseButton: {
@@ -721,7 +798,7 @@ const styles = StyleSheet.create({
   },
   wordCount: {
     fontSize: 12,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#94A3B8',
     textAlign: 'right',
     marginTop: -16,
@@ -749,12 +826,12 @@ const styles = StyleSheet.create({
   tagButtonText: {
     color: '#64748B',
     marginLeft: 8,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     fontWeight: '500',
   },
   locationError: {
     fontSize: 12,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#EF4444',
     marginTop: 4,
     marginLeft: 8,
@@ -762,14 +839,14 @@ const styles = StyleSheet.create({
 
   privacyTitle: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 16,
   },
   requiredText: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#EF4444',
     marginBottom: 16,
     fontStyle: 'italic',
@@ -792,7 +869,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: 'white',
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '600',
   },
 });

@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         fontSize: 20,
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         fontWeight: '600',
         color: '#1E293B',
         marginTop: 16,
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     },
     errorMessage: {
         fontSize: 16,
-        fontFamily: 'Jost-Regular',
+        fontFamily: 'Figtree-Regular',
         color: '#64748B',
         textAlign: 'center',
         lineHeight: 22,
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     retryButtonText: {
         color: 'white',
         fontSize: 16,
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         fontWeight: '600',
     },
 });

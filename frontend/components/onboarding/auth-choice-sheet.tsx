@@ -85,13 +85,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: scale(22),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: verticalScale(8),
   },
   subtitle: {
     fontSize: scale(14),
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     lineHeight: verticalScale(20),
     marginBottom: verticalScale(28),
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   secondaryButton: {
     borderRadius: 18,
@@ -117,6 +117,6 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#1E293B',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

@@ -81,14 +81,14 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 22,
-        fontFamily: 'Outfit-Bold',
+        fontFamily: 'Figtree-Bold',
         color: '#1E293B',
         marginBottom: 12,
         textAlign: 'center',
     },
     description: {
         fontSize: 16,
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         color: '#64748B',
         textAlign: 'center',
         lineHeight: 24,
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     },
     highlight: {
         color: '#8B5CF6',
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
     },
     badge: {
         flexDirection: 'row',
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         fontSize: 14,
-        fontFamily: 'Outfit-Medium',
+        fontFamily: 'Figtree-Medium',
         color: '#8B5CF6',
     },
 });

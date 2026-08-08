@@ -75,13 +75,13 @@ const styles = StyleSheet.create({
   },
   fallbackTitle: {
     color: Colors.white,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontSize: 22,
     textAlign: 'center',
   },
   fallbackSubtitle: {
     color: '#CBD5E1',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',

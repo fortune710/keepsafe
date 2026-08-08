@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     marginLeft: 8,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   loadingContainer: {
     flex: 1,

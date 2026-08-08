@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Heart, ExternalLink, Mail, Shield, ChevronRight } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -27,7 +27,7 @@ export default function AboutScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.appSection}>
           <Text style={styles.appName}>Keepsafe</Text>
           <Text style={styles.appTagline}>Your most treasured moments, all in one place</Text>
@@ -69,7 +69,7 @@ export default function AboutScreen() {
             <Text style={styles.creditsText}>by the Keepsafe team</Text>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -108,13 +108,13 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 32,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: 8,
   },
   appTagline: {
     fontSize: 16,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     textAlign: 'center',
     marginBottom: 24,
@@ -125,13 +125,13 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#8B5CF6',
     marginBottom: 4,
   },
   buildText: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#94A3B8',
   },
   linksSection: {
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   linkText: {
     flex: 1,
     fontSize: 16,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     color: '#1E293B',
   },
   creditsSection: {
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   },
   creditsTitle: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#94A3B8',
     marginBottom: 8,
   },
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   creditsText: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     marginLeft: 6,
   },

@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#1E293B',
-    fontFamily: 'monospace',
+    fontFamily: 'Figtree-Regular',
   },
   copyButton: {
     padding: 8,

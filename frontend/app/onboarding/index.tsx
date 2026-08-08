@@ -135,14 +135,14 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontSize: scale(30),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#ffffff',
     marginBottom: 16,
     textAlign: 'center',
   },
   tagline: {
     fontSize: 18,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#F1F5F9',
     textAlign: 'center',
     lineHeight: 26,
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   signInButton: {
     backgroundColor: 'transparent',
@@ -179,6 +179,6 @@ const styles = StyleSheet.create({
   signInButtonText: {
     color: '#8B5CF6',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

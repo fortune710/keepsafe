@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontSize: scale(17),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginRight: scale(12),
   },
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: scale(13.5),
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     lineHeight: verticalScale(20),
     paddingHorizontal: scale(20),
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   secondaryButton: {
     borderRadius: 18,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#1E293B',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   tertiaryButton: {
     borderRadius: 18,
@@ -403,6 +403,6 @@ const styles = StyleSheet.create({
   tertiaryButtonText: {
     color: '#64748B',
     fontSize: scale(14),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

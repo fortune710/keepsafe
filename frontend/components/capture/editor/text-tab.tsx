@@ -210,7 +210,7 @@ export default function TextTab({
     const renderFontTab = () => (
         <View style={styles.tabContent}>
             <FontStyleSelector
-                fonts={["Arial", "Helvetica", "Times New Roman", "Georgia", "Verdana", "Tahoma", "Courier New", "Comic Sans MS", "Impact", "Lucida Console", "Palatino", "Garamond", "Bookman", "New York", "Rockwell", "Symbol", "Arial Black", "Arial Narrow", "Arial Rounded MT Bold", "Arial Unicode MS", "Book Antiqua", "Calibri", "Cambria", "Candara", "Century Gothic", "Consolas", "Corbel", "Courier", "Curlz MT", "Franklin Gothic Medium", "Garamond", "Georgia", "Helvetica", "Impact", "Lucida Console", "Lucida Fax", "Lucida Sans", "Lucida Sans Unicode", "Microsoft Sans Serif", "Myriad Pro", "New York", "Palatino Linotype", "Segoe UI", "Segoe UI Symbol", "Symbol", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana", "Webdings", "Wingdings", "Wingdings 2", "Wingdings 3"]}
+                fonts={["Figtree-Regular", "Arial", "Helvetica", "Times New Roman", "Georgia", "Verdana", "Tahoma", "Courier New", "Comic Sans MS", "Impact", "Lucida Console", "Palatino", "Garamond", "Bookman", "New York", "Rockwell", "Symbol", "Arial Black", "Arial Narrow", "Arial Rounded MT Bold", "Arial Unicode MS", "Book Antiqua", "Calibri", "Cambria", "Candara", "Century Gothic", "Consolas", "Corbel", "Courier", "Curlz MT", "Franklin Gothic Medium", "Garamond", "Georgia", "Helvetica", "Impact", "Lucida Console", "Lucida Fax", "Lucida Sans", "Lucida Sans Unicode", "Microsoft Sans Serif", "Myriad Pro", "New York", "Palatino Linotype", "Segoe UI", "Segoe UI Symbol", "Symbol", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana", "Webdings", "Wingdings", "Wingdings 2", "Wingdings 3"]}
                 onSelect={onFontChange}
             />
         </View>
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 14,
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         fontWeight: '600',
         color: '#1E293B',
         marginBottom: 12,
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     },
     customColorButtonText: {
         fontSize: 14,
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         fontWeight: '600',
         color: '#8B5CF6',
     },
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     },
     colorCode: {
         fontSize: 14,
-        fontFamily: 'Jost-Regular',
+        fontFamily: 'Figtree-Regular',
         fontWeight: '600',
         color: '#1E293B',
         textAlign: 'center',

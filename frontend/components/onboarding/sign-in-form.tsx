@@ -11,7 +11,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, X } from 'lucide-react-native';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '@/providers/auth-provider';
@@ -97,7 +97,21 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSwitchToSignUp }) => {
           </TouchableOpacity>
         )}
         <Text style={styles.headerTitle}>Login</Text>
-        <View style={styles.headerSpacer} />
+        {Platform.OS === 'ios' ? (
+          <TouchableOpacity
+            style={styles.closeButtonIOS}
+            onPress={() => router.replace('/')}
+          >
+            <X color="#64748B" size={24} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.closeButtonCircle}
+            onPress={() => router.replace('/')}
+          >
+            <X color="#64748B" size={20} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <Animated.View entering={FadeInDown.delay(200)} style={styles.content}>
@@ -214,13 +228,29 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: scale(18),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
   },
-  headerSpacer: {
-    width: scale(36),
+  closeButtonIOS: {
+    padding: scale(4),
     marginLeft: scale(16),
+  },
+  closeButtonCircle: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginLeft: scale(16),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   content: {
     paddingHorizontal: scale(16),
@@ -228,7 +258,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: scale(20),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: verticalScale(24),
     textAlign: 'left',
@@ -247,7 +277,7 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   inputError: {
     borderColor: '#EF4444',
@@ -256,12 +286,12 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontSize: scale(12),
     marginTop: 4,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   authButtonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   forgotPasswordButton: {
     width: '100%',
@@ -271,7 +301,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: '#8B5CF6',
     fontSize: scale(16),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   bottomContainer: {
     position: 'absolute',
@@ -284,11 +314,11 @@ const styles = StyleSheet.create({
   switchText: {
     fontSize: scale(16),
     color: '#64748B',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   switchLink: {
     color: '#8B5CF6',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   buttonActions: {
     flexDirection: 'column',

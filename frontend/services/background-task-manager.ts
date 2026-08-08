@@ -6,6 +6,8 @@ import { convertToArrayBuffer, getContentType, getFileExtension, getTimefromTime
 import { RenderedMediaCanvasItem } from '@/types/capture';
 import { deviceStorage } from './device-storage';
 import { EntryService } from './entry-service';
+import { TimeCapsuleService } from './time-capsule-service';
+import { TimeCapsuleDraft } from '@/components/capture/time-capsule-config';
 import { logger } from '@/lib/logger';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
@@ -23,7 +25,30 @@ interface EntryProcessingData {
   selectedFriends: string[];
   attachments: RenderedMediaCanvasItem[];
   idempotencyKey: string;
+  timeCapsule?: TimeCapsuleDraft | null;
 }
+
+const TIME_CAPSULE_CREATE_MAX_ATTEMPTS = 3;
+
+/**
+ * Bounded retry for the capsule-row insert. A failure here happens *after* the entry row
+ * already exists, so leaving it unretried would strand an entry with no time_capsules row -
+ * which per the RLS design means fully visible, unprotected, in the main feed.
+ */
+const createTimeCapsuleWithRetry = async (
+  entryId: string,
+  userId: string,
+  draft: TimeCapsuleDraft,
+): Promise<boolean> => {
+  for (let attempt = 1; attempt <= TIME_CAPSULE_CREATE_MAX_ATTEMPTS; attempt++) {
+    const result = await TimeCapsuleService.createCapsule(entryId, userId, draft);
+    if (result.success) return true;
+    if (attempt < TIME_CAPSULE_CREATE_MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+    }
+  }
+  return false;
+};
 
 // A lightweight foreground queue persisted to device storage.
 // This avoids relying on background task registration and runs while the app is active.
@@ -99,73 +124,108 @@ const uploadMedia = async (
  * Processes an entry in the background
  */
 const processEntry = async (data: EntryProcessingData): Promise<{ success: boolean; entry?: Entry; error?: string }> => {
+  const isTimeCapsule = !!data.timeCapsule;
+
   try {
     console.log('Processing entry in background:', data.entryId);
 
-    // Update status to processing
-    await deviceStorage.updateEntry(data.userId, data.entryId, {
-      status: 'processing',
-      processingStartedAt: new Date().toISOString()
-    });
-    deviceStorage.emit('entryStatusChanged', {
-      userId: data.userId,
-      entryId: data.entryId,
-      status: 'processing'
-    });
+    // Time capsule entries were never added via addOptimisticEntry (they must not appear in
+    // the main feed even optimistically), so device-storage's entries cache has no temp
+    // placeholder for them - skip touching that cache entirely for capsule entries, since
+    // replaceEntry() unconditionally prepends when no temp match is found, which would leak
+    // a locked capsule entry into the main feed client-side regardless of server-side RLS.
+    if (!isTimeCapsule) {
+      await deviceStorage.updateEntry(data.userId, data.entryId, {
+        status: 'processing',
+        processingStartedAt: new Date().toISOString()
+      });
+      deviceStorage.emit('entryStatusChanged', {
+        userId: data.userId,
+        entryId: data.entryId,
+        status: 'processing'
+      });
+    }
 
-    // Prepare entry data
-    let finalContentUrl = data.capture.uri;
+    // Reuse the entry row if it already exists - this is what makes a retry after a
+    // partial success (entry created, but e.g. time capsule creation below failed) safe:
+    // re-running the upload+insert would otherwise fail on the id's unique constraint.
+    let entry: Entry;
+    const { data: existingEntry } = await supabase
+      .from(TABLES.ENTRIES)
+      .select('*')
+      .eq('id', data.entryId)
+      .maybeSingle();
 
-    // Upload media to Supabase storage
-    try {
-      const timestamp = Date.now();
-      const fileExtension = getFileExtension(data.capture.type);
-      const fileName = `${data.capture.type}_${timestamp}.${fileExtension}`;
-      const contentType = getContentType(data.capture.type);
+    if (existingEntry) {
+      entry = existingEntry as Entry;
+    } else {
+      let finalContentUrl = data.capture.uri;
 
-      const uploadedUrl = await uploadMedia(data.capture.uri, data.userId, fileName, contentType);
+      try {
+        const timestamp = Date.now();
+        const fileExtension = getFileExtension(data.capture.type);
+        const fileName = `${data.capture.type}_${timestamp}.${fileExtension}`;
+        const contentType = getContentType(data.capture.type);
 
-      if (!uploadedUrl) {
-        throw new Error('Failed to upload media to storage');
+        const uploadedUrl = await uploadMedia(data.capture.uri, data.userId, fileName, contentType);
+
+        if (!uploadedUrl) {
+          throw new Error('Failed to upload media to storage');
+        }
+
+        finalContentUrl = uploadedUrl;
+      } catch (uploadError) {
+        console.error('Media upload error:', uploadError);
+        throw new Error('Failed to upload media. Please try again.');
       }
 
-      finalContentUrl = uploadedUrl;
-    } catch (uploadError) {
-      console.error('Media upload error:', uploadError);
-      throw new Error('Failed to upload media. Please try again.');
+      const sharedWith = data.isPrivate ? [data.userId] : [data.userId, ...data.selectedFriends];
+
+      const createdAt = getTimefromTimezone().toISOString();
+
+      const newEntry: EntryInsert = {
+        id: data.entryId as any,
+        user_id: data.userId,
+        diary_id: data.userId,
+        type: data.capture.type as 'photo' | 'video' | 'audio',
+        shared_with: sharedWith,
+        content_url: finalContentUrl,
+        text_content: data.textContent || null,
+        music_tag: data.musicTag || null,
+        location_tag: data.locationTag || null,
+        is_private: data.isPrivate,
+        shared_with_everyone: data.isEveryone,
+        attachments: data.attachments,
+        created_at: createdAt,
+        updated_at: createdAt,
+        metadata: data.capture.metadata ? JSON.parse(JSON.stringify(data.capture.metadata)) : null,
+      };
+
+      console.log('Processing new entry', newEntry);
+
+      // Use EntryService to create the entry
+      const result = await EntryService.createEntry(data.userId, newEntry);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create entry');
+      }
+
+      entry = result.data!;
     }
 
-    const sharedWith = data.isPrivate ? [data.userId] : [data.userId, ...data.selectedFriends];
-
-    const createdAt = getTimefromTimezone().toISOString();
-
-    const newEntry: EntryInsert = {
-      id: data.entryId as any,
-      user_id: data.userId,
-      type: data.capture.type as 'photo' | 'video' | 'audio',
-      shared_with: sharedWith,
-      content_url: finalContentUrl,
-      text_content: data.textContent || null,
-      music_tag: data.musicTag || null,
-      location_tag: data.locationTag || null,
-      is_private: data.isPrivate,
-      shared_with_everyone: data.isEveryone,
-      attachments: data.attachments,
-      created_at: createdAt,
-      updated_at: createdAt,
-      metadata: data.capture.metadata ? JSON.parse(JSON.stringify(data.capture.metadata)) : null,
-    };
-
-    console.log('Processing new entry', newEntry);
-
-    // Use EntryService to create the entry
-    const result = await EntryService.createEntry(data.userId, newEntry);
-
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to create entry');
+    if (data.timeCapsule) {
+      const capsuleCreated = await createTimeCapsuleWithRetry(data.entryId, data.userId, data.timeCapsule);
+      if (!capsuleCreated) {
+        throw new Error('Entry saved, but sealing it in your Time Capsule failed. Please retry.');
+      }
     }
 
-    const entry = result.data!;
+    if (isTimeCapsule) {
+      // No entries-cache update here (see the guard above) - the Time Capsule tab already
+      // reflects this via its own optimistic capsule entry and Realtime subscription.
+      console.log('Time capsule entry processed successfully:', data.entryId);
+      return { success: true, entry };
+    }
 
     // Update status to completed and ensure real entry replaces temp in storage
     // Ensure profile is present; fetch if needed
@@ -200,24 +260,25 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
     console.log('Entry processed successfully:', data.entryId);
     return { success: true, entry };
 
-    console.log('Entry processed successfully:', data.entryId);
-    return { success: true, entry };
-
   } catch (error) {
     console.error('Background processing error:', error);
 
-    // Update status to failed
-    await deviceStorage.updateEntry(data.userId, data.entryId, {
-      status: 'failed',
-      processingFailedAt: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-    deviceStorage.emit('entryStatusChanged', {
-      userId: data.userId,
-      entryId: data.entryId,
-      status: 'failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    // Time capsule entries never entered the entries-cache, so there's nothing to mark
+    // failed there; the stale optimistic capsule card clears on the Time Capsule tab's
+    // next refetch (Realtime reconnect / app foreground).
+    if (!isTimeCapsule) {
+      await deviceStorage.updateEntry(data.userId, data.entryId, {
+        status: 'failed',
+        processingFailedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      deviceStorage.emit('entryStatusChanged', {
+        userId: data.userId,
+        entryId: data.entryId,
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
 
     return {
       success: false,

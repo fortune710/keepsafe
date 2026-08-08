@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         fontSize: 16,
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         color: '#64748B',
         marginTop: 16,
     },

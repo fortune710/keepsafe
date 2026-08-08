@@ -11,6 +11,7 @@ interface VideoCaptureParams {
     isCameraReady: boolean;
     cameraMode: 'picture' | 'video';
     updateCameraMode: (mode: 'picture' | 'video') => void;
+    isTimeCapsule: boolean;
 }
 
 /**
@@ -48,6 +49,7 @@ export function usePhotoCapture({
     isCameraReady,
     cameraMode,
     updateCameraMode,
+    isTimeCapsule,
 }: VideoCaptureParams) {
     const router = useRouter();
     const isCameraReadyRef = useRef(isCameraReady);
@@ -90,7 +92,8 @@ export function usePhotoCapture({
                         captureId: capture.id,
                         type: capture.type,
                         uri: encodeURIComponent(capture.uri),
-                        facing: facing
+                        facing: facing,
+                        timeCapsule: isTimeCapsule ? 'true' : undefined,
                     }
                 });
             }

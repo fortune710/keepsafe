@@ -346,3 +346,78 @@ class NotificationEnqueueService:
                 extra={"month": month},
             )
             return False
+
+    async def enqueue_time_capsule_unlocked_notifications(
+        self,
+        unlocked_capsules: List[Dict[str, Any]]
+    ) -> int:
+        """
+        Enqueue one push notification per unlocked time capsule.
+
+        Unlike monthly dumps (one shared content target fanned out to many users), each
+        unlocked capsule has a distinct deep-link target (its own entry), so this sends one
+        notification per capsule rather than batching per user.
+
+        Parameters:
+            unlocked_capsules: dicts with at least "id", "entry_id", "user_id" - no other
+                capsule/entry fields (e.g. condition_label, content_url) should ever be passed
+                in here, since they must never appear in logs or notification content.
+
+        Returns:
+            int: number of capsules a notification was successfully enqueued for.
+        """
+        notified = 0
+        for capsule in unlocked_capsules:
+            capsule_id = capsule.get("id")
+            entry_id = capsule.get("entry_id")
+            user_id = capsule.get("user_id")
+
+            try:
+                recipients = self._filter_recipients_by_notification_settings(
+                    [user_id], notification_type="push_notifications"
+                )
+                if not recipients:
+                    logger.info(
+                        "Time capsule unlock notification skipped (setting disabled)",
+                        extra={"capsule_id": capsule_id, "user_id": user_id},
+                    )
+                    continue
+
+                push_tokens = self._get_push_tokens_for_users(recipients)
+                if not push_tokens:
+                    logger.info(
+                        "Time capsule unlock notification skipped (no push tokens)",
+                        extra={"capsule_id": capsule_id, "user_id": user_id},
+                    )
+                    continue
+
+                success = self.notification_service.enqueue_notification(
+                    title="Your Time Capsule Has Arrived",
+                    body="Tap to open the entry you sealed away.",
+                    recipients=push_tokens,
+                    priority="normal",
+                    metadata={
+                        "notification_type": "time_capsule_unlocked",
+                        "capsule_id": capsule_id,
+                    },
+                    data={"page_url": f"/time-capsule-reveal/{entry_id}"},
+                )
+
+                if success:
+                    notified += 1
+                    logger.info(
+                        "Time capsule unlock notification enqueued",
+                        extra={"capsule_id": capsule_id, "user_id": user_id},
+                    )
+                else:
+                    logger.error(
+                        "Failed to enqueue time capsule unlock notification",
+                        extra={"capsule_id": capsule_id, "user_id": user_id},
+                    )
+            except Exception:
+                logger.exception(
+                    "Error enqueueing time capsule unlock notification",
+                    extra={"capsule_id": capsule_id, "user_id": user_id},
+                )
+
+        return notified

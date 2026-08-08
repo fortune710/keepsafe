@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: moderateScale(14),
         fontWeight: '600',
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#64748B',
         marginLeft: 8,
     },

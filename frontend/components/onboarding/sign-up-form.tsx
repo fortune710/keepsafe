@@ -23,6 +23,7 @@ import {
   User,
   AtSign,
   CheckCircle,
+  X,
 } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { scale, verticalScale } from 'react-native-size-matters';
@@ -159,6 +160,10 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToSignIn }) => {
         handleSubmit(onSubmit)();
         break;
     }
+  };
+
+  const handleClose = () => {
+    router.replace('/');
   };
 
   const handleBack = () => {
@@ -322,8 +327,12 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToSignIn }) => {
     'username',
     'review',
   ];
-  const progressIndex = steps.indexOf(currentStep) + 1;
-  const progressWidth = (progressIndex / steps.length) * 100;
+  const currentStepIndex = steps.indexOf(currentStep);
+  const getSegmentWidth = (index: number) => {
+    if (index < currentStepIndex) return '100%';
+    if (index === currentStepIndex) return '50%';
+    return '0%';
+  };
 
   return (
     <View style={styles.container}>
@@ -341,15 +350,32 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToSignIn }) => {
               <ChevronLeft color="#64748B" size={22} />
             </TouchableOpacity>
           )}
-          {/* <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <Animated.View
-                style={[styles.progressFill, { width: `${progressWidth}%` }]}
+          <Text style={styles.headerTitle}>Create Account</Text>
+          {Platform.OS === 'ios' ? (
+            <TouchableOpacity style={styles.closeButtonIOS} onPress={handleClose}>
+              <X color="#64748B" size={24} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.closeButtonCircle}
+              onPress={handleClose}
+            >
+              <X color="#64748B" size={20} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.progressRow}>
+          {steps.map((step, index) => (
+            <View key={step} style={styles.progressSegmentBackground}>
+              <View
+                style={[
+                  styles.progressSegmentFill,
+                  { width: getSegmentWidth(index) },
+                ]}
               />
             </View>
-          </View> */}
-          <Text style={styles.headerTitle}>Create Account</Text>
-          <View style={styles.headerSpacer} />
+          ))}
         </View>
 
         <Animated.View
@@ -530,7 +556,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: verticalScale(46),
-    paddingBottom: verticalScale(20),
+    paddingBottom: verticalScale(16),
   },
   backButtonIOS: {
     padding: scale(4),
@@ -555,24 +581,43 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: scale(18),
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
   },
-  headerSpacer: {
-    width: scale(36),
+  closeButtonIOS: {
+    padding: scale(4),
     marginLeft: scale(16),
   },
-  progressContainer: {
-    flex: 1,
+  closeButtonCircle: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginLeft: scale(16),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  progressBar: {
+  progressRow: {
+    flexDirection: 'row',
+    gap: scale(6),
+    marginBottom: verticalScale(20),
+  },
+  progressSegmentBackground: {
+    flex: 1,
     height: 4,
     backgroundColor: '#E2E8F0',
     borderRadius: 2,
     overflow: 'hidden',
   },
-  progressFill: {
+  progressSegmentFill: {
     height: '100%',
     backgroundColor: '#8B5CF6',
     borderRadius: 2,
@@ -596,7 +641,7 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: scale(20),
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: verticalScale(8),
     textAlign: 'left',
@@ -606,7 +651,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'left',
     marginBottom: verticalScale(24),
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   inputContainer: {
     marginBottom: verticalScale(20),
@@ -619,7 +664,7 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   inputError: {
     borderColor: '#EF4444',
@@ -628,12 +673,12 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontSize: scale(12),
     marginTop: 4,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   buttonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   termsContainer: {
     marginTop: verticalScale(24),
@@ -645,11 +690,11 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 18,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   termsLink: {
     color: '#8B5CF6',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   reviewContainer: {
     alignItems: 'center',
@@ -678,13 +723,13 @@ const styles = StyleSheet.create({
     fontSize: scale(11),
     color: '#94A3B8',
     marginBottom: verticalScale(4),
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   detailValue: {
     fontSize: scale(16),
     color: '#1E293B',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

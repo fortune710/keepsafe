@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     },
     streakTitle: {
         fontSize: moderateScale(12),
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#1E293B',
         textAlign: 'center',
         marginRight: 12
@@ -74,14 +74,14 @@ const styles = StyleSheet.create({
     },
     streakNumber: {
         fontSize: moderateScale(16),
-        fontFamily: 'Outfit-Medium',
+        fontFamily: 'Figtree-Medium',
         color: '#8B5CF6',
         marginLeft: 2
     },
     streakLabel: {
         fontSize: moderateScale(16),
         color: '#64748B',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         marginLeft: 8
     },
     streakDivider: {

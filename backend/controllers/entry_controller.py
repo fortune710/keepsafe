@@ -18,9 +18,12 @@ class EntryController(BaseController):
     ):
         """
         Fetch entries for a user in a specific month with optional type filtering and pagination.
+
+        Reads from `visible_entries` rather than the base table so locked/pending time capsule
+        entries are excluded here too, matching the RLS-enforced direct-Supabase read path.
         """
         query = (
-            self.supabase.table(self.table_name.value)
+            self.supabase.table(DatabaseTables.VISIBLE_ENTRIES.value)
             .select("*", count="exact")
             .eq("user_id", user_id)
             .gte("created_at", start_utc_iso)
