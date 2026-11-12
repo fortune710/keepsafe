@@ -36,6 +36,8 @@ jobs:
         run: |
           set -euo pipefail
           docker compose --env-file .env.production -f compose.production.yaml config --quiet
+          docker compose --env-file .env.production -f compose.production.yaml config --format json |
+            python3 -c 'import json,sys; services=json.load(sys.stdin)["services"]; ports={(name,p["host_ip"],p["published"]) for name,service in services.items() for p in service.get("ports",[])}; assert ports == {("nginx","127.0.0.1","28080"),("nginx","127.0.0.1","28443")}, ports'
           docker compose --env-file .env.production -f compose.production.yaml build backend
 
       - name: Validate NGINX bootstrap and HTTPS syntax
