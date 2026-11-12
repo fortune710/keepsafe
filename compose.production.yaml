@@ -1,0 +1,109 @@
+name: keepsafe
+
+services:
+  nginx:
+    image: nginx:1.30.6-alpine
+    entrypoint: ["/bin/sh", "/etc/nginx/keepsafe/start.sh"]
+    ports:
+      - "127.0.0.1:28080:8080"
+      - "127.0.0.1:28443:8443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx:/etc/nginx/keepsafe:ro
+      - /var/lib/keepsafe/acme:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - edge
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m
+      - /var/run:rw,noexec,nosuid,size=1m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t && if test -s /etc/letsencrypt/live/keepsafeapi.fortunealebiosu.dev/fullchain.pem; then cmp -s /etc/nginx/conf.d/default.conf /etc/nginx/keepsafe/https.conf; else cmp -s /etc/nginx/conf.d/default.conf /etc/nginx/keepsafe/bootstrap.conf; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: keepsafe-backend:production
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: production
+      PORT: "8080"
+      LOG_LEVEL: INFO
+      ALLOWED_HOSTS: ""
+      SUPABASE_URL: ${SUPABASE_URL:?Set SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY:?Set SUPABASE_KEY}
+      GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:?Set GOOGLE_GENERATIVE_AI_API_KEY}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:?Set PINECONE_API_KEY}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-keepsafe-entries}
+      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT:-}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      REDIS_DB: "0"
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:?Set SENDGRID_API_KEY}
+      SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL:?Set SENDGRID_FROM_EMAIL}
+      SENDGRID_FROM_NAME: ${SENDGRID_FROM_NAME:?Set SENDGRID_FROM_NAME}
+      ENTRY_REPORT_NOTIFICATION_TO_EMAIL: ${ENTRY_REPORT_NOTIFICATION_TO_EMAIL:?Set ENTRY_REPORT_NOTIFICATION_TO_EMAIL}
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-https://us.i.posthog.com}
+      SUPABASE_WEBHOOK_SECRET: ${SUPABASE_WEBHOOK_SECRET:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - edge
+      - data
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8080/health', timeout=3).status == 200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["exec redis-server --save '' --appendonly no --requirepass \"$$REDIS_PASSWORD\""]
+    networks:
+      - data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=16m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  edge:
+  data:
+    internal: true

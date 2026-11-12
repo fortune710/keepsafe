@@ -1,0 +1,116 @@
+name: Keepsafe Production Deployment
+
+on:
+  workflow_run:
+    workflows: [Keepsafe Production Migrations]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.event == 'pull_request_target' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: keepsafe-production-vps
+      cancel-in-progress: false
+    steps:
+      - name: Verify successful merged-PR migration job
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIGRATION_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          [[ "$MIGRATION_RUN_ID" =~ ^[0-9]+$ ]]
+          successful_job="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$MIGRATION_RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name == "migrate" and .conclusion == "success") | .id')"
+          test -n "$successful_job"
+
+      - name: Check out trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install migration history checker
+        run: python3 -m pip install 'psycopg[binary]==3.2.9'
+
+      - name: Require all merged migrations before deployment
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python3 .github/scripts/check-production-migrations.py --require-current
+
+      - name: Configure verified SSH access
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_SSH_PRIVATE_KEY"
+          test -n "$VPS_SSH_KNOWN_HOSTS"
+          install -m 700 -d "$RUNNER_TEMP/keepsafe-ssh"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/keepsafe-ssh/id_ed25519"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/keepsafe-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/keepsafe-ssh/id_ed25519" "$RUNNER_TEMP/keepsafe-ssh/known_hosts"
+
+      - name: Render production environment
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_FROM_EMAIL: ${{ secrets.SENDGRID_FROM_EMAIL }}
+          SENDGRID_FROM_NAME: ${{ secrets.SENDGRID_FROM_NAME }}
+          ENTRY_REPORT_NOTIFICATION_TO_EMAIL: ${{ secrets.ENTRY_REPORT_NOTIFICATION_TO_EMAIL }}
+          PINECONE_INDEX_NAME: ${{ vars.PINECONE_INDEX_NAME }}
+          PINECONE_ENVIRONMENT: ${{ vars.PINECONE_ENVIRONMENT }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          SUPABASE_WEBHOOK_SECRET: ${{ secrets.SUPABASE_WEBHOOK_SECRET }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM_NUMBER: ${{ secrets.TWILIO_FROM_NUMBER }}
+        run: python3 .github/scripts/render-production-env.py "$RUNNER_TEMP/keepsafe-production.env"
+
+      - name: Transfer candidate environment
+        run: |
+          set -euo pipefail
+          ssh -T -i "$RUNNER_TEMP/keepsafe-ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/keepsafe-ssh/known_hosts" root@13.140.233.20 \
+            'umask 077; cd /root/keepsafe && cat > .env.production.next && chmod 600 .env.production.next' \
+            < "$RUNNER_TEMP/keepsafe-production.env"
+
+      - name: Deploy on VPS
+        run: |
+          set -euo pipefail
+          ssh -i "$RUNNER_TEMP/keepsafe-ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/keepsafe-ssh/known_hosts" root@13.140.233.20 bash -se <<'REMOTE'
+          set -euo pipefail
+          cd /root/keepsafe
+          trap 'rm -f .env.production.next' EXIT
+          test "$(git branch --show-current)" = main
+          git diff --quiet
+          git diff --cached --quiet
+          test -f .env.production.next
+          export GIT_TERMINAL_PROMPT=0
+          git fetch origin main
+          git merge --ff-only origin/main
+          install -d -m 0755 /var/lib/keepsafe/acme
+          docker compose --env-file .env.production.next -f compose.production.yaml config --quiet
+          mv -f .env.production.next .env.production
+          docker compose --env-file .env.production -f compose.production.yaml up -d --build --wait backend redis
+          docker compose --env-file .env.production -f compose.production.yaml up -d --force-recreate --no-deps nginx
+          docker compose --env-file .env.production -f compose.production.yaml up -d --wait
+          docker compose --env-file .env.production -f compose.production.yaml exec -T nginx nginx -t
+          docker compose --env-file .env.production -f compose.production.yaml exec -T nginx nginx -s reload
+          docker compose --env-file .env.production -f compose.production.yaml exec -T backend python -c "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8080/health', timeout=5).status == 200"
+          REMOTE
