@@ -5,6 +5,9 @@ as Compose project `keepsafe`. Source is at `/root/keepsafe`; ACME challenge
 files are under `/var/lib/keepsafe/acme`. Supabase owns the production database,
 storage, and bearer-token authentication. The mobile application is released
 separately and should use `EXPO_PUBLIC_BACKEND_URL=https://keepsafeapi.fortunealebiosu.dev`.
+The backend also binds `127.0.0.1:8080` on the VPS for local health checks;
+public clients reach it through NGINX, which proxies to `backend:8080` on the
+private Compose network. Redis has no host port.
 
 There is no browser frontend origin for this mobile-only deployment. Production
 FastAPI CORS has no allowed browser origins, and the backend does not issue
