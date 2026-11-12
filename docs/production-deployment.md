@@ -43,9 +43,11 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
 
 ## First deployment
 
-1. Merge the shared ingress change in the sibling application repository
-   through its PR. Confirm its HTTP redirects and HTTPS health through the
-   new ingress.
+1. Stage a separately managed host ingress for public ports 80 and 443.
+   Coordinate its activation with the sibling application's loopback-port
+   change, then confirm that application's HTTP redirects and HTTPS health.
+   Keep the shared routing configuration outside either application's NGINX
+   configuration.
 2. Clone Keepsafe `main` to `/root/keepsafe` on the VPS and keep that checkout
    clean. Create `/var/lib/keepsafe/acme` with mode 0755. Configure the GitHub
    production Environment secrets listed above.
