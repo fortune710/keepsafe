@@ -13,11 +13,17 @@ DECLARE
   payload jsonb;
   signing_secret text;
   signature text;
+  target_path text;
 BEGIN
-  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'entries'
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME NOT IN ('entries', 'entry_reports')
      OR TG_WHEN <> 'AFTER' OR TG_LEVEL <> 'ROW' OR TG_OP <> 'INSERT' THEN
-    RAISE EXCEPTION 'generate_hmac requires an AFTER INSERT row trigger on public.entries';
+    RAISE EXCEPTION 'generate_hmac requires an AFTER INSERT row trigger on a supported table';
   END IF;
+
+  target_path := CASE TG_TABLE_NAME
+    WHEN 'entries' THEN '/webhooks/entries'
+    WHEN 'entry_reports' THEN '/webhooks/entry-reports'
+  END;
 
   SELECT decrypted_secret INTO signing_secret
   FROM vault.decrypted_secrets
@@ -41,7 +47,7 @@ BEGIN
   );
 
   PERFORM net.http_post(
-    url := 'https://keepsafeapi.fortunealebiosu.dev/webhooks/entries',
+    url := 'https://keepsafeapi.fortunealebiosu.dev' || target_path,
     body := payload,
     headers := jsonb_build_object(
       'Content-Type', 'application/json',

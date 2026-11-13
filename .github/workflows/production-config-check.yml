@@ -30,6 +30,7 @@ jobs:
           SENDGRID_FROM_EMAIL: example@example.com
           SENDGRID_FROM_NAME: Keepsafe
           ENTRY_REPORT_NOTIFICATION_TO_EMAIL: example@example.com
+          SUPABASE_WEBHOOK_SECRET: placeholder
         run: python3 .github/scripts/render-production-env.py .env.production
 
       - name: Validate Compose and build backend

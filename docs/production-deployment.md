@@ -31,9 +31,10 @@ Create the `production` Environment and supply these **Keepsafe-specific** secre
 | `SENDGRID_FROM_EMAIL` | Verified Keepsafe sender address. |
 | `SENDGRID_FROM_NAME` | Keepsafe sender display name. |
 | `ENTRY_REPORT_NOTIFICATION_TO_EMAIL` | Entry report recipient. |
+| `SUPABASE_WEBHOOK_SECRET` | HMAC signing key shared with Supabase Vault. |
 
 Optional secrets for enabled integrations: `POSTHOG_API_KEY`,
-`SUPABASE_WEBHOOK_SECRET`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
 `TWILIO_FROM_NUMBER`. Optional nonsecret Environment variables:
 `PINECONE_INDEX_NAME` (default `keepsafe-entries`), `PINECONE_ENVIRONMENT`,
 and `POSTHOG_HOST`. `REDIS_URL`, `REDIS_DB`, `ENVIRONMENT`, `PORT`, and
@@ -58,6 +59,9 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    `supabase_migrations.schema_migrations` in the Keepsafe production project.
    The migration workflow requires the current baseline and refuses a gap or
    unknown version. Reconcile any difference before merging the Keepsafe PR.
+   The existing production project currently has migrations beyond the baseline
+   that are absent from this branch; bring the matching migration files into the
+   deployment branch and review their application compatibility before release.
 4. Merge the Keepsafe PR. The migration workflow runs first; the deploy workflow
    runs only after its successful migration job. NGINX initially serves ACME
    challenges and returns 503 for other HTTP requests until a certificate exists.
@@ -69,6 +73,12 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    after first issuance to switch NGINX from bootstrap to HTTPS.
 6. Verify HTTP ACME access, HTTP to HTTPS redirect, TLS hostname/certificate,
    `/health`, and a mobile authenticated API call. Renewals use the same hook.
+7. Verify signed requests to `/webhooks/entries` and `/webhooks/entry-reports`
+   succeed and unsigned requests are rejected. Confirm the Vault signing key and
+   GitHub Environment secret are configured, then apply
+   `scripts/deploy/activate-signed-webhooks.sql` to switch both database triggers
+   atomically. For rollback, apply `scripts/deploy/rollback-signed-webhooks.sql`.
+   The previous triggers remain available but disabled after cutover.
 
 The workflows never print `.env.production`. Both it and candidate
 `.env.production.next` are ignored by Git; the candidate is validated with
