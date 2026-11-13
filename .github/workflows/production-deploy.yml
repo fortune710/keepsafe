@@ -36,6 +36,10 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - name: Capture revision for migration verification and deployment
+        id: revision
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -91,10 +95,15 @@ jobs:
             < "$RUNNER_TEMP/keepsafe-production.env"
 
       - name: Deploy on VPS
+        env:
+          DEPLOY_SHA: ${{ steps.revision.outputs.sha }}
         run: |
           set -euo pipefail
-          ssh -i "$RUNNER_TEMP/keepsafe-ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/keepsafe-ssh/known_hosts" root@13.140.233.20 bash -se <<'REMOTE'
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh -i "$RUNNER_TEMP/keepsafe-ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/keepsafe-ssh/known_hosts" root@13.140.233.20 bash -se -- "$DEPLOY_SHA" <<'REMOTE'
           set -euo pipefail
+          deploy_sha="$1"
+          [[ "$deploy_sha" =~ ^[0-9a-f]{40}$ ]]
           cd /root/keepsafe
           trap 'rm -f .env.production.next' EXIT
           test "$(git branch --show-current)" = main
@@ -103,7 +112,10 @@ jobs:
           test -f .env.production.next
           export GIT_TERMINAL_PROMPT=0
           git fetch origin main
-          git merge --ff-only origin/main
+          git merge-base --is-ancestor "$deploy_sha" origin/main
+          git merge-base --is-ancestor HEAD "$deploy_sha"
+          git merge --ff-only "$deploy_sha"
+          test "$(git rev-parse HEAD)" = "$deploy_sha"
           install -d -m 0755 /var/lib/keepsafe/acme
           docker compose --env-file .env.production.next -f compose.production.yaml config --quiet
           mv -f .env.production.next .env.production

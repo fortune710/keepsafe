@@ -52,8 +52,9 @@ def main() -> int:
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as output:
         for name in sorted(values):
-            # Single quotes prevent Compose interpolation of dollar signs in secrets.
-            output.write(f"{name}='{values[name].replace(chr(39), chr(92) + chr(39))}'\n")
+            # Double quotes support escaped backslashes; $$ prevents interpolation.
+            escaped = values[name].replace("\\", "\\\\").replace('"', '\\"').replace("$", "$$")
+            output.write(f'{name}="{escaped}"\n')
     return 0
 
 

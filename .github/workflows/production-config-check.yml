@@ -33,6 +33,9 @@ jobs:
           SUPABASE_WEBHOOK_SECRET: placeholder
         run: python3 .github/scripts/render-production-env.py .env.production
 
+      - name: Test Compose environment round trips
+        run: python3 -m unittest discover -s .github/scripts/tests -v
+
       - name: Validate Compose and build backend
         run: |
           set -euo pipefail
