@@ -37,6 +37,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--timeout-graceful-shutdown", "60"]
+    stop_signal: SIGTERM
+    stop_grace_period: 90s
     ports:
       - "127.0.0.1:8080:8080"
     environment:
