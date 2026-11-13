@@ -1,6 +1,9 @@
 import os
 import sys
 import types
+import hashlib
+import hmac
+import json
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -48,6 +51,7 @@ def _build_client() -> TestClient:
 
 def test_entry_insert_webhook_queues_ingestion(monkeypatch):
     client = _build_client()
+    monkeypatch.setattr(webhooks.settings, "SUPABASE_WEBHOOK_SECRET", "test-secret")
 
     async def fake_enqueue_entry(record, operation="upsert"):
         assert operation == "upsert"
@@ -60,14 +64,13 @@ def test_entry_insert_webhook_queues_ingestion(monkeypatch):
     monkeypatch.setattr(webhooks.entry_ingestion_queue_service, "enqueue_entry", fake_enqueue_entry)
     monkeypatch.setattr(webhooks.notification_enqueue_service, "enqueue_entry_notification", fake_notification)
 
-    response = client.post(
-        "/webhooks/entries",
-        json={
+    body = json.dumps({
             "type": "INSERT",
             "table": "entries",
             "record": {"id": "entry-1", "is_enqueued": False},
-        },
-    )
+        }).encode()
+    signature = hmac.new(b"test-secret", body, hashlib.sha256).hexdigest()
+    response = client.post("/webhooks/entries", content=body, headers={"content-type": "application/json", "x-supabase-signature": signature})
 
     assert response.status_code == 200
     assert response.json()["ingestion"] == "queued"
@@ -76,6 +79,7 @@ def test_entry_insert_webhook_queues_ingestion(monkeypatch):
 
 def test_entry_update_webhook_queues_reingestion(monkeypatch):
     client = _build_client()
+    monkeypatch.setattr(webhooks.settings, "SUPABASE_WEBHOOK_SECRET", "test-secret")
 
     async def fake_enqueue_entry(record, operation="upsert"):
         assert operation == "upsert"
@@ -83,14 +87,13 @@ def test_entry_update_webhook_queues_reingestion(monkeypatch):
 
     monkeypatch.setattr(webhooks.entry_ingestion_queue_service, "enqueue_entry", fake_enqueue_entry)
 
-    response = client.post(
-        "/webhooks/entries",
-        json={
+    body = json.dumps({
             "type": "UPDATE",
             "table": "entries",
             "record": {"id": "entry-1", "is_enqueued": False},
-        },
-    )
+        }).encode()
+    signature = hmac.new(b"test-secret", body, hashlib.sha256).hexdigest()
+    response = client.post("/webhooks/entries", content=body, headers={"content-type": "application/json", "x-supabase-signature": signature})
 
     assert response.status_code == 200
     assert response.json()["message"] == "Entry entry-1 queued for re-ingestion successfully"

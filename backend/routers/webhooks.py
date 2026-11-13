@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from services.ingestion_service import IngestionService
@@ -11,8 +11,25 @@ from starlette.concurrency import run_in_threadpool
 import logging
 import hmac
 import hashlib
+import re
 
 logger = logging.getLogger(__name__)
+
+
+async def verify_webhook_signature(
+    request: Request,
+    x_supabase_signature: Optional[str] = Header(None, alias="x-supabase-signature"),
+) -> None:
+    """Authenticate a webhook against its exact request bytes."""
+    secret = settings.SUPABASE_WEBHOOK_SECRET
+    if not secret:
+        logger.error("Webhook signature verification is not configured")
+        raise HTTPException(status_code=500, detail="Webhook signature verification is not configured")
+    if not x_supabase_signature or not re.fullmatch(r"[0-9a-f]{64}", x_supabase_signature):
+        raise HTTPException(status_code=401, detail="Missing or invalid webhook signature")
+    expected = hmac.new(secret.encode("utf-8"), await request.body(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, x_supabase_signature):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -51,7 +68,7 @@ class EntryReportWebhookPayload(BaseModel):
     record: Optional[EntryReportRecord] = None
     old_record: Optional[Dict[str, Any]] = None
 
-@router.post("/entries")
+@router.post("/entries", dependencies=[Depends(verify_webhook_signature)])
 async def entry_webhook(
     payload: EntryWebhookPayload,
     request: Request,
@@ -65,15 +82,12 @@ async def entry_webhook(
     Parameters:
         payload (EntryWebhookPayload): Webhook payload describing the change.
         request (Request): The incoming HTTP request object.
-        x_supabase_signature (Optional[str]): Optional Supabase webhook signature header (used if signature verification is implemented).
+        x_supabase_signature (Optional[str]): HMAC signature validated by the route dependency.
     
     Returns:
         dict: Response object containing `status`, `message`, and, when applicable, `entry_id`, `ingestion`, and `notification` status fields.
     """
     try:
-        # Verify webhook signature if needed (optional security check)
-        # You can implement signature verification here if Supabase sends it
-        
         if payload.table != "entries":
             logger.warning(f"Received webhook for unexpected table: {payload.table}")
             return {"status": "ignored", "message": f"Table {payload.table} not handled"}
@@ -198,7 +212,7 @@ async def entry_webhook(
         )
 
 
-@router.post("/friends")
+@router.post("/friends", dependencies=[Depends(verify_webhook_signature)])
 async def friend_webhook(
     payload: FriendWebhookPayload,
     request: Request,
@@ -214,7 +228,7 @@ async def friend_webhook(
     Parameters:
         payload (FriendWebhookPayload): Webhook payload describing the change.
         request (Request): The incoming HTTP request object.
-        x_supabase_signature (Optional[str]): Optional Supabase webhook signature header.
+        x_supabase_signature (Optional[str]): HMAC signature validated by the route dependency.
     
     Returns:
         dict: Response object containing `status`, `message`, and `friendship_id`.
@@ -324,7 +338,7 @@ async def friend_webhook(
             detail=f"Internal server error: {str(e)}"
         )
 
-@router.post("/entry-reports")
+@router.post("/entry-reports", dependencies=[Depends(verify_webhook_signature)])
 async def entry_report_webhook(
     payload: EntryReportWebhookPayload,
     request: Request,
@@ -333,25 +347,6 @@ async def entry_report_webhook(
     """Process entry report Supabase webhooks and send email notifications."""
     try:
         logger.info("Entry report webhook request received")
-        webhook_secret = settings.SUPABASE_WEBHOOK_SECRET
-        if not webhook_secret:
-            logger.error("SUPABASE_WEBHOOK_SECRET is not configured")
-            raise HTTPException(status_code=500, detail="Webhook signature verification is not configured")
-
-        if not x_supabase_signature:
-            raise HTTPException(status_code=401, detail="Missing webhook signature")
-
-        raw_body = await request.body()
-        expected_signature = hmac.new(
-            webhook_secret.encode("utf-8"),
-            raw_body,
-            hashlib.sha256,
-        ).hexdigest()
-
-        if not hmac.compare_digest(expected_signature, x_supabase_signature):
-            logger.warning("Invalid webhook signature for entry report webhook")
-            raise HTTPException(status_code=401, detail="Invalid webhook signature")
-
         if payload.table != "entry_reports":
             logger.warning(f"Received webhook for unexpected table: {payload.table}")
             return {"status": "ignored", "message": f"Table {payload.table} not handled"}

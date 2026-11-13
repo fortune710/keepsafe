@@ -1,0 +1,64 @@
+name: Keepsafe Production Configuration Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - compose.production.yaml
+      - config/nginx/**
+      - backend/Dockerfile
+      - .github/scripts/**
+      - .github/workflows/production-*.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render validation environment
+        env:
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_KEY: placeholder
+          GOOGLE_GENERATIVE_AI_API_KEY: placeholder
+          PINECONE_API_KEY: placeholder
+          REDIS_PASSWORD: placeholder
+          SENDGRID_API_KEY: placeholder
+          SENDGRID_FROM_EMAIL: example@example.com
+          SENDGRID_FROM_NAME: Keepsafe
+          ENTRY_REPORT_NOTIFICATION_TO_EMAIL: example@example.com
+          SUPABASE_WEBHOOK_SECRET: placeholder
+        run: python3 .github/scripts/render-production-env.py .env.production
+
+      - name: Test Compose environment round trips
+        run: python3 -m unittest discover -s .github/scripts/tests -v
+
+      - name: Validate Compose and build backend
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.production -f compose.production.yaml config --quiet
+          docker compose --env-file .env.production -f compose.production.yaml config --format json |
+            python3 -c 'import json,sys; services=json.load(sys.stdin)["services"]; ports={(name,p["host_ip"],p["published"]) for name,service in services.items() for p in service.get("ports",[])}; assert ports == {("backend","127.0.0.1","8080"),("nginx","127.0.0.1","28080"),("nginx","127.0.0.1","28443")}, ports'
+          docker compose --env-file .env.production -f compose.production.yaml config --format json |
+            python3 -c 'import json,sys; backend=json.load(sys.stdin)["services"]["backend"]; assert backend["stop_signal"] == "SIGTERM" and backend["stop_grace_period"] == "1m30s"; assert backend["command"][-2:] == ["--timeout-graceful-shutdown", "60"]'
+          docker compose --env-file .env.production -f compose.production.yaml build backend
+
+      - name: Validate NGINX bootstrap and HTTPS syntax
+        run: |
+          set -euo pipefail
+          certificate_dir="$RUNNER_TEMP/letsencrypt/live/keepsafeapi.fortunealebiosu.dev"
+          mkdir -p "$certificate_dir"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=keepsafeapi.fortunealebiosu.dev' \
+            -keyout "$certificate_dir/privkey.pem" \
+            -out "$certificate_dir/fullchain.pem" >/dev/null 2>&1
+          docker run --rm \
+            --entrypoint sh \
+            -v "$PWD/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            -v "$PWD/config/nginx:/etc/nginx/keepsafe:ro" \
+            -v "$RUNNER_TEMP/letsencrypt:/etc/letsencrypt:ro" \
+            nginx:1.30.6-alpine -ec \
+            'cp /etc/nginx/keepsafe/bootstrap.conf /etc/nginx/conf.d/default.conf; nginx -t; cp /etc/nginx/keepsafe/https.conf /etc/nginx/conf.d/default.conf; nginx -t'
