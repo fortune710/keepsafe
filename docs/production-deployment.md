@@ -57,7 +57,7 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    For `keepsafeapi.fortunealebiosu.dev`, route public HTTP port 80 to
    `127.0.0.1:28080` and public HTTPS port 443 to `127.0.0.1:28443`.
    Preserve TLS passthrough so Keepsafe NGINX serves the certificate. Keep
-   this route staged until the temporary ingress cutover below is complete.
+   the routes staged until the bootstrap NGINX container is running below.
    Coordinate its activation with the sibling application's loopback-port
    change, then confirm that application's HTTP redirects and HTTPS health.
    Keep the shared routing configuration outside either application's NGINX
@@ -69,54 +69,39 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    `supabase_migrations.schema_migrations` in the Keepsafe production project.
    The migration workflow requires the current baseline and refuses a gap or
    unknown version. Reconcile any difference before merging the Keepsafe PR.
-   The existing production project currently has migrations beyond the baseline
-   that are absent from this branch; bring the matching migration files into the
-   deployment branch and review their application compatibility before release.
-4. Before merging the PR, point `keepsafeapi.fortunealebiosu.dev` at a temporary
-   HTTPS ingress that forwards both webhook paths to the **existing** backend.
-   Serve ACME challenges from `/var/lib/keepsafe/acme` and issue a valid
-   certificate on the VPS at `/etc/letsencrypt/live/keepsafeapi.fortunealebiosu.dev/`.
-   Configure upstream TLS/Host routing, and verify the new hostname reaches that
-   backend without changing the request body or `x-supabase-signature` header.
-   The signing function sends requests to this hostname, so DNS, TLS, and
-   forwarding must work before switching triggers.
-5. Verify that the existing backend accepts signed requests for both paths using
-   the Vault signing key. The entry handler on `main` ignores the signature;
-   it does not prove the signature is valid. The entry-report handler on `main`
-   already verifies HMAC and needs the matching secret. Confirm the running
-   backend's version and settings without exposing secrets; if either path
-   cannot accept signed deliveries, stop and keep the existing triggers active.
-   Confirm the GitHub Environment secret matches the Vault signing key.
-   The existing `main` entry handler reports a successful notification even
-   when its enqueue method returns `False`. Before cutover, make the running
-   backend report that failure accurately using a separately reviewed,
-   backward-compatible fix. Otherwise the dispatcher could acknowledge an
-   event whose notification was not queued. Do not activate the new triggers
-   until this behavior is verified on the running backend.
-6. Merge the Keepsafe PR after the migration history is reconciled. Its
-   migration installs the durable outbox and scheduled dispatcher. The deploy
-   job deliberately stops at the webhook readiness check until cutover is
-   complete; keep the temporary ingress on the existing backend. Check that
-   the migration succeeded and the `keepsafe-webhook-delivery` cron job is active.
-7. Apply `scripts/deploy/activate-signed-webhooks.sql` to switch both database
-   triggers atomically. Verify actual signed deliveries to `/webhooks/entries`
-   and `/webhooks/entry-reports` through the temporary ingress **to the existing
-   backend**, and confirm their intended downstream processing. Independently
-   verify each HMAC against the raw request body using a controlled verifier
-   that does not log payloads, signatures, or secrets; a successful response
-   from the entry handler alone is insufficient. If either delivery fails,
-   apply `scripts/deploy/rollback-signed-webhooks.sql` and investigate before
-   proceeding. Rollback restores the old triggers but does not cancel events
-   already in the outbox; inspect and reconcile those events to avoid duplicate
-   effects. The previous triggers remain available but disabled after cutover.
-   Confirm `keepsafe_internal.webhook_delivery_status` contains a successful
-   delivery for both `entries` and `entry_reports`. After both deliveries and
-   their downstream effects are verified, rerun the failed deployment job.
-8. Confirm the certificate is available to the Keepsafe VPS NGINX and its
-   HTTPS configuration passes `nginx -t`, then route the public hostname to it.
-   Configure the host's Certbot deploy hook to invoke
-   `/root/keepsafe/scripts/deploy/reload-nginx-after-cert.sh`. If the certificate
-   was issued after NGINX started, run the hook before switching traffic.
+4. Configure DNS for `keepsafeapi.fortunealebiosu.dev` and configure the host's
+   Certbot deploy hook to invoke
+   `/root/keepsafe/scripts/deploy/reload-nginx-after-cert.sh` after issuance and
+   renewal.
+5. Merge the Keepsafe PR. The migration workflow installs the durable outbox
+   and scheduled dispatcher. The deploy job checks their prerequisites and a
+   consistent trigger state, then starts the backend and NGINX. Without a
+   certificate, NGINX starts in HTTP bootstrap mode. Enable the staged HTTP
+   ingress route and verify a test file under
+   `/var/lib/keepsafe/acme/.well-known/acme-challenge/` is
+   reachable at `http://keepsafeapi.fortunealebiosu.dev/.well-known/acme-challenge/`
+   before requesting a certificate. The original webhook triggers remain active.
+6. Request the certificate using Certbot's webroot method with
+   `/var/lib/keepsafe/acme`. The deploy hook switches NGINX to HTTPS, checks its
+   configuration, and reloads it. Confirm the certificate is at
+   `/etc/letsencrypt/live/keepsafeapi.fortunealebiosu.dev/`, enable the staged
+   HTTPS ingress route, and verify the TLS hostname and `/health` over HTTPS.
+7. Confirm the running backend accepts correctly signed requests to both
+   `/webhooks/entries` and `/webhooks/entry-reports`, and reports an entry
+   notification enqueue failure as a failure. Independently verify the HMAC
+   against the exact request body without logging payloads, signatures, or keys.
+   Check the GitHub Environment secret matches the Vault signing key without
+   exposing either value. Keep the original triggers active until these checks
+   pass; if an existing backend serves those triggers, confirm its deliveries
+   continue to work until cutover.
+8. Apply `scripts/deploy/activate-signed-webhooks.sql` to switch both triggers
+   atomically. Create a controlled entry and entry report. Verify signed
+   delivery to both paths, confirm the intended downstream effects, and check
+   that `keepsafe_internal.webhook_delivery_status` records both tables.
+   If either delivery fails, apply `scripts/deploy/rollback-signed-webhooks.sql`
+   and investigate. Rollback restores the old triggers but does not cancel
+   events already in the outbox; inspect and reconcile those events to avoid
+   duplicate effects.
 9. Verify HTTP ACME access, the HTTPS redirect, TLS hostname/certificate,
    `/health`, a mobile authenticated API call, and signed deliveries to both
    webhook paths. Confirm unsigned requests receive `401` from the new backend.
