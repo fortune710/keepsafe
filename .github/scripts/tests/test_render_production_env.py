@@ -10,13 +10,24 @@ ROOT = Path(__file__).resolve().parents[3]
 RENDERER = ROOT / '.github/scripts/render-production-env.py'
 REQUIRED = (
     'SUPABASE_URL', 'SUPABASE_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY',
-    'PINECONE_API_KEY', 'REDIS_PASSWORD', 'SENDGRID_API_KEY',
+    'PINECONE_API_KEY', 'REDIS_PASSWORD', 'REDIS_URL', 'SENDGRID_API_KEY',
     'SENDGRID_FROM_EMAIL', 'SENDGRID_FROM_NAME',
     'ENTRY_REPORT_NOTIFICATION_TO_EMAIL', 'SUPABASE_WEBHOOK_SECRET',
 )
 
 
 class RenderProductionEnvTests(unittest.TestCase):
+    def test_redis_url_and_password_are_required(self):
+        for missing in ('REDIS_URL', 'REDIS_PASSWORD'):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as directory:
+                env = {key: 'placeholder' for key in REQUIRED if key != missing}
+                result = subprocess.run(
+                    [sys.executable, str(RENDERER), str(Path(directory) / 'env')],
+                    env=env, capture_output=True, text=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(missing, result.stderr)
+
     def test_compose_round_trips_special_characters(self):
         values = [
             'trailing\\', 'multiple\\\\', "quote'and\"double",
