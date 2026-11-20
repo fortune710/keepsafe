@@ -48,6 +48,10 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
 ## First deployment
 
 1. Stage a separately managed host ingress for public ports 80 and 443.
+   For `keepsafeapi.fortunealebiosu.dev`, route public HTTP port 80 to
+   `127.0.0.1:28080` and public HTTPS port 443 to `127.0.0.1:28443`.
+   Preserve TLS passthrough so Keepsafe NGINX serves the certificate. Keep
+   this route staged until the temporary ingress cutover below is complete.
    Coordinate its activation with the sibling application's loopback-port
    change, then confirm that application's HTTP redirects and HTTPS health.
    Keep the shared routing configuration outside either application's NGINX
@@ -77,7 +81,18 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    backend's version and settings without exposing secrets; if either path
    cannot accept signed deliveries, stop and keep the existing triggers active.
    Confirm the GitHub Environment secret matches the Vault signing key.
-6. Apply `scripts/deploy/activate-signed-webhooks.sql` to switch both database
+   The existing `main` entry handler reports a successful notification even
+   when its enqueue method returns `False`. Before cutover, make the running
+   backend report that failure accurately using a separately reviewed,
+   backward-compatible fix. Otherwise the dispatcher could acknowledge an
+   event whose notification was not queued. Do not activate the new triggers
+   until this behavior is verified on the running backend.
+6. Merge the Keepsafe PR after the migration history is reconciled. Its
+   migration installs the durable outbox and scheduled dispatcher. The deploy
+   job deliberately stops at the webhook readiness check until cutover is
+   complete; keep the temporary ingress on the existing backend. Check that
+   the migration succeeded and the `keepsafe-webhook-delivery` cron job is active.
+7. Apply `scripts/deploy/activate-signed-webhooks.sql` to switch both database
    triggers atomically. Verify actual signed deliveries to `/webhooks/entries`
    and `/webhooks/entry-reports` through the temporary ingress **to the existing
    backend**, and confirm their intended downstream processing. Independently
@@ -85,11 +100,12 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    that does not log payloads, signatures, or secrets; a successful response
    from the entry handler alone is insufficient. If either delivery fails,
    apply `scripts/deploy/rollback-signed-webhooks.sql` and investigate before
-   proceeding. The previous triggers remain available but disabled after cutover.
-7. Once both signed deliveries are verified, merge the Keepsafe PR. The migration
-   workflow runs first; the deploy workflow runs only after its successful
-   migration job. Keep the temporary ingress forwarding to the existing backend
-   until the VPS backend and its NGINX are healthy and HTTPS is ready.
+   proceeding. Rollback restores the old triggers but does not cancel events
+   already in the outbox; inspect and reconcile those events to avoid duplicate
+   effects. The previous triggers remain available but disabled after cutover.
+   Confirm `keepsafe_internal.webhook_delivery_status` contains a successful
+   delivery for both `entries` and `entry_reports`. After both deliveries and
+   their downstream effects are verified, rerun the failed deployment job.
 8. Confirm the certificate is available to the Keepsafe VPS NGINX and its
    HTTPS configuration passes `nginx -t`, then route the public hostname to it.
    Configure the host's Certbot deploy hook to invoke
@@ -99,6 +115,15 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    `/health`, a mobile authenticated API call, and signed deliveries to both
    webhook paths. Confirm unsigned requests receive `401` from the new backend.
    Renewals use the same certificate hook.
+
+The trigger saves each event in a logged outbox in the same transaction as the
+insert. The scheduled dispatcher retries failed, partial, and missing responses;
+it marks an event delivered only after a successful HTTP response with a JSON
+`status` of `success`. Inspect pending counts and `last_error` in
+`keepsafe_internal.webhook_outbox` without exposing payloads or signatures. An
+empty or missing signing secret leaves events pending. Delivery is at least once:
+an interrupted response or partial processing can cause a retry and duplicate
+notifications or emails. Monitor the outbox and reconcile downstream effects.
 
 The workflows never print `.env.production`. Both it and candidate
 `.env.production.next` are ignored by Git; the candidate is validated with

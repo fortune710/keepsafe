@@ -53,6 +53,11 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: python3 .github/scripts/check-production-migrations.py --require-current
 
+      - name: Require verified signed webhook cutover
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python3 .github/scripts/check-webhook-readiness.py
+
       - name: Configure verified SSH access
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}

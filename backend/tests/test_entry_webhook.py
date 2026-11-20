@@ -97,3 +97,24 @@ def test_entry_update_webhook_queues_reingestion(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["message"] == "Entry entry-1 queued for re-ingestion successfully"
+
+
+def test_failed_notification_is_not_reported_as_success(monkeypatch):
+    client = _build_client()
+    monkeypatch.setattr(webhooks.settings, "SUPABASE_WEBHOOK_SECRET", "test-secret")
+
+    async def succeeds(*_args, **_kwargs):
+        return True
+
+    async def fails(*_args, **_kwargs):
+        return False
+
+    monkeypatch.setattr(webhooks.entry_ingestion_queue_service, "enqueue_entry", succeeds)
+    monkeypatch.setattr(webhooks.notification_enqueue_service, "enqueue_entry_notification", fails)
+    body = json.dumps({"type": "INSERT", "table": "entries", "record": {"id": "entry-1"}}).encode()
+    signature = hmac.new(b"test-secret", body, hashlib.sha256).hexdigest()
+    response = client.post("/webhooks/entries", content=body, headers={"content-type": "application/json", "x-supabase-signature": signature})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "partial_success"
+    assert response.json()["notification"] == "failed"

@@ -16,7 +16,8 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - edge
+      edge:
+        ipv4_address: 172.30.42.2
     read_only: true
     cap_drop: [ALL]
     cap_add: [CHOWN, SETGID, SETUID]
@@ -45,6 +46,7 @@ services:
     environment:
       ENVIRONMENT: production
       PORT: "8080"
+      FORWARDED_ALLOW_IPS: "172.30.42.2"
       LOG_LEVEL: INFO
       ALLOWED_HOSTS: ""
       SUPABASE_URL: ${SUPABASE_URL:?Set SUPABASE_URL}
@@ -110,5 +112,9 @@ services:
 
 networks:
   edge:
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
+          ip_range: 172.30.42.128/25
   data:
     internal: true

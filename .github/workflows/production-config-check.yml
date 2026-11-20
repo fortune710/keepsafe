@@ -9,6 +9,9 @@ on:
       - backend/Dockerfile
       - .github/scripts/**
       - .github/workflows/production-*.yml
+      - frontend/supabase/migrations/**
+      - frontend/supabase/tests/**
+      - scripts/deploy/activate-signed-webhooks.sql
 
 permissions:
   contents: read
@@ -18,6 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Test durable webhook delivery
+        run: |
+          npm install --prefix "$RUNNER_TEMP/webhook-pgtest" --no-save --ignore-scripts @electric-sql/pglite@0.5.17
+          NODE_PATH="$RUNNER_TEMP/webhook-pgtest/node_modules" node frontend/supabase/tests/webhook_outbox.cjs
 
       - name: Render validation environment
         env:

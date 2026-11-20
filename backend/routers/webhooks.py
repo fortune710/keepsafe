@@ -114,8 +114,9 @@ async def entry_webhook(
             
             # Enqueue notification for shared entry
             try:
-                await notification_enqueue_service.enqueue_entry_notification(payload.record)
-                notification_success = True
+                notification_success = await notification_enqueue_service.enqueue_entry_notification(payload.record)
+                if not notification_success:
+                    logger.error("Failed to enqueue entry notification", extra={"entry_id": entry_id})
             except Exception as e:
                 # Log error but don't fail the webhook if notification fails
                 logger.error(f"Failed to enqueue entry notification: {str(e)}", exc_info=True)
