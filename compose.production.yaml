@@ -54,8 +54,7 @@ services:
       GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:?Set GOOGLE_GENERATIVE_AI_API_KEY}
       PINECONE_API_KEY: ${PINECONE_API_KEY:?Set PINECONE_API_KEY}
       PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-keepsafe-entries}
-      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT:-}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
       REDIS_DB: "0"
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:?Set SENDGRID_API_KEY}
@@ -70,12 +69,8 @@ services:
       TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
-    depends_on:
-      redis:
-        condition: service_healthy
     networks:
       - edge
-      - data
     init: true
     read_only: true
     cap_drop: [ALL]
@@ -90,31 +85,9 @@ services:
       retries: 5
       start_period: 30s
 
-  redis:
-    image: redis:7-alpine
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
-    entrypoint: ["/bin/sh", "-ec"]
-    command: ["exec redis-server --save '' --appendonly no --requirepass \"$$REDIS_PASSWORD\""]
-    networks:
-      - data
-    read_only: true
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    tmpfs:
-      - /data:rw,noexec,nosuid,size=16m
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
 networks:
   edge:
     ipam:
       config:
         - subnet: 172.30.42.0/24
           ip_range: 172.30.42.128/25
-  data:
-    internal: true

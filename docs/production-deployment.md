@@ -1,13 +1,13 @@
 # Keepsafe production deployment
 
-The VPS runs the API, a private Redis cache, and the Keepsafe NGINX container
-as Compose project `keepsafe`. Source is at `/root/keepsafe`; ACME challenge
+The VPS runs the API and Keepsafe NGINX as Compose project `keepsafe`. The API
+uses a separately managed Redis service. Source is at `/root/keepsafe`; ACME challenge
 files are under `/var/lib/keepsafe/acme`. Supabase owns the production database,
 storage, and bearer-token authentication. The mobile application is released
 separately and should use `EXPO_PUBLIC_BACKEND_URL=https://keepsafeapi.fortunealebiosu.dev`.
 The backend also binds `127.0.0.1:8080` on the VPS for local health checks;
 public clients reach it through NGINX, which proxies to `backend:8080` on the
-private Compose network. Redis has no host port.
+private Compose network.
 
 There is no browser frontend origin for this mobile-only deployment. Production
 FastAPI CORS has no allowed browser origins, and the backend does not issue
@@ -24,8 +24,9 @@ Create the `production` Environment and supply these **Keepsafe-specific** secre
 | `SUPABASE_DB_URL` | Keepsafe production database connection, used only by migration checks and Supabase CLI. |
 | `SUPABASE_URL` | Keepsafe production Supabase project URL. |
 | `SUPABASE_KEY` | Keepsafe service role key for backend access. |
-| `REDIS_PASSWORD` | New password for the private Keepsafe Redis instance. |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Keepsafe Gemini credential. |
+| `REDIS_URL` | URL for the separate Keepsafe Redis service. |
+| `REDIS_PASSWORD` | Password for the separate Keepsafe Redis service. |
+| `GOOGLE_GENERATIVE_AI_KEY` | Keepsafe Gemini credential, passed to the backend as `GOOGLE_GENERATIVE_AI_API_KEY`. |
 | `PINECONE_API_KEY` | Keepsafe Pinecone credential. |
 | `SENDGRID_API_KEY` | Keepsafe mail credential. |
 | `SENDGRID_FROM_EMAIL` | Verified Keepsafe sender address. |
@@ -33,13 +34,18 @@ Create the `production` Environment and supply these **Keepsafe-specific** secre
 | `ENTRY_REPORT_NOTIFICATION_TO_EMAIL` | Entry report recipient. |
 | `SUPABASE_WEBHOOK_SECRET` | HMAC signing key shared with Supabase Vault. |
 
-Optional secrets for enabled integrations: `POSTHOG_API_KEY`,
+Optional secrets for enabled integrations: `POSTHOG_API_KEY`, `POSTHOG_HOST`,
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
 `TWILIO_FROM_NUMBER`. Optional nonsecret Environment variables:
-`PINECONE_INDEX_NAME` (default `keepsafe-entries`), `PINECONE_ENVIRONMENT`,
-and `POSTHOG_HOST`. `REDIS_URL`, `REDIS_DB`, `ENVIRONMENT`, `PORT`, and
+`PINECONE_INDEX_NAME` (default `keepsafe-entries`). `REDIS_DB`, `ENVIRONMENT`, `PORT`, and
 `ALLOWED_HOSTS` are fixed in Compose. Do not add database, RabbitMQ, Vault,
 JWT, or SMTP credentials from another application.
+
+Use a Redis service and credentials isolated from other applications. Set
+`REDIS_URL` to a host reachable from the backend container, without a password
+in the URL, and supply the password separately. Use `rediss://` when the
+service supports TLS. Compose no longer starts or checks Redis; verify its
+connectivity and health independently before deployment.
 
 Before using `gh secret set`, run `gh auth status`. If it fails, stop and run
 `gh auth login -h github.com`. Supply values through a private terminal or
