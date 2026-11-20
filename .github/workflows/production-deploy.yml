@@ -71,7 +71,7 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: python3 .github/scripts/check-production-migrations.py --require-current
 
-      - name: Require verified signed webhook cutover
+      - name: Require durable webhook infrastructure
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: python3 .github/scripts/check-webhook-readiness.py
