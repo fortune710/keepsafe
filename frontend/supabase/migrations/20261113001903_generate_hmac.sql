@@ -1,5 +1,6 @@
 -- This function is deliberately not attached to a trigger. Configure the
--- Vault secret and backend signature verification before switching delivery.
+-- Vault secret and confirm the existing backend accepts signed delivery before
+-- switching triggers; the production deployment runbook defines the cutover.
 CREATE SCHEMA IF NOT EXISTS keepsafe_internal;
 REVOKE ALL ON SCHEMA keepsafe_internal FROM PUBLIC, anon, authenticated;
 

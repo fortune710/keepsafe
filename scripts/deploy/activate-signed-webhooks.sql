@@ -1,4 +1,5 @@
--- Run only after the new backend is live and signature verification is tested.
+-- Run only after the new hostname routes to the existing backend over HTTPS,
+-- both webhook paths accept the signing key, and signed delivery is ready to test.
 -- This cutover is separate from pre-deployment schema migrations.
 BEGIN;
 
