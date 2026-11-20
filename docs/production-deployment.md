@@ -57,7 +57,7 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    For `keepsafeapi.fortunealebiosu.dev`, route public HTTP port 80 to
    `127.0.0.1:28080` and public HTTPS port 443 to `127.0.0.1:28443`.
    Preserve TLS passthrough so Keepsafe NGINX serves the certificate. Keep
-   this route staged until the temporary ingress cutover below is complete.
+   the routes staged until the bootstrap NGINX container is running below.
    Coordinate its activation with the sibling application's loopback-port
    change, then confirm that application's HTTP redirects and HTTPS health.
    Keep the shared routing configuration outside either application's NGINX
@@ -69,22 +69,24 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    `supabase_migrations.schema_migrations` in the Keepsafe production project.
    The migration workflow requires the current baseline and refuses a gap or
    unknown version. Reconcile any difference before merging the Keepsafe PR.
-   The existing production project currently has migrations beyond the baseline
-   that are absent from this branch; bring the matching migration files into the
-   deployment branch and review their application compatibility before release.
-4. Configure DNS and shared ingress for `keepsafeapi.fortunealebiosu.dev`.
-   Issue a valid certificate on the VPS at
-   `/etc/letsencrypt/live/keepsafeapi.fortunealebiosu.dev/`, serving ACME
-   challenges from `/var/lib/keepsafe/acme`. Configure the host's Certbot deploy
-   hook to invoke `/root/keepsafe/scripts/deploy/reload-nginx-after-cert.sh`.
+4. Configure DNS for `keepsafeapi.fortunealebiosu.dev` and configure the host's
+   Certbot deploy hook to invoke
+   `/root/keepsafe/scripts/deploy/reload-nginx-after-cert.sh` after issuance and
+   renewal.
 5. Merge the Keepsafe PR. The migration workflow installs the durable outbox
    and scheduled dispatcher. The deploy job checks their prerequisites and a
-   consistent trigger state, then starts the backend and NGINX. The original
-   webhook triggers remain active until the signed cutover. Confirm NGINX passes
-   `nginx -t`, the public hostname routes to it, the certificate is valid, and
-   `/health` succeeds. If the certificate was issued after NGINX started, run
-   the Certbot deploy hook before switching traffic.
-6. Confirm the running backend accepts correctly signed requests to both
+   consistent trigger state, then starts the backend and NGINX. Without a
+   certificate, NGINX starts in HTTP bootstrap mode. Enable the staged HTTP
+   ingress route and verify a test file under
+   `/var/lib/keepsafe/acme/.well-known/acme-challenge/` is
+   reachable at `http://keepsafeapi.fortunealebiosu.dev/.well-known/acme-challenge/`
+   before requesting a certificate. The original webhook triggers remain active.
+6. Request the certificate using Certbot's webroot method with
+   `/var/lib/keepsafe/acme`. The deploy hook switches NGINX to HTTPS, checks its
+   configuration, and reloads it. Confirm the certificate is at
+   `/etc/letsencrypt/live/keepsafeapi.fortunealebiosu.dev/`, enable the staged
+   HTTPS ingress route, and verify the TLS hostname and `/health` over HTTPS.
+7. Confirm the running backend accepts correctly signed requests to both
    `/webhooks/entries` and `/webhooks/entry-reports`, and reports an entry
    notification enqueue failure as a failure. Independently verify the HMAC
    against the exact request body without logging payloads, signatures, or keys.
@@ -92,7 +94,7 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    exposing either value. Keep the original triggers active until these checks
    pass; if an existing backend serves those triggers, confirm its deliveries
    continue to work until cutover.
-7. Apply `scripts/deploy/activate-signed-webhooks.sql` to switch both triggers
+8. Apply `scripts/deploy/activate-signed-webhooks.sql` to switch both triggers
    atomically. Create a controlled entry and entry report. Verify signed
    delivery to both paths, confirm the intended downstream effects, and check
    that `keepsafe_internal.webhook_delivery_status` records both tables.
@@ -100,7 +102,7 @@ GitHub's Environment UI; never place them in a command argument, log, or PR.
    and investigate. Rollback restores the old triggers but does not cancel
    events already in the outbox; inspect and reconcile those events to avoid
    duplicate effects.
-8. Verify HTTP ACME access, the HTTPS redirect, TLS hostname/certificate,
+9. Verify HTTP ACME access, the HTTPS redirect, TLS hostname/certificate,
    `/health`, a mobile authenticated API call, and signed deliveries to both
    webhook paths. Confirm unsigned requests receive `401` from the new backend.
    Renewals use the same certificate hook.
