@@ -13,6 +13,33 @@ BASELINE_VERSION = "20260420044000"
 MIGRATIONS = Path("frontend/supabase/migrations")
 
 
+def database_error_category(error: psycopg.Error) -> str:
+    """Classify failures without logging libpq messages that may contain secrets."""
+    code = error.sqlstate or ""
+    message = str(error).lower()
+    if code.startswith("28") or "password authentication failed" in message:
+        return "database authentication failed; check the database username and password"
+    if code == "42501":
+        return "database permission denied while reading migration history"
+    if code in {"3F000", "42P01"}:
+        return "migration history schema or table does not exist in the selected database"
+    if "invalid uri" in message or "invalid connection" in message or "missing '='" in message or "invalid percent-encoded" in message:
+        return "invalid database connection string; check its format and password encoding"
+    if "could not translate host name" in message or "name or service not known" in message or "nodename nor servname provided" in message:
+        return "database hostname could not be resolved"
+    if "network is unreachable" in message or "no route to host" in message:
+        return "database network is unreachable; check IPv4/IPv6 compatibility and network restrictions"
+    if "timed out" in message or "timeout" in message:
+        return "database connection timed out; check network access and restrictions"
+    if "connection refused" in message:
+        return "database connection was refused; check the host, port and network access"
+    if "ssl" in message or "certificate" in message:
+        return "database TLS connection failed; check TLS settings and certificates"
+    if code:
+        return f"database error (SQLSTATE {code})"
+    return "database connection or query failed; check the URL, network and database access"
+
+
 def main() -> int:
     require_current = sys.argv[1:] == ["--require-current"]
     if sys.argv[1:] and not require_current:
@@ -23,13 +50,17 @@ def main() -> int:
         print("Local migration baseline is missing or versions are duplicated.", file=sys.stderr)
         return 1
 
+    if not os.environ.get("SUPABASE_DB_URL"):
+        print("Missing required secret: SUPABASE_DB_URL.", file=sys.stderr)
+        return 1
+
     try:
         with psycopg.connect(os.environ["SUPABASE_DB_URL"], connect_timeout=10) as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT version FROM supabase_migrations.schema_migrations ORDER BY version")
                 remote = [row[0] for row in cursor.fetchall()]
-    except (KeyError, psycopg.Error):
-        print("Could not read production Supabase migration history.", file=sys.stderr)
+    except psycopg.Error as error:
+        print("Could not read production Supabase migration history: " + database_error_category(error) + ".", file=sys.stderr)
         return 1
 
     baseline_count = local.index(BASELINE_VERSION) + 1
