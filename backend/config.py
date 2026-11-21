@@ -88,6 +88,15 @@ class Settings:
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "")
 
+    # Meta Instagram Unified Login
+    META_APP_ID: str = os.getenv("META_APP_ID", "")
+    META_APP_SECRET: str = os.getenv("META_APP_SECRET", "")
+    META_INSTAGRAM_CONFIG_ID: str = os.getenv("META_INSTAGRAM_CONFIG_ID", "")
+    META_INSTAGRAM_REDIRECT_URI: str = os.getenv("META_INSTAGRAM_REDIRECT_URI", "")
+    META_INSTAGRAM_LOGIN_URL: str = os.getenv("META_INSTAGRAM_LOGIN_URL", "")
+    META_GRAPH_API_VERSION: str = os.getenv("META_GRAPH_API_VERSION", "")
+    INSTAGRAM_TOKEN_ENCRYPTION_KEY: str = os.getenv("INSTAGRAM_TOKEN_ENCRYPTION_KEY", "")
+
     # Frontend
     ALLOWED_HOSTS: list[str] = get_list_env(os.getenv("ALLOWED_HOSTS", ""))
 
