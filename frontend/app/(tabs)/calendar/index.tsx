@@ -218,13 +218,13 @@ const styles = StyleSheet.create({
   },
   weekday: {
     fontSize: 13,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#94A3B8',
     marginBottom: 2,
   },
   title: {
     fontSize: 22,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     fontWeight: '700',
     color: '#1E293B',
   },
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   streakBadgeText: {
     fontSize: 13,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#B45309',
   },
   loadingContainer: {
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     marginTop: 12,
   },
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   },
   monthTitle: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     textAlign: 'center',
     letterSpacing: 0.2,
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 14,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#64748B',
   },
   daysGrid: {
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   },
   dayNumber: {
     fontSize: 16,
-    fontFamily: 'Jost-Medium',
+    fontFamily: 'Figtree-Medium',
     color: '#1E293B',
   },
   dayNumberCircle: {
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
   dayNumberActive: {
     fontSize: 16,
-    fontFamily: 'Jost-Medium',
+    fontFamily: 'Figtree-Medium',
     color: 'white',
   },
 

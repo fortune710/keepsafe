@@ -69,6 +69,12 @@ class Settings:
     REDIS_DB: int = _get_int_env("REDIS_DB", 0)
     REDIS_CACHE_TTL: int = _get_int_env("REDIS_CACHE_TTL", 3600)
 
+    # Spotify provider
+    SPOTIFY_CLIENT_ID: str = os.getenv("SPOTIFY_CLIENT_ID", "")
+    SPOTIFY_CLIENT_SECRET: str = os.getenv("SPOTIFY_CLIENT_SECRET", "")
+    SPOTIFY_REDIRECT_URI: str = os.getenv("SPOTIFY_REDIRECT_URI", "")
+    SPOTIFY_TOKEN_ENCRYPTION_KEY: str = os.getenv("SPOTIFY_TOKEN_ENCRYPTION_KEY", "")
+
 
     # SendGrid
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")

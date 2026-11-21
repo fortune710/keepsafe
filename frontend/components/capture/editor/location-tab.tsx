@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 14,
-        fontFamily: "Outfit-SemiBold",
+        fontFamily: "Figtree-SemiBold",
         fontWeight: "600",
         color: "#64748B",
         marginVertical: 12,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: scale(12),
-        fontFamily: "Jost-Regular",
+        fontFamily: "Figtree-Regular",
         fontWeight: "400",
         color: Colors.text,
     },
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     },
     locationName: {
         fontSize: scale(14),
-        fontFamily: "Outfit-SemiBold",
+        fontFamily: "Figtree-SemiBold",
         fontWeight: "600",
         color: Colors.text,
     },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     },
     badge: {
         fontSize: 11,
-        fontFamily: "Outfit-SemiBold",
+        fontFamily: "Figtree-SemiBold",
         fontWeight: "600",
         color: "#8B5CF6",
         backgroundColor: "#EEF2FF",
@@ -273,12 +273,12 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         fontSize: 14,
-        fontFamily: "Jost-Regular",
+        fontFamily: "Figtree-Regular",
         color: "#64748B",
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: "Jost-Regular",
+        fontFamily: "Figtree-Regular",
         color: "#94A3B8",
         textAlign: "center",
         paddingVertical: 20,
@@ -289,6 +289,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 12,
         fontSize: 16,
-        fontFamily: "Outfit-Regular",
+        fontFamily: "Figtree-Regular",
     },
 });

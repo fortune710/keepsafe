@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: scale(24),
-        fontFamily: 'Outfit-Bold',
+        fontFamily: 'Figtree-Bold',
         color: '#1E293B',
         marginBottom: 8,
         textAlign: 'center',
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
         color: '#64748B',
         textAlign: 'center',
         lineHeight: 22,
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         paddingHorizontal: 16,
     },
     formContainer: {
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         borderWidth: 1,
         borderColor: '#E2E8F0',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
     },
     sendButton: {
         backgroundColor: '#8B5CF6',
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     sendButtonText: {
         color: 'white',
         fontSize: 18,
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
     },
     bottomContainer: {
         position: 'absolute',
@@ -192,10 +192,10 @@ const styles = StyleSheet.create({
     backToLoginText: {
         fontSize: 16,
         color: '#64748B',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
     },
     backToLoginLink: {
         color: '#8B5CF6',
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
     },
 });

@@ -139,13 +139,13 @@ const styles = StyleSheet.create({
     },
     friendName: {
         fontSize: 12,
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#64748B',
         fontWeight: '500',
         textAlign: 'center',
     },
     selectedFriendName: {
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#8B5CF6',
         fontWeight: '600',
     },

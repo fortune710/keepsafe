@@ -40,36 +40,54 @@ export const CaptureActions = ({
   // otherwise releasing the tap that just started recording would immediately stop it.
   const useHoldToRecordGesture = isCameraFamily && captureUIMode !== 'video';
 
+  const isRecordingActive = isCapturing || isVideoRecording;
+
+  const captureButtonLabel = isCameraFamily
+    ? captureUIMode === 'video'
+      ? isVideoRecording
+        ? 'Stop recording video'
+        : 'Start recording video'
+      : 'Take photo'
+    : isCapturing
+      ? 'Stop recording audio'
+      : 'Start recording audio';
+
   return (
     <>
       <View style={styles.actionContainer}>
-        {isCameraFamily ? (
-          <TouchableOpacity
-            style={[
-              styles.uploadButton,
-              {
+        <View style={[styles.sideActionSlot, styles.sideActionSlotStart]}>
+          {isCameraFamily ? (
+            <TouchableOpacity
+              style={[
+                styles.uploadButton,
+                {
+                  minWidth: minTouchTarget,
+                  minHeight: minTouchTarget,
+                },
+              ]}
+              onPress={handleUpload}
+              accessibilityRole="button"
+              accessibilityLabel="Open gallery"
+            >
+              <GalleryIcon color="#94A3B8" size={26} />
+            </TouchableOpacity>
+          ) : (
+            <View
+              style={{
                 minWidth: minTouchTarget,
                 minHeight: minTouchTarget,
-              },
-            ]}
-            onPress={handleUpload}
-          >
-            <GalleryIcon color="#94A3B8" size={26} />
-          </TouchableOpacity>
-        ) : (
-          <View
-            style={{
-              minWidth: minTouchTarget,
-              minHeight: minTouchTarget,
-            }}
-          />
-        )}
+              }}
+            />
+          )}
+        </View>
 
         <TouchableOpacity
           style={[
             styles.captureButton,
-            (isCapturing || isVideoRecording) && styles.recordingButton,
-            !isCameraReady && isCameraFamily && styles.disabledButton,
+            isCameraFamily ? styles.captureButtonRing : styles.captureButtonFilled,
+            isRecordingActive &&
+              (isCameraFamily ? styles.recordingRing : styles.recordingFilled),
+            !isCameraReady && isCameraFamily && styles.disabledRing,
           ]}
           onPress={isCameraFamily ? handleCameraCapture : toggleRecording}
           onLongPress={useHoldToRecordGesture ? startVideo : undefined}
@@ -81,6 +99,12 @@ export const CaptureActions = ({
           }
           delayLongPress={200}
           disabled={isCameraFamily && !isCameraReady}
+          accessibilityRole="button"
+          accessibilityLabel={captureButtonLabel}
+          accessibilityState={{
+            disabled: isCameraFamily && !isCameraReady,
+            busy: isVideoRecording || isCapturing,
+          }}
         >
           <View style={styles.captureButtonInner}>
             {isCameraFamily ? (
@@ -103,16 +127,18 @@ export const CaptureActions = ({
           </View>
         </TouchableOpacity>
 
-        <View
-          style={[
-            styles.uploadButton,
-            {
-              minWidth: minTouchTarget,
-              minHeight: minTouchTarget,
-              opacity: 0,
-            },
-          ]}
-        />
+        <View style={[styles.sideActionSlot, styles.sideActionSlotEnd]}>
+          <View
+            style={[
+              styles.uploadButton,
+              {
+                minWidth: minTouchTarget,
+                minHeight: minTouchTarget,
+                opacity: 0,
+              },
+            ]}
+          />
+        </View>
       </View>
     </>
   );
@@ -122,9 +148,18 @@ const styles = StyleSheet.create({
   actionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 40,
     marginBottom: 20,
+  },
+  sideActionSlot: {
+    flex: 1,
+  },
+  sideActionSlotStart: {
+    alignItems: 'flex-start',
+  },
+  sideActionSlotEnd: {
+    alignItems: 'flex-end',
   },
   uploadButton: {
     width: 60,
@@ -140,19 +175,32 @@ const styles = StyleSheet.create({
     width: scale(87),
     height: scale(87),
     borderRadius: 999,
-    backgroundColor: 'transparent',
-    borderWidth: scale(4),
-    borderColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
     minWidth: 87,
     minHeight: 87,
   },
-  recordingButton: {
-    borderColor: '#EF4444',
+  // Photo/video: a purple ring with a transparent center, so there's a gap
+  // between the ring and the inner white circle.
+  captureButtonRing: {
+    backgroundColor: 'transparent',
+    borderWidth: scale(4),
+    borderColor: Colors.primary,
   },
-  disabledButton: {
-    borderColor: '#95a5a6',
+  // Audio: no camera preview behind it, so the button is a solid filled
+  // circle instead of a ring.
+  captureButtonFilled: {
+    backgroundColor: Colors.primary,
+  },
+  recordingRing: {
+    borderColor: Colors.danger,
+  },
+  recordingFilled: {
+    backgroundColor: Colors.danger,
+  },
+  disabledRing: {
+    borderColor: Colors.textSubtle,
+    opacity: 0.5,
   },
   captureButtonInner: {
     width: scale(76),

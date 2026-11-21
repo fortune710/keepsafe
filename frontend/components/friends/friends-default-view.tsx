@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     },
     searchPlaceholder: {
         fontSize: scale(14),
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         fontWeight: '600',
         color: '#94A3B8',
         marginLeft: scale(12),

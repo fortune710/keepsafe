@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     fontWeight: '600',
     color: '#1E293B',
   },

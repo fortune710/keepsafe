@@ -8,11 +8,13 @@ import { CameraView } from 'expo-camera';
 interface AudioCaptureParams {
     cameraRef: RefObject<CameraView | null>;
     setVideoDuration: (duration: number) => void;
+    isTimeCapsule: boolean;
 }
 
 export function useAudioCapture({
     cameraRef,
-    setVideoDuration
+    setVideoDuration,
+    isTimeCapsule,
 }: AudioCaptureParams) {
     const { isCapturing, isVideoRecording, setIsVideoRecording } = useCaptureContext();
     const { startAudioRecording, stopAudioRecording } = useMediaCapture();
@@ -27,7 +29,8 @@ export function useAudioCapture({
                         captureId: capture.id,
                         type: capture.type,
                         uri: encodeURIComponent(capture.uri),
-                        duration: capture.duration?.toString() || '0'
+                        duration: capture.duration?.toString() || '0',
+                        timeCapsule: isTimeCapsule ? 'true' : undefined,
                     }
                 });
             }
@@ -58,7 +61,8 @@ export function useAudioCapture({
         startAudioRecording,
         stopAudioRecording,
         setIsVideoRecording,
-        setVideoDuration
+        setVideoDuration,
+        isTimeCapsule,
     ]);
 
     return { toggleRecording };

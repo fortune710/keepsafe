@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   cameraLoadingText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
   },
   cameraOverlay: {
     position: 'absolute',
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   videoTimerText: {
     color: 'white',
     fontSize: 14,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     marginLeft: 8,
   },
   cameraControls: {
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   zoomText: {
     color: 'white',
     fontSize: 13,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   zoomTextActive: {
     color: '#000',
@@ -292,6 +292,6 @@ const styles = StyleSheet.create({
   recordingText: {
     fontSize: 14,
     color: '#EF4444',
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
   },
 });

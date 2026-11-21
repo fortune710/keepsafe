@@ -40,6 +40,6 @@ const styles = StyleSheet.create({
   selectionPillText: {
     color: '#F8FAFC',
     fontSize: 12,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

@@ -74,7 +74,7 @@ export default function EditorPopover({
   const { musicTags, isLoading } = useMusicTag(musicQuery);
   const [selectedStyle, setSelectedStyle] = useState({
     color: "#FFFFFF",
-    fontFamily: "Arial",
+    fontFamily: "Figtree-Regular",
     backgroundColor: "#000000",
   });
 

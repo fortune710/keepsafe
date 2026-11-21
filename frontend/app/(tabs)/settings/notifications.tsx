@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { Bell, Users, Calendar, UserPlus } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -68,7 +68,7 @@ export default function NotificationsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notification Preferences</Text>
           <Text style={styles.sectionDescription}>
@@ -109,7 +109,7 @@ export default function NotificationsScreen() {
             You can change these settings anytime. Some notifications may still appear for important account security updates.
           </Text>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -140,13 +140,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     lineHeight: 20,
   },
@@ -173,13 +173,13 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   settingDescription: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
   infoSection: {
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     lineHeight: 20,
     textAlign: 'center',

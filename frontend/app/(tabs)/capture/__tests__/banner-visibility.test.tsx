@@ -39,6 +39,7 @@ jest.mock('@/hooks/use-media-capture', () => ({
     clearCapture: jest.fn(),
   }),
 }));
+jest.mock('@/providers/capture-provider', () => ({ useCaptureContext: () => ({ setPendingLocationAttachment: jest.fn() }) }));
 jest.mock('@/hooks/use-vault-preloader', () => ({
   useVaultPreloader: jest.fn(),
 }));
@@ -79,13 +80,14 @@ jest.mock('@/hooks/capture/use-media-upload', () => ({
 }));
 jest.mock('expo-router', () => ({
   useFocusEffect: (cb: any) => cb(),
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: jest.fn() }),
 }));
 
 // Mock sub-components to avoid rendering issues
-jest.mock('@/components/capture/mode-selector', () => ({
+jest.mock('@/components/capture/capture-mode-selector', () => ({
   __esModule: true,
-  ModeSelector: () => null,
+  CaptureModeSelector: () => null,
 }));
 jest.mock('@/components/capture/media-display', () => ({
   __esModule: true,
@@ -94,10 +96,6 @@ jest.mock('@/components/capture/media-display', () => ({
 jest.mock('@/components/capture/capture-actions', () => ({
   __esModule: true,
   CaptureActions: () => null,
-}));
-jest.mock('@/components/capture/vault-button', () => ({
-  __esModule: true,
-  VaultButton: () => null,
 }));
 jest.mock('@/components/phone-number-bottom-sheet', () => ({
   __esModule: true,
@@ -113,6 +111,7 @@ jest.mock('@/components/monthly-dumps/monthly-dump-banner', () => {
 });
 jest.mock('react-native-safe-area-context', () => ({
     SafeAreaView: ({ children }: any) => children,
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 describe('CaptureScreen - Monthly Dump Banner Visibility', () => {
@@ -145,8 +144,7 @@ describe('CaptureScreen - Monthly Dump Banner Visibility', () => {
 
     const { getByText } = render(<CaptureScreen />);
     
-    // Check if "April Recap🎉" chip is visible
-    expect(getByText('April Recap🎉')).toBeTruthy();
+    expect(getByText('April Recap')).toBeTruthy();
   });
 
   it('toggles the banner when the date/chip is pressed', async () => {
@@ -157,23 +155,20 @@ describe('CaptureScreen - Monthly Dump Banner Visibility', () => {
       isLoading: false,
     });
 
-    const { getByTestId, queryByTestId } = render(<CaptureScreen />);
+    const { getByTestId, getByText, queryByText } = render(<CaptureScreen />);
     
     // The banner container itself should have pointerEvents="none" initially
     // and opacity 0 (though opacity is harder to check in plain RNTL without getting styles).
     // We can check if the Banner component is rendered.
     expect(getByTestId('monthly-dump-banner')).toBeTruthy();
 
-    // The trigger button (DateContainer)
-    const trigger = getByTestId('banner-trigger-button');
+    const trigger = getByText('April Recap');
     
     // Toggle ON
     await act(async () => {
       fireEvent.press(trigger);
     });
 
-    // In a real test we'd check if specific state changed or if pointerEvents is now 'auto'
-    // but the visibility is controlled by reanimated and useState.
-    // We've verified it responds to press and doesn't crash.
+    expect(queryByText('April Recap')).toBeNull();
   });
 });

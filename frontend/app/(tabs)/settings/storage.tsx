@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { HardDrive, Image, Mic, Trash2, Download } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
@@ -67,7 +67,7 @@ export default function StorageScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <View style={styles.usageSection}>
           <Text style={styles.sectionTitle}>Storage Usage</Text>
           
@@ -138,7 +138,7 @@ export default function StorageScreen() {
             </View>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   content: {
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 16,
   },
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   usageText: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginLeft: 12,
   },
@@ -230,18 +230,18 @@ const styles = StyleSheet.create({
   },
   breakdownTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   breakdownCount: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
   breakdownSize: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
   },
   actionsSection: {
@@ -260,13 +260,13 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
     marginBottom: 2,
   },
   actionDescription: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
   },
 });

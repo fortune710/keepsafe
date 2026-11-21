@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     marginBottom: 12,
     textAlign: 'center',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   message: {
     fontSize: 16,
@@ -180,18 +180,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 8,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   errorText: {
     fontSize: 12,
     color: '#EF4444',
-    fontFamily: 'monospace',
+    fontFamily: 'Figtree-Regular',
     marginBottom: 8,
   },
   stackText: {
     fontSize: 10,
     color: '#64748B',
-    fontFamily: 'monospace',
+    fontFamily: 'Figtree-Regular',
   },
   button: {
     backgroundColor: '#8B5CF6',
@@ -205,6 +205,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
 });

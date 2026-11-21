@@ -81,12 +81,12 @@ const styles = StyleSheet.create({
     name: {
         fontSize: moderateScale(14),
         fontWeight: '600',
-        fontFamily: 'Outfit-Bold',
+        fontFamily: 'Figtree-Bold',
         color: '#1E293B',
     },
     username: {
         fontSize: moderateScale(12),
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#64748B',
     },
     addButton: {
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
         fontSize: moderateScale(12),
         color: Colors.white,
         fontWeight: '600',
-        fontFamily: 'Outfit-Bold',
+        fontFamily: 'Figtree-Bold',
         marginLeft: scale(4),
     },
 });

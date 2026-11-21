@@ -46,6 +46,14 @@ jest.mock('lucide-react-native', () => {
     const React = require('react');
     const { View } = require('react-native');
     return {
+        Camera: () => <View />,
+        Trash2: () => <View />,
+        Lock: () => <View />,
+        Eye: () => <View />,
+        EyeOff: () => <View />,
+        ArrowLeft: () => <View />,
+        Mail: () => <View />,
+        Check: () => <View />,
         Sparkles: () => <View />,
         Play: () => <View />,
         UserPlus: () => <View />,

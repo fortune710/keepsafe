@@ -62,7 +62,10 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.WRITE_CONTACTS",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "package": "com.fortune710.keepsafe"
     },
@@ -132,9 +135,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysPermission": "Allow Keepsafe to access your location to let friends know your location",
-          "locationWhenInUsePermission": "Allow Keepsafe to access your location to let friends know your location",
-          "isIosBackgroundLocationEnabled": false
+          "locationAlwaysPermission": "Allow Keepsafe to access your location to privately remember places you visited",
+          "locationWhenInUsePermission": "Allow Keepsafe to access your location to privately remember places you visited",
+          "isIosBackgroundLocationEnabled": true
         }
       ]
     ],

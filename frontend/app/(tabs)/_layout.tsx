@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { PlatformPressable } from '@react-navigation/elements';
 import { Colors } from '@/lib/constants';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { CalendarIcon } from '@/components/icons/calendar-icon';
@@ -10,12 +11,15 @@ import { CaptureIcon } from '@/components/icons/capture-icon';
 import { FriendsIcon } from '@/components/icons/friends-icon';
 import { SettingsIcon } from '@/components/icons/settings-icon';
 
-const TAB_BAR_RADIUS = scale(32);
-const TAB_ICON_SIZE = scale(27);
+const TAB_BAR_RADIUS = scale(42);
+const TAB_ICON_SIZE = scale(22);
+const TAB_ITEM_ACTIVE_BACKGROUND = 'rgba(15, 23, 42, 0.08)';
 
 const TAB_BAR_STYLE = {
   position: 'absolute' as const,
   marginHorizontal: scale(10),
+  paddingHorizontal: scale(10),
+  paddingBottom: 0,
   left: scale(100),
   right: scale(100),
   bottom: verticalScale(28),
@@ -39,6 +43,7 @@ export default function TabsLayout() {
       initialRouteName="capture"
       screenOptions={{
         headerShown: false,
+        animation: 'fade',
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
@@ -55,26 +60,33 @@ export default function TabsLayout() {
             <View style={styles.glassBorder} pointerEvents="none" />
           </View>
         ),
-        tabBarItemStyle: {
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
+        tabBarButton: (props) => (
+          <PlatformPressable {...props} style={[props.style, styles.tabButton]} />
+        ),
       }}
     >
       <Tabs.Screen
         name="calendar"
         options={{
-          tabBarIcon: ({ color }) => (
-            <CalendarIcon color={color} size={TAB_ICON_SIZE} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
+              <CalendarIcon color={color} size={TAB_ICON_SIZE} />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="diary"
-        options={{
-          tabBarIcon: ({ color }) => (
-            <DiaryIcon color={color} size={TAB_ICON_SIZE} />
-          ),
+        options={({ route }) => {
+          const focusedRouteName = getFocusedRouteNameFromRoute(route) ?? 'index';
+          return {
+            tabBarIcon: ({ color, focused }) => (
+              <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
+                <DiaryIcon color={color} size={TAB_ICON_SIZE} />
+              </View>
+            ),
+            tabBarStyle: focusedRouteName === 'index' ? TAB_BAR_STYLE : { display: 'none' },
+          };
         }}
       />
       <Tabs.Screen
@@ -82,8 +94,10 @@ export default function TabsLayout() {
         options={({ route }) => {
           const focusedRouteName = getFocusedRouteNameFromRoute(route) ?? 'index';
           return {
-            tabBarIcon: ({ color }) => (
-              <CaptureIcon color={color} size={TAB_ICON_SIZE} />
+            tabBarIcon: ({ color, focused }) => (
+              <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
+                <CaptureIcon color={color} size={TAB_ICON_SIZE} />
+              </View>
             ),
             tabBarStyle: focusedRouteName === 'details' ? { display: 'none' } : TAB_BAR_STYLE,
           };
@@ -92,8 +106,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="friends"
         options={{
-          tabBarIcon: ({ color }) => (
-            <FriendsIcon color={color} size={TAB_ICON_SIZE + 7} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
+              <FriendsIcon color={color} size={TAB_ICON_SIZE + 7} />
+            </View>
           ),
         }}
       />
@@ -102,8 +118,10 @@ export default function TabsLayout() {
         options={({ route }) => {
           const focusedRouteName = getFocusedRouteNameFromRoute(route) ?? 'index';
           return {
-            tabBarIcon: ({ color }) => (
-              <SettingsIcon color={color} size={TAB_ICON_SIZE} />
+            tabBarIcon: ({ color, focused }) => (
+              <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
+                <SettingsIcon color={color} size={TAB_ICON_SIZE} />
+              </View>
             ),
             tabBarStyle: focusedRouteName === 'index' ? TAB_BAR_STYLE : { display: 'none' },
           };
@@ -123,5 +141,19 @@ const styles = StyleSheet.create({
     borderRadius: TAB_BAR_RADIUS,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.35)',
+  },
+  tabIconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: scale(60),
+    height: scale(52),
+    borderRadius: scale(24),
+  },
+  tabIconWrapperActive: {
+    backgroundColor: TAB_ITEM_ACTIVE_BACKGROUND,
+  },
+  tabButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -95,7 +95,24 @@ async function getEntryOwnerProfile(
 
 const DEFAULT_PAGE_SIZE = 20;
 
-export function useUserEntries(friendId?: string): UseUserEntriesResult {
+const getUserEntriesQueryKey = (userId?: string, friendId?: string, diaryId?: string) =>
+  ['user-entries', userId, friendId || 'all', diaryId || 'all'] as const;
+
+function filterCachedEntries(
+  entries: EntryWithProfile[] | null,
+  friendId?: string,
+  diaryId?: string,
+): EntryWithProfile[] {
+  if (!entries) return [];
+
+  return entries.filter((entry) => {
+    if (friendId && entry.user_id !== friendId) return false;
+    if (diaryId && entry.diary_id !== diaryId) return false;
+    return true;
+  });
+}
+
+export function useUserEntries(friendId?: string, diaryId?: string): UseUserEntriesResult {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
   const [unseenEntryIds, setUnseenEntryIds] = useState<Set<string>>(new Set());
@@ -104,6 +121,16 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const prefetchedUrlsRef = useRef<Set<string>>(new Set());
+  const queryKey = getUserEntriesQueryKey(user?.id, friendId, diaryId);
+  const initialEntries = useMemo(() => {
+    if (!user?.id) return [];
+
+    const diaryEntries = diaryId
+      ? deviceStorage.peekDiaryEntries(user.id, diaryId) as EntryWithProfile[] | null
+      : null;
+    const cachedEntries = diaryEntries ?? deviceStorage.peekEntries(user.id) as EntryWithProfile[] | null;
+    return filterCachedEntries(cachedEntries, friendId, diaryId).slice(0, DEFAULT_PAGE_SIZE);
+  }, [diaryId, friendId, user?.id]);
 
   const {
     data,
@@ -114,23 +141,17 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
     fetchNextPage,
     hasNextPage,
   } = useInfiniteQuery({
-    queryKey: ['user-entries', user?.id, friendId || 'all'],
+    queryKey,
     queryFn: async ({ pageParam }) => {
       if (!user) return [];
 
-      // Try to get cached entries first for initial load
       let cachedEntries: EntryWithProfile[] | null = null;
       if (!pageParam) {
-        cachedEntries = await deviceStorage.getEntries(user.id) as EntryWithProfile[];
-        if (friendId) {
-          cachedEntries = cachedEntries?.filter((entry) => entry.user_id === friendId) || null;
-        }
-
-        // Only return cached entries immediately if we have a full page.
-        // This prevents getNextPageParam from prematurely returning undefined (no more pages).
-        if (cachedEntries && cachedEntries.length >= DEFAULT_PAGE_SIZE) {
-          return cachedEntries;
-        }
+        const storedEntries = diaryId
+          ? await deviceStorage.getDiaryEntries(user.id, diaryId) as EntryWithProfile[] | null
+          : await deviceStorage.getEntries(user.id) as EntryWithProfile[] | null;
+        const fallbackEntries = storedEntries ?? await deviceStorage.getEntries(user.id) as EntryWithProfile[] | null;
+        cachedEntries = filterCachedEntries(fallbackEntries, friendId, diaryId);
       }
 
       let query = supabase
@@ -141,12 +162,14 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
             *
           )
         `)
-        .contains('shared_with', [user.id])
         .order('created_at', { ascending: false })
         .limit(DEFAULT_PAGE_SIZE);
 
-      if (friendId) {
-        query = query.eq('user_id', friendId);
+      if (diaryId) {
+        query = query.eq('user_id', user.id).eq('diary_id', diaryId);
+      } else {
+        query = query.contains('shared_with', [user.id]);
+        if (friendId) query = query.eq('user_id', friendId);
       }
 
       if (pageParam) {
@@ -174,7 +197,16 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
 
       // Cache the data. DeviceStorage now handles merging local-only entries.
       if (!pageParam && entries) {
-        if (!friendId) {
+        if (diaryId) {
+          const mergedDiaryEntries = [...entries, ...(cachedEntries || [])]
+            .filter((entry, index, self) => self.findIndex((item) => item.id === entry.id) === index)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, DEFAULT_PAGE_SIZE);
+          await deviceStorage.setDiaryEntries(user.id, diaryId, mergedDiaryEntries);
+          return mergedDiaryEntries;
+        }
+
+        if (!friendId && !diaryId) {
           await deviceStorage.setEntries(user.id, entries);
           // Get the merged set from storage to ensure local-only entries are visible
           const mergedEntries = await deviceStorage.getEntries(user.id) || entries;
@@ -191,7 +223,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
           .filter((entry, index, self) => self.findIndex((item) => item.id === entry.id) === index)
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-        logger.info(`Vault Sync (friend filter): Server returned ${entries.length}, local merged total ${mergedFilteredEntries.length}`);
+        logger.info(`Vault Sync (filtered): Server returned ${entries.length}, local merged total ${mergedFilteredEntries.length}`);
 
         // IMPORTANT: Return exactly the page size to maintain correct pagination offsets
         // and avoid double-counting or skipped entries on next page fetch.
@@ -202,6 +234,10 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
 
       return entries;
     },
+    initialData: initialEntries.length > 0
+      ? { pages: [initialEntries], pageParams: [null] }
+      : undefined,
+    initialDataUpdatedAt: initialEntries.length > 0 ? 0 : undefined,
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage: EntryWithProfile[]) => {
       if (!lastPage || lastPage.length < DEFAULT_PAGE_SIZE) {
@@ -212,6 +248,30 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
     enabled: !!user,
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
+
+  useEffect(() => {
+    if (!user?.id || initialEntries.length > 0) return;
+
+    let isCancelled = false;
+    const hydrateEntries = async () => {
+      const storedEntries = diaryId
+        ? await deviceStorage.getDiaryEntries(user.id, diaryId) as EntryWithProfile[] | null
+        : await deviceStorage.getEntries(user.id) as EntryWithProfile[] | null;
+      const fallbackEntries = storedEntries ?? await deviceStorage.getEntries(user.id) as EntryWithProfile[] | null;
+      const cachedEntries = filterCachedEntries(fallbackEntries, friendId, diaryId).slice(0, DEFAULT_PAGE_SIZE);
+      if (isCancelled || cachedEntries.length === 0) return;
+
+      queryClient.setQueryData<InfiniteData<EntryWithProfile[], string | null>>(
+        queryKey,
+        (current) => current ?? { pages: [cachedEntries], pageParams: [null] },
+      );
+    };
+
+    void hydrateEntries();
+    return () => {
+      isCancelled = true;
+    };
+  }, [diaryId, friendId, initialEntries.length, queryClient, user?.id]);
 
   const entries = data?.pages.flat() || [];
   const lastPage = data?.pages[data.pages.length - 1];
@@ -228,12 +288,22 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
   useEffect(() => {
     if (!user) return;
     const unsubscribe = deviceStorage.on('entriesChanged', ({ userId }: { userId: string }) => {
-      if (userId === user.id) {
-        refetch();
-      }
+      if (userId !== user.id) return;
+
+      const cachedEntries = filterCachedEntries(
+        deviceStorage.peekEntries(user.id) as EntryWithProfile[] | null,
+        friendId,
+        diaryId,
+      ).slice(0, DEFAULT_PAGE_SIZE);
+      if (cachedEntries.length === 0) return;
+
+      queryClient.setQueryData<InfiniteData<EntryWithProfile[], string | null>>(queryKey, (current) => ({
+        pages: [cachedEntries, ...(current?.pages.slice(1) ?? [])],
+        pageParams: current?.pageParams ?? [null],
+      }));
     });
     return unsubscribe;
-  }, [user, refetch]);
+  }, [diaryId, friendId, queryClient, user]);
 
   // Preload images for better UX
   useEffect(() => {
@@ -299,12 +369,14 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
       let recentEntriesQuery = supabase
         .from(TABLES.ENTRIES)
         .select(`*, profile:${TABLES.PROFILES}(*)`)
-        .contains('shared_with', [userId])
         .gte('created_at', tenMinutesAgo)
         .order('created_at', { ascending: false });
 
-      if (friendId) {
-        recentEntriesQuery = recentEntriesQuery.eq('user_id', friendId);
+      if (diaryId) {
+        recentEntriesQuery = recentEntriesQuery.eq('user_id', userId).eq('diary_id', diaryId);
+      } else {
+        recentEntriesQuery = recentEntriesQuery.contains('shared_with', [userId]);
+        if (friendId) recentEntriesQuery = recentEntriesQuery.eq('user_id', friendId);
       }
 
       const { data: recentEntries, error: fetchError } = await recentEntriesQuery;
@@ -314,14 +386,15 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
         return;
       }
 
-      const infiniteData = queryClient.getQueryData<InfiniteData<EntryWithProfile[]>>(['user-entries', userId, friendId || 'all']);
+      const currentQueryKey = getUserEntriesQueryKey(userId, friendId, diaryId);
+      const infiniteData = queryClient.getQueryData<InfiniteData<EntryWithProfile[]>>(currentQueryKey);
       const currentEntries = infiniteData?.pages.flat() || [];
       const currentEntryIds = new Set(currentEntries.map(e => e.id));
 
       // Find entries that were missed
       const missedEntries = recentEntries.filter(
         (entry: EntryWithProfile) =>
-          !currentEntryIds.has(entry.id) && entry.user_id !== userId
+          !currentEntryIds.has(entry.id) && (diaryId ? entry.diary_id === diaryId : entry.user_id !== userId)
       );
 
       if (missedEntries.length > 0) {
@@ -330,7 +403,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
         // Sort only the new entries if we want to prepend, or merge all and sort
         // For simplicity and correct visual order, we prepend them to the first page
         queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-          ['user-entries', userId, friendId || 'all'],
+          currentQueryKey,
           (oldData) => {
             if (!oldData) return undefined;
 
@@ -374,7 +447,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
     } catch (error) {
       logger.error('Error in fetchMissedEntries:', error);
     }
-  }, [queryClient, friendId]);
+  }, [diaryId, queryClient, friendId]);
 
   // Helper function to setup subscription
   const setupSubscription = useCallback((userId: string) => {
@@ -407,7 +480,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
             if (payload.eventType === 'DELETE') {
               const oldEntry = payload.old as any;
               queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-                ['user-entries', userId, friendId || 'all'],
+                getUserEntriesQueryKey(userId, friendId, diaryId),
                 (oldData) => {
                   if (!oldData) return undefined;
                   return {
@@ -426,6 +499,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
             if (friendId && entryData.user_id !== friendId) {
               return;
             }
+            if (diaryId && entryData.diary_id !== diaryId) return;
 
             // Filter: Check if entry is shared with this user (if not own entry)
             if (!isOwnEntry) {
@@ -462,7 +536,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
             logger.info(`Realtime ${payload.eventType} for entry:`, typedEntry.id);
 
             queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-              ['user-entries', userId, friendId || 'all'],
+              getUserEntriesQueryKey(userId, friendId, diaryId),
               (oldData) => {
                 if (!oldData) return undefined;
 
@@ -531,7 +605,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
       });
 
     subscriptionRef.current = channel;
-  }, [queryClient, fetchMissedEntries, friendId]);
+  }, [diaryId, queryClient, fetchMissedEntries, friendId]);
 
   // Helper function to schedule reconnection with exponential backoff
   const scheduleReconnect = useCallback((userId: string) => {
@@ -575,7 +649,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
 
       // Update React Query cache directly instead of a full refetch
       queryClient.setQueryData<InfiniteData<EntryWithProfile[]>>(
-        ['user-entries', user.id, friendId || 'all'],
+        getUserEntriesQueryKey(user.id, friendId, diaryId),
         (oldData) => {
           if (!oldData) return undefined;
 
@@ -601,7 +675,7 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
     });
 
     return unsubscribe;
-  }, [user, queryClient, friendId]);
+  }, [diaryId, user, queryClient, friendId]);
 
   // Realtime subscription for new shared entries
   useEffect(() => {
@@ -650,9 +724,9 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
     if (user) {
       await deviceStorage.addEntry(user.id, optimisticEntry);
       // Invalidate to let storage sync with UI
-      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id, friendId || 'all'] });
+      queryClient.invalidateQueries({ queryKey: getUserEntriesQueryKey(user.id, friendId, diaryId) });
     }
-  }, [user, queryClient, friendId]);
+  }, [diaryId, user, queryClient, friendId]);
 
   const replaceOptimisticEntry = useCallback(async (tempId: string, realEntry?: EntryWithProfile) => {
     logger.info('Vault: Replacing optimistic entry', { tempId, action: realEntry ? 'with real' : 'removing' });
@@ -666,9 +740,9 @@ export function useUserEntries(friendId?: string): UseUserEntriesResult {
       }
 
       // Thoroughly invalidate to ensure 'completed' state reflects immediately
-      queryClient.invalidateQueries({ queryKey: ['user-entries', user.id, friendId || 'all'] });
+      queryClient.invalidateQueries({ queryKey: getUserEntriesQueryKey(user.id, friendId, diaryId) });
     }
-  }, [user, queryClient, friendId]);
+  }, [diaryId, user, queryClient, friendId]);
 
   const retryEntry = useCallback(async (entryId: string) => {
     if (!user) return;
