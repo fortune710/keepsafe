@@ -1,18 +1,16 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, ScrollView } from 'react-native';
-import Animated, { SlideInDown, SlideOutDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { X } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { X, Check } from 'lucide-react-native';
 import { NameUpdateForm } from './name-update-form';
 import { UsernameUpdateForm } from './username-update-form';
 import { BioUpdateForm } from './bio-update-form';
 import { AvatarUpdateForm } from './avatar-update-form';
 import { BirthdayUpdateForm } from './birthday-update-form';
 import { PhoneUpdateForm } from './phone-update-form';
-import { verticalScale } from 'react-native-size-matters';
-
-const { height } = Dimensions.get('window');
-const BASE_PADDING_BOTTOM = 80;
+import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { Button } from '@/components/ui/button';
+import { scale, verticalScale } from 'react-native-size-matters';
+import type { UpdateFormHandle, UpdateFormState } from './form-handle';
 
 type UpdateType = 'name' | 'username' | 'bio' | 'avatar' | 'birthday' | 'phone';
 
@@ -25,27 +23,32 @@ interface ProfileUpdatePopoverProps {
   onError?: (message: string) => void;
 }
 
-export default function ProfileUpdatePopover({ 
-  isVisible, 
-  updateType, 
-  currentValue = '', 
-  onClose, 
-  onSuccess, 
-  onError 
+const INITIAL_FORM_STATE: UpdateFormState = { isValid: false, isLoading: false };
+
+/**
+ * Uses the shared `BottomSheet` component so it matches the style and layout
+ * used by the onboarding bottom sheets and the phone number bottom sheet.
+ */
+export default function ProfileUpdatePopover({
+  isVisible,
+  updateType,
+  currentValue = '',
+  onClose,
+  onSuccess,
+  onError
 }: ProfileUpdatePopoverProps) {
-  const keyboard = useAnimatedKeyboard();
+  const formRef = useRef<UpdateFormHandle>(null);
+  const [formState, setFormState] = useState<UpdateFormState>(INITIAL_FORM_STATE);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    paddingBottom: BASE_PADDING_BOTTOM + keyboard.height.value + 30,
-  }));
+  useEffect(() => {
+    setFormState(INITIAL_FORM_STATE);
+  }, [updateType]);
 
-  // Swipe down gesture to dismiss
-  const swipeDownGesture = Gesture.Pan()
-    .onEnd((event) => {
-      if (event.translationY > 100 && event.velocityY > 500) {
-        onClose();
-      }
-    });
+  const handleStateChange = useCallback((next: UpdateFormState) => {
+    setFormState((prev) =>
+      prev.isValid === next.isValid && prev.isLoading === next.isLoading ? prev : next
+    );
+  }, []);
 
   const getTitle = () => {
     switch (updateType) {
@@ -62,111 +65,91 @@ export default function ProfileUpdatePopover({
   const renderForm = () => {
     switch (updateType) {
       case 'name':
-        return <NameUpdateForm currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} />;
+        return <NameUpdateForm ref={formRef} currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} onStateChange={handleStateChange} />;
       case 'username':
-        return <UsernameUpdateForm currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} />;
+        return <UsernameUpdateForm ref={formRef} currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} onStateChange={handleStateChange} />;
       case 'bio':
-        return <BioUpdateForm currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} />;
+        return <BioUpdateForm ref={formRef} currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} onStateChange={handleStateChange} />;
       case 'avatar':
-        return <AvatarUpdateForm onSuccess={onSuccess} onError={onError} onClose={onClose} />;
+        return <AvatarUpdateForm ref={formRef} onSuccess={onSuccess} onError={onError} onClose={onClose} onStateChange={handleStateChange} />;
       case 'birthday':
-        return <BirthdayUpdateForm currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} />;
+        return <BirthdayUpdateForm ref={formRef} currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} onStateChange={handleStateChange} />;
       case 'phone':
-        return <PhoneUpdateForm currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} />;
+        return <PhoneUpdateForm ref={formRef} currentValue={currentValue} onSuccess={onSuccess} onError={onError} onClose={onClose} onStateChange={handleStateChange} />;
       default:
         return null;
     }
   };
 
-  if (!isVisible) return null;
-
   return (
-    <Animated.View 
-      style={styles.overlay}
-      testID="profile-update-popover"
-    >
-      <TouchableOpacity style={styles.backdrop} onPress={onClose} />
-      
-      <GestureDetector gesture={swipeDownGesture}>
-        <Animated.View 
-          style={[styles.popover, animatedStyle]}
-          entering={SlideInDown.duration(300).springify().damping(27).stiffness(90)} 
-          exiting={SlideOutDown.duration(300).springify().damping(20).stiffness(90)}
-        >
-          <View style={styles.handle} />
-          
-          <View style={styles.header}>
-            <Text style={styles.title}>{getTitle()}</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X color="#64748B" size={20} />
-            </TouchableOpacity>
-          </View>
+    <BottomSheet visible={isVisible} onClose={onClose} maxHeight="90%">
+      <View style={styles.header}>
+        <Text style={styles.title} numberOfLines={1}>{getTitle()}</Text>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose} hitSlop={12}>
+          <X color="#64748B" size={20} />
+        </TouchableOpacity>
+      </View>
 
-          <ScrollView 
-            style={styles.scrollView}
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-          >
-            {renderForm()}
-          </ScrollView>
-        </Animated.View>
-      </GestureDetector>
-    </Animated.View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        {renderForm()}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Button
+          onPress={() => formRef.current?.save()}
+          disabled={!formState.isValid}
+          loading={formState.isLoading}
+        >
+          <Check color="white" size={20} />
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        </Button>
+      </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  popover: {
-    position: 'absolute',
-    bottom: verticalScale(-30),
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: verticalScale(BASE_PADDING_BOTTOM),
-    maxHeight: height * 0.9, // Increased max height to allow for keyboard
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 20,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    paddingHorizontal: scale(20),
+    paddingBottom: verticalScale(12),
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    flex: 1,
+    fontSize: scale(17),
+    fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
+    marginRight: scale(12),
   },
   closeButton: {
-    padding: 4,
+    width: scale(28),
+    height: scale(28),
+    borderRadius: scale(14),
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
-    flex: 1,
+    flexGrow: 0,
   },
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: scale(20),
+    paddingTop: verticalScale(16),
+    paddingBottom: verticalScale(12),
+  },
+  footer: {
+    paddingHorizontal: scale(20),
+    paddingBottom: verticalScale(20),
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   removalBadgeText: {
     color: '#F8FAFC',
     fontSize: 12,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
   },
   removalOverlay: {
     ...StyleSheet.absoluteFillObject,

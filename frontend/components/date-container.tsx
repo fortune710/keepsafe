@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
         fontSize: scale(12),
         color: '#1E293B',
         fontWeight: '500',
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
     },
     recapChip: {
         position: 'absolute',
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     recapChipText: {
         fontSize: scale(10),
         color: 'white',
-        fontFamily: 'Outfit-Bold',
+        fontFamily: 'Figtree-Bold',
         fontWeight: '700',
     },
 })

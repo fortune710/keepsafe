@@ -211,7 +211,7 @@ export function useAuth(): UseAuthResult {
       // Build redirect URL based on platform
       const redirectTo = Platform.OS === 'web'
         ? `${window.location.origin}/reset-password`
-        : `https://keepsafe.fortunealebiosu.dev/reset-password`
+        : `https://keepsafe.fortunealebiosu.tech/reset-password`
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,

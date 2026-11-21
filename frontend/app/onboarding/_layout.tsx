@@ -5,9 +5,9 @@ export default function OnboardingLayout() {
   const platform = Platform.OS;
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
+      <Stack.Screen name="index" options={{ animation: 'fade' }} />
       <Stack.Screen name="value-props" />
-      <Stack.Screen name="auth" />
+      <Stack.Screen name="auth" options={{ animation: 'fade' }} />
       <Stack.Screen name="invite" />
       <Stack.Screen
         name="forgot-password"

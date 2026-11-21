@@ -16,6 +16,8 @@ export const TABLES = {
   PHONE_NUMBER_UPDATES: 'phone_number_updates',
   ENTRY_REPORTS: 'entry_reports',
   MONTHLY_DUMPS: 'monthly_dumps',
+  TIME_CAPSULES: 'time_capsules',
+  DIARIES: 'diaries',
 } as const;
 
 // Storage Bucket Names
@@ -62,6 +64,7 @@ export const SCHEMA = {
   ENTRIES: {
     id: 'uuid PRIMARY KEY DEFAULT gen_random_uuid()',
     user_id: 'uuid REFERENCES profiles(id) NOT NULL',
+    diary_id: 'uuid REFERENCES diaries(id) NOT NULL',
     type: 'entry_type NOT NULL',
     shared_with: 'varchar[]',
     content_url: 'text',
@@ -74,6 +77,15 @@ export const SCHEMA = {
     created_at: 'timestamptz DEFAULT now()',
     updated_at: 'timestamptz DEFAULT now()',
 
+  },
+  DIARIES: {
+    id: 'uuid PRIMARY KEY DEFAULT gen_random_uuid()',
+    user_id: 'uuid REFERENCES profiles(id) NOT NULL',
+    name: 'text NOT NULL',
+    color: 'text NOT NULL',
+    cover_color: 'text NOT NULL',
+    is_default: 'boolean NOT NULL DEFAULT false',
+    created_at: 'timestamptz DEFAULT now()',
   },
   FRIENDSHIPS: {
     id: 'uuid PRIMARY KEY DEFAULT gen_random_uuid()',

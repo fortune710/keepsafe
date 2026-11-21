@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
     fontSize: 24,
     lineHeight: 30,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     letterSpacing: -0.4,
   },
   sourceSubtitle: {
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     color: '#C7D2E1',
     fontSize: 14,
     lineHeight: 20,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
   },
   sourceCloseButton: {
     width: 40,
@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: '#F8FAFC',
     fontSize: 15,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   confirmButtonDisabled: {
     opacity: 0.5,

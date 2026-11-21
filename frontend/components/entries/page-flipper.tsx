@@ -123,7 +123,7 @@ const PageFlipper = React.memo(forwardRef<PageFlipperRef, PageFlipperProps>(({
   const canInteract = useSharedValue(enableInteraction);
   
   // Auto flip timer
-  const autoFlipTimer = React.useRef<number | null>(null);
+  const autoFlipTimer = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const isAutoFlipActive = useSharedValue(autoFlip);
   
   const canvasWidth = (style?.width as number) || SCREEN_WIDTH;

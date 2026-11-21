@@ -1,5 +1,4 @@
 import { View, ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
-import { scale, verticalScale } from "react-native-size-matters";
 import { TextIcon, MusicIcon, MapPin } from "lucide-react-native";
 import { MediaCanvasItemType } from "@/types/capture";
 
@@ -25,10 +24,6 @@ const attachmentTypes: { type: MediaCanvasItemType; icon: React.ComponentType<an
 export default function EntryAttachmentList({ onSelectAttachment }: EntryAttachmentListProps) {
     return (
         <View>
-            <Text style={styles.attachmentText}>
-                Add Attachment
-            </Text>
-
             <View style={styles.attachmentSection}>
                 <ScrollView
                     horizontal
@@ -58,13 +53,6 @@ export default function EntryAttachmentList({ onSelectAttachment }: EntryAttachm
 }
 
 const styles = StyleSheet.create({
-    attachmentText: {
-        textAlign: "center",
-        fontSize: scale(16),
-        fontFamily: 'Outfit-SemiBold',
-        fontWeight: '500',
-        marginVertical: verticalScale(8)
-    },
     attachmentSection: {
         marginBottom: 32,
     },
@@ -91,7 +79,7 @@ const styles = StyleSheet.create({
     },
     attachmentName: {
         fontSize: 12,
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#64748B',
         fontWeight: '500',
         textAlign: 'center',

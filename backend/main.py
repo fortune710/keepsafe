@@ -7,8 +7,10 @@ from routers import phone_number
 from routers import monthly_dumps
 from routers import entries
 from routers import instagram
+from routers import spotify
 from config import settings
 from schedulers.scheduler_manager import SchedulerManager
+from schedulers.spotify_sync_scheduler import SpotifySyncScheduler
 import logging
 
 # Configure logging
@@ -48,6 +50,7 @@ app.add_middleware(RedactInstagramCallbackQuery)
 
 # Initialize background schedulers
 scheduler_manager = SchedulerManager()
+spotify_sync_scheduler = SpotifySyncScheduler()
 
 allowed_hosts = ["*"] if settings.ENVIRONMENT == "development" else settings.ALLOWED_HOSTS
 
@@ -68,6 +71,7 @@ app.include_router(phone_number.router)
 app.include_router(monthly_dumps.router)
 app.include_router(entries.router)
 app.include_router(instagram.router)
+app.include_router(spotify.router)
 
 @app.get("/")
 async def root():
@@ -104,6 +108,7 @@ async def startup_event():
     try:
         settings.validate_entry_report_email_config()
         scheduler_manager.start()
+        spotify_sync_scheduler.start()
         logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}", exc_info=True)
@@ -115,6 +120,7 @@ async def shutdown_event():
     logger.info("Shutting down application...")
     try:
         scheduler_manager.stop()
+        spotify_sync_scheduler.stop()
         logger.info("Application shutdown complete")
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}", exc_info=True)
