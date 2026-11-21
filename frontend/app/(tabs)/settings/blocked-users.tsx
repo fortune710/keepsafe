@@ -22,7 +22,7 @@ export default function BlockedUsersScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View className="flex flex-row items-center justify-between px-5 py-4" style={styles.header}>
+      <View style={styles.header}>
         <BackButton onPress={handleBack} />
         <Text style={styles.title}>Blocked Users</Text>
         <View style={{ width: 24 }} />

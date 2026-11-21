@@ -240,7 +240,7 @@ export default function EntryCommentsPopup({ isVisible, entryId, onClose }: Entr
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'fixed',
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
