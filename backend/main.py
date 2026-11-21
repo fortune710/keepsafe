@@ -6,6 +6,7 @@ from routers import user
 from routers import phone_number
 from routers import monthly_dumps
 from routers import entries
+from routers import instagram
 from config import settings
 from schedulers.scheduler_manager import SchedulerManager
 import logging
@@ -23,6 +24,27 @@ app = FastAPI(
     description="Backend API for KeepSafe with vector search capabilities",
     version="1.0.0"
 )
+
+
+class RedactInstagramCallbackQuery:
+    """Remove OAuth credentials from the application server's access log."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        async def send_without_query(message):
+            if message["type"] == "http.response.start":
+                scope["query_string"] = b""
+            await send(message)
+
+        if scope["type"] == "http" and scope["path"] == "/instagram/callback":
+            await self.app(scope, receive, send_without_query)
+        else:
+            await self.app(scope, receive, send)
+
+
+app.add_middleware(RedactInstagramCallbackQuery)
 
 # Initialize background schedulers
 scheduler_manager = SchedulerManager()
@@ -45,6 +67,7 @@ app.include_router(user.router)
 app.include_router(phone_number.router)
 app.include_router(monthly_dumps.router)
 app.include_router(entries.router)
+app.include_router(instagram.router)
 
 @app.get("/")
 async def root():
