@@ -10,3 +10,4 @@ class DatabaseTables(str, Enum):
     ENTRY_SHARES = "entry_shares"
     INVITES = "invites"
     PUSH_TOKENS = "push_tokens"
+    EXTERNAL_CONNECTIONS = "external_connections"
