@@ -66,7 +66,7 @@ export async function generateInviteCode(): Promise<string> {
 }
 
 export const generateDeepLinkUrl = () => {
-  const PROD_URL = "https://keepsafe.fortunealebiosu.dev";
+  const PROD_URL = "https://keepsafe.fortunealebiosu.tech";
   const DEV_URL = "exp://192.168.12.175:8081/--";
 
   console.log({ env: process.env.EXPO_PUBLIC_NODE_ENV })
@@ -200,6 +200,23 @@ export const formatMonthYear = (date: Date) => {
   return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 };
 
+export const getOrdinalSuffix = (day: number) => {
+  if (day >= 11 && day <= 13) return 'th';
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+};
+
+// e.g. "July 3rd" - no year.
+export const formatDateWithoutYear = (date: Date) => {
+  const month = date.toLocaleDateString('en-US', { month: 'long' });
+  const day = date.getDate();
+  return `${month} ${day}${getOrdinalSuffix(day)}`;
+};
+
 export const hasEntries = (day: number, monthDate: Date, entriesData: Record<string, number>) => {
   const dateKey = new Date(monthDate.getFullYear(), monthDate.getMonth(), day).toISOString().split('T')[0];
   return entriesData[dateKey] > 0;
@@ -239,6 +256,7 @@ export const getEntriesForDate = (
     is_private: entry.is_private,
     profile: entry.profile,
     user_id: entry.user_id,
+    diary_id: entry.diary_id,
     shared_with: entry.shared_with,
     shared_with_everyone: entry.shared_with_everyone,
     metadata: entry.metadata,

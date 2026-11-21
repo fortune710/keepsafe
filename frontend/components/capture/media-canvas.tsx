@@ -1,12 +1,12 @@
 import React, { RefObject, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, Pressable, TouchableOpacity, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import ViewShot from "react-native-view-shot";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { MediaType } from "@/types/media";
 import { MediaCanvasItem, MusicTag } from "@/types/capture";
-import { scale, verticalScale } from "react-native-size-matters";
+import { scale } from "react-native-size-matters";
 import { TextCanvasItem } from "./canvas/text-canvas-item";
 import { MusicCanvasItem } from "./canvas/music-canvas-item";
 import { StickerCanvasItem } from "./canvas/sticker-canvas-item";
@@ -15,6 +15,11 @@ import { X } from "lucide-react-native";
 import { Colors } from "@/lib/constants";
 import AudioPreviewPopover from "./music/audio-preview-popover";
 import { Portal } from 'react-native-portalize';
+
+// Matches the photo card height on the capture details screen so the
+// captured photo isn't cropped shorter than the frame that wraps it.
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MEDIA_PREVIEW_HEIGHT = SCREEN_HEIGHT * 0.5;
 
 interface MediaCanvasProps {
   type: MediaType,
@@ -191,7 +196,7 @@ function DraggableItem({ item, onTransformChange, onDeleteItem, onMusicPress }: 
 const styles = StyleSheet.create({
   mediaPreview: {
     width: '100%',
-    height: verticalScale(250),
+    height: MEDIA_PREVIEW_HEIGHT,
     flex: 1
   },
   textContainer: {

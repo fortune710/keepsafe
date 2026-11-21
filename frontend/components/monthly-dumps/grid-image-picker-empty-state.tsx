@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
   sourceEmptyTitle: {
     color: '#F8FAFC',
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     textAlign: 'center',
   },
   sourceEmptySubtitle: {
     color: '#C7D2E1',
     fontSize: 13,
-    fontFamily: 'Outfit-Regular',
+    fontFamily: 'Figtree-Regular',
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   sourceActionButtonText: {
     color: '#F8FAFC',
     fontSize: 14,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
     textAlign: 'center',
   },
 });

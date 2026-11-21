@@ -11,6 +11,7 @@ interface VideoCaptureParams {
     isCameraReady: boolean;
     cameraMode: 'picture' | 'video';
     captureMode: 'camera' | 'microphone';
+    isTimeCapsule: boolean;
     updateCameraMode: (mode: 'picture' | 'video') => void;
     updateCameraReady: (ready: boolean) => void;
 }
@@ -44,13 +45,14 @@ export function useVideoCapture({
     isCameraReady,
     cameraMode,
     captureMode,
+    isTimeCapsule,
     updateCameraMode,
     updateCameraReady
 }: VideoCaptureParams) {
     const [micPermission, requestMicPermission] = useMicrophonePermissions();
     const { isVideoRecording, setIsVideoRecording } = useCaptureContext();
     const [videoDuration, setVideoDuration] = useState(0);
-    const videoTimerRef = useRef<number | null>(null);
+    const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const videoStateRef = useRef<'idle' | 'starting' | 'failed'>('idle');
     const pendingVideoStartRef = useRef(false);
     const pendingVideoStopRef = useRef(false);
@@ -165,7 +167,8 @@ export function useVideoCapture({
                             captureId: capture.id,
                             type: capture.type,
                             uri: encodeURIComponent(capture.uri),
-                            duration: videoDuration.toString()
+                            duration: videoDuration.toString(),
+                            timeCapsule: isTimeCapsule ? 'true' : undefined,
                         }
                     });
                 }

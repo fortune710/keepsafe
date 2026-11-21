@@ -1,5 +1,4 @@
 import { View, ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
-import { scale, verticalScale } from "react-native-size-matters";
 import { Lock, Users } from "lucide-react-native";
 import { Image } from "expo-image";
 
@@ -24,10 +23,6 @@ interface Friend {
 export default function EntryShareList({ isPrivate, isEveryone, selectedFriends, handlePrivateToggle, handleEveryoneToggle, handleFriendToggle, friends }: EntryShareListProps) {
     return (
         <View>
-            <Text style={styles.privacyText}>
-                Share With
-            </Text>
-
             <View style={styles.privacySection}>
               
               <ScrollView 
@@ -92,13 +87,6 @@ export default function EntryShareList({ isPrivate, isEveryone, selectedFriends,
 }
 
 const styles = StyleSheet.create({
-    privacyText: {
-        textAlign: "center",
-        fontSize: scale(16),
-        fontFamily: 'Outfit-SemiBold',
-        fontWeight: '500',
-        marginVertical: verticalScale(8)
-    },
     privacySection: {
         marginBottom: 32,
     },
@@ -151,13 +139,13 @@ const styles = StyleSheet.create({
     },
     friendName: {
         fontSize: 12,
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#64748B',
         fontWeight: '500',
         textAlign: 'center',
     },
     selectedFriendName: {
-        fontFamily: 'Jost-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
         color: '#8B5CF6',
         fontWeight: '600',
     },

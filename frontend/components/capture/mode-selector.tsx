@@ -68,10 +68,10 @@ const styles = StyleSheet.create({
         fontSize: scale(10),
         color: '#94A3B8',
         marginLeft: 4,
-        fontFamily: 'Outfit-Medium',
+        fontFamily: 'Figtree-Medium',
     },
     activeModeText: {
         color: '#8B5CF6',
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
     },
 });

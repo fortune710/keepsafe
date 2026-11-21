@@ -17,6 +17,9 @@ interface UseSuggestedFriendsResult {
 /**
  * Custom hook to manage suggested friends fetching and storage sync.
  * Uses React Query for state management and device storage for persistence.
+ * Device storage itself expires after 60 minutes (see
+ * deviceStorage.setSuggestedFriends), so a stale local copy is never used
+ * past that TTL even if this hook re-mounts before a fresh fetch resolves.
  */
 export function useSuggestedFriends(): UseSuggestedFriendsResult {
   const { profile } = useAuthContext();

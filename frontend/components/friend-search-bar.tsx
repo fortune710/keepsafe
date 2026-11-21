@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import Animated, { FadeInDown, FadeOutUp, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Search, X } from 'lucide-react-native';
+import { Colors } from '@/lib/constants';
 
 const { width } = Dimensions.get('window');
 
@@ -19,13 +19,9 @@ export default function FriendSearchBar({
   placeholder = "Search friends by name or email..."
 }: FriendSearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const inputOpacity = useSharedValue(0);
 
   React.useEffect(() => {
-    if (isVisible) {
-      inputOpacity.value = withTiming(1, { duration: 300 });
-    } else {
-      inputOpacity.value = withTiming(0, { duration: 200 });
+    if (!isVisible) {
       setSearchQuery('');
     }
   }, [isVisible]);
@@ -41,21 +37,11 @@ export default function FriendSearchBar({
     onClose();
   };
 
-  const animatedInputStyle = useAnimatedStyle(() => {
-    return {
-      opacity: inputOpacity.value,
-    };
-  });
-
   if (!isVisible) return null;
 
   return (
-    <Animated.View
-      entering={FadeInDown.duration(300).springify().damping(20).stiffness(90)}
-      exiting={FadeOutUp.duration(200)}
-      style={styles.container}
-    >
-      <Animated.View style={[styles.searchContainer, animatedInputStyle]}>
+    <View style={styles.container}>
+      <View style={styles.searchContainer}>
         <Search color="#94A3B8" size={20} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
@@ -69,8 +55,8 @@ export default function FriendSearchBar({
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <X color="#64748B" size={20} />
         </TouchableOpacity>
-      </Animated.View>
-    </Animated.View>
+      </View>
+    </View>
   );
 }
 
@@ -81,8 +67,10 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: Colors.card,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },

@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     marginTop: 16,
   },
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 24,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginTop: 24,
     marginBottom: 8,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     fontSize: 16,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: 'white',
     fontSize: 16,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   content: {
     flex: 1,
@@ -265,14 +265,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 18,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     textAlign: 'center',
   },
@@ -313,14 +313,14 @@ const styles = StyleSheet.create({
   },
   inviterName: {
     fontSize: 24,
-    fontFamily: 'Outfit-Bold',
+    fontFamily: 'Figtree-Bold',
     color: '#1E293B',
     marginBottom: 4,
     textAlign: 'center',
   },
   inviterEmail: {
     fontSize: 16,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#64748B',
     marginBottom: 16,
     textAlign: 'center',
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#475569',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -368,19 +368,19 @@ const styles = StyleSheet.create({
   acceptButtonText: {
     color: 'white',
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   declineButtonText: {
     color: '#64748B',
     fontSize: 18,
-    fontFamily: 'Outfit-SemiBold',
+    fontFamily: 'Figtree-SemiBold',
   },
   footer: {
     alignItems: 'center',
   },
   footerText: {
     fontSize: 14,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Figtree-Regular',
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 20,
