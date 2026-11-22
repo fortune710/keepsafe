@@ -19,7 +19,25 @@ class InstagramConfigurationError(Exception):
 
 
 class InstagramProviderError(Exception):
-    pass
+    def __init__(self, message="Meta returned an invalid response", *, code=None, subcode=None, http_status=None):
+        super().__init__(message)
+        self.code = code
+        self.subcode = subcode
+        self.http_status = http_status
+
+
+def _meta_error(data, http_status=None):
+    error = data.get("error") if isinstance(data, dict) else None
+    if not isinstance(error, dict):
+        return InstagramProviderError("Meta returned an unexpected error response", http_status=http_status)
+    code = error.get("code")
+    subcode = error.get("error_subcode")
+    return InstagramProviderError(
+        "Meta rejected the request",
+        code=code if isinstance(code, int) and not isinstance(code, bool) else None,
+        subcode=subcode if isinstance(subcode, int) and not isinstance(subcode, bool) else None,
+        http_status=http_status,
+    )
 
 
 class InstagramAccountError(Exception):
@@ -30,7 +48,7 @@ def token_cipher():
     try:
         return Fernet(settings.INSTAGRAM_TOKEN_ENCRYPTION_KEY.encode("ascii"))
     except (ValueError, TypeError, UnicodeError, AttributeError) as exc:
-        raise InstagramConfigurationError from exc
+        raise InstagramConfigurationError("Instagram token encryption key is invalid") from exc
 
 
 def decrypt_access_token(connection):
@@ -41,19 +59,19 @@ def create_authorization_url(redis_client, user_id):
     token_cipher()
     url = urlsplit(settings.META_INSTAGRAM_LOGIN_URL)
     if url.scheme != "https" or url.hostname not in {"facebook.com", "www.facebook.com"}:
-        raise InstagramConfigurationError
+        raise InstagramConfigurationError("Instagram login URL is missing or invalid")
     query = [(key, value) for key, value in parse_qsl(url.query, keep_blank_values=True) if key != "state"]
     state = secrets.token_urlsafe(32)
     query.append(("state", state))
     if not redis_client.set(STATE_PREFIX + state, str(user_id), ex=STATE_TTL_SECONDS, nx=True):
-        raise InstagramConfigurationError
+        raise InstagramConfigurationError("Unable to reserve a unique OAuth state")
     return urlunsplit((url.scheme, url.netloc, url.path, urlencode(query), url.fragment))
 
 
 def _graph_get(path, params=None, access_token=None):
     version = settings.META_GRAPH_API_VERSION
     if not version or not version.startswith("v") or not all(part.isdigit() for part in version[1:].split(".")):
-        raise InstagramConfigurationError
+        raise InstagramConfigurationError("Meta Graph API version is missing or invalid")
     url = f"https://graph.facebook.com/{version}/{path}"
     if params:
         url += "?" + urlencode(params)
@@ -61,16 +79,26 @@ def _graph_get(path, params=None, access_token=None):
     try:
         with urlopen(Request(url, headers=headers), timeout=15) as response:
             data = json.load(response)
-        if not isinstance(data, dict) or "error" in data:
+        if isinstance(data, dict) and "error" in data:
+            raise _meta_error(data)
+        if not isinstance(data, dict):
             raise InstagramProviderError
         return data
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
-        raise InstagramProviderError from exc
+    except HTTPError as exc:
+        try:
+            payload = json.loads(exc.read(65536))
+        except (ValueError, OSError):
+            payload = None
+        raise _meta_error(payload, exc.code) from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise InstagramProviderError("Unable to reach Meta") from exc
+    except ValueError as exc:
+        raise InstagramProviderError("Meta returned invalid JSON") from exc
 
 
 def exchange_code(code):
     if not all((settings.META_APP_ID, settings.META_APP_SECRET, settings.META_INSTAGRAM_REDIRECT_URI)):
-        raise InstagramConfigurationError
+        raise InstagramConfigurationError("Meta app credentials or callback URL are missing")
     result = _graph_get("oauth/access_token", {
         "client_id": settings.META_APP_ID,
         "client_secret": settings.META_APP_SECRET,
@@ -78,7 +106,7 @@ def exchange_code(code):
         "code": code,
     })
     if not isinstance(result.get("access_token"), str) or not result["access_token"]:
-        raise InstagramProviderError
+        raise InstagramProviderError("Meta did not return an access token")
     return result
 
 
@@ -93,19 +121,19 @@ def get_single_account(access_token):
         result = _graph_get("me/assigned_instagram_accounts", params, access_token)
         data = result.get("data")
         if not isinstance(data, list) or any(not isinstance(item, dict) or not item.get("id") for item in data):
-            raise InstagramProviderError
+            raise InstagramProviderError("Meta returned invalid Instagram account data")
         accounts.update(str(item["id"]) for item in data)
         if len(accounts) > 1:
             raise InstagramAccountError("More than one Instagram account is available")
         paging = result.get("paging") or {}
         if not isinstance(paging, dict):
-            raise InstagramProviderError
+            raise InstagramProviderError("Meta returned invalid account pagination")
         if not paging.get("next"):
             break
         cursors = paging.get("cursors") or {}
         cursor = cursors.get("after") if isinstance(cursors, dict) else None
         if not isinstance(cursor, str) or not cursor or cursor in seen_cursors:
-            raise InstagramProviderError
+            raise InstagramProviderError("Meta returned an invalid or repeated pagination cursor")
         seen_cursors.add(cursor)
     if not accounts:
         raise InstagramAccountError("No Instagram account is available")
@@ -129,5 +157,5 @@ def make_connection(account_id, token_response):
                 raise ValueError
             connection["expires_at"] = (now + timedelta(seconds=seconds)).isoformat()
         except (ValueError, TypeError, OverflowError) as exc:
-            raise InstagramProviderError from exc
+            raise InstagramProviderError("Meta returned an invalid token expiry") from exc
     return connection
