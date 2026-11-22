@@ -19,7 +19,10 @@ const mockKeepsafeUsers = [
 ];
 
 describe('useContactSearch', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(QueryClientProvider, { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) }, children);
+    const wrapper = ({ children }: { children: React.ReactNode }) => {
+        const [client] = React.useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }));
+        return React.createElement(QueryClientProvider, { client }, children);
+    };
     beforeEach(() => {
         (ContactsService.getDeviceContacts as jest.Mock).mockResolvedValue(mockContacts);
         (FriendService.getSuggestedFriendsFromContacts as jest.Mock).mockResolvedValue(mockKeepsafeUsers);

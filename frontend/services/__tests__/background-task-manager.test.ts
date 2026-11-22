@@ -4,6 +4,7 @@ import { EntryService } from '../entry-service';
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: null }) }) }) }),
     storage: {
       from: () => ({
         upload: jest.fn().mockResolvedValue({ data: { path: 'file.jpg' }, error: null }),

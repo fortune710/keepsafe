@@ -8,7 +8,7 @@ export const Colors = {
   accent: '#8B5CF6', // same as primary for now
 
   // UI Surfaces
-  background: '#F0F9FF', // light blue background seen across screens
+  background: '#f8fcff',
   surface: '#F8FAFC', // slate-50
   card: '#F1F5F9', // slate-100
   mutedSurface: '#F3F4F6', // gray-100

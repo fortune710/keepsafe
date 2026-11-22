@@ -10,8 +10,6 @@ export interface TypewriterProps {
   delay?: number;
   /** Delay in milliseconds before starting to type the next text */
   pauseDelay?: number;
-  /** Optional className for web compatibility */
-  className?: string;
   /** Optional style for the text */
   style?: TextStyle;
   /** Callback fired when all texts have been typed (if loop is false) */
@@ -23,7 +21,6 @@ export default function Typewriter({
   loop = false,
   delay = 50,
   pauseDelay = 2000,
-  className,
   style,
   onComplete,
 }: TypewriterProps) {
@@ -140,7 +137,7 @@ export default function Typewriter({
   }, []);
 
   return (
-    <Text className={className} style={[styles.text, style]}>
+    <Text style={[styles.text, style]}>
       {displayText}
       {showCursor && <Text style={styles.cursor}>|</Text>}
     </Text>

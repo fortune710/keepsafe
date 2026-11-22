@@ -11,6 +11,7 @@ interface VideoCaptureParams {
     isCameraReady: boolean;
     cameraMode: 'picture' | 'video';
     captureMode: 'camera' | 'microphone';
+    isTimeCapsule: boolean;
     updateCameraMode: (mode: 'picture' | 'video') => void;
     updateCameraReady: (ready: boolean) => void;
 }
@@ -44,6 +45,7 @@ export function useVideoCapture({
     isCameraReady,
     cameraMode,
     captureMode,
+    isTimeCapsule,
     updateCameraMode,
     updateCameraReady
 }: VideoCaptureParams) {
@@ -165,7 +167,8 @@ export function useVideoCapture({
                             captureId: capture.id,
                             type: capture.type,
                             uri: encodeURIComponent(capture.uri),
-                            duration: videoDuration.toString()
+                            duration: videoDuration.toString(),
+                            timeCapsule: isTimeCapsule ? 'true' : undefined,
                         }
                     });
                 }

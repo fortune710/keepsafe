@@ -41,13 +41,11 @@ describe('ForgotPasswordScreen', () => {
         expect(getByText('Send Reset Link')).toBeTruthy();
     });
 
-    it('shows error toast if email is empty', () => {
+    it('disables submission when email is empty', () => {
         const { getByText } = render(<ForgotPasswordScreen />);
-
         fireEvent.press(getByText('Send Reset Link'));
-
-        expect(mockShowToast).not.toHaveBeenCalled();
         expect(mockResetPasswordForEmail).not.toHaveBeenCalled();
+        expect(mockShowToast).not.toHaveBeenCalled();
     });
 
     it('shows error toast if email is invalid', () => {

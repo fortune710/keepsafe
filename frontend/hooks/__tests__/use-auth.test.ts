@@ -50,7 +50,7 @@ describe('useAuth Hook', () => {
             const error = { message: 'Network error' };
             (supabase.auth.resetPasswordForEmail as jest.Mock).mockResolvedValue({ error });
 
-            let response;
+            let response: { error: Error | null } = { error: null };
             await act(async () => {
                 response = await result.current.resetPasswordForEmail('test@example.com');
             });
@@ -83,7 +83,7 @@ describe('useAuth Hook', () => {
             const error = { message: 'Weak password' };
             (supabase.auth.updateUser as jest.Mock).mockResolvedValue({ error });
 
-            let response;
+            let response: { error: Error | null } = { error: null };
             await act(async () => {
                 response = await result.current.updatePassword('weak');
             });

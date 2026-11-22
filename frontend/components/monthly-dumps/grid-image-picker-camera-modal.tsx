@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   cameraLoadingText: {
     color: '#F8FAFC',
     fontSize: 15,
-    fontFamily: 'Outfit-Medium',
+    fontFamily: 'Figtree-Medium',
   },
   cameraControls: {
     position: 'absolute',

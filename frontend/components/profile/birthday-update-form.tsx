@@ -1,15 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
-import { Check, ChevronDown } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { useProfileOperations } from '@/hooks/use-profile-operations';
 import { scale, verticalScale } from 'react-native-size-matters';
-import { useAuthContext } from '@/providers/auth-provider';
+import type { UpdateFormHandle, UpdateFormState } from './form-handle';
 
 interface BirthdayUpdateFormProps {
   currentValue: string;
   onSuccess?: (message: string) => void;
   onError?: (message: string) => void;
   onClose: () => void;
+  onStateChange?: (state: UpdateFormState) => void;
 }
 
 interface DateSelectProps {
@@ -85,166 +86,159 @@ function DateSelect({ label, value, options, onSelect }: DateSelectProps) {
   );
 }
 
-export function BirthdayUpdateForm({ currentValue, onSuccess, onError, onClose }: BirthdayUpdateFormProps) {
-  const currentDate = useMemo(() => {
-    if (currentValue) {
-      // `currentValue` is stored as a date-only string: "YYYY-MM-DD"
-      const [yearStr, monthStr, dayStr] = currentValue.split('-');
-      const year = Number(yearStr);
-      const month = Number(monthStr);
-      const day = Number(dayStr);
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        return {
-          year,
-          month,
-          day
-        };
+export const BirthdayUpdateForm = forwardRef<UpdateFormHandle, BirthdayUpdateFormProps>(
+  ({ currentValue, onSuccess, onError, onClose, onStateChange }, ref) => {
+    const currentDate = useMemo(() => {
+      if (currentValue) {
+        // `currentValue` is stored as a date-only string: "YYYY-MM-DD"
+        const [yearStr, monthStr, dayStr] = currentValue.split('-');
+        const year = Number(yearStr);
+        const month = Number(monthStr);
+        const day = Number(dayStr);
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          return {
+            year,
+            month,
+            day
+          };
+        }
       }
-    }
-    const today = new Date();
-    return {
-      year: today.getFullYear(),
-      month: today.getMonth() + 1,
-      day: today.getDate()
+      const today = new Date();
+      return {
+        year: today.getFullYear(),
+        month: today.getMonth() + 1,
+        day: today.getDate()
+      };
+    }, [currentValue]);
+
+    const [year, setYear] = useState(currentDate.year);
+    const [month, setMonth] = useState(currentDate.month);
+    const [day, setDay] = useState(currentDate.day);
+
+    const { updateProfile, isLoading } = useProfileOperations();
+
+    // Generate year options (last 80 years from current year)
+    const yearOptions = useMemo(() => {
+      const currentYear = new Date().getFullYear();
+      const years = [];
+      for (let i = 0; i <= 80; i++) {
+        const yearValue = currentYear - i;
+        years.push({ value: yearValue, label: yearValue.toString() });
+      }
+      return years;
+    }, []);
+
+    // Generate month options
+    const monthOptions = useMemo(() => {
+      const months = [
+        { value: 1, label: 'January' },
+        { value: 2, label: 'February' },
+        { value: 3, label: 'March' },
+        { value: 4, label: 'April' },
+        { value: 5, label: 'May' },
+        { value: 6, label: 'June' },
+        { value: 7, label: 'July' },
+        { value: 8, label: 'August' },
+        { value: 9, label: 'September' },
+        { value: 10, label: 'October' },
+        { value: 11, label: 'November' },
+        { value: 12, label: 'December' },
+      ];
+      return months;
+    }, []);
+
+    // Generate day options based on selected month and year
+    const dayOptions = useMemo(() => {
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const days = [];
+      for (let i = 1; i <= daysInMonth; i++) {
+        days.push({ value: i, label: i.toString() });
+      }
+      return days;
+    }, [year, month]);
+
+    // Adjust day if it's invalid for the selected month/year (e.g., Feb 30)
+    const adjustedDay = useMemo(() => {
+      const maxDay = new Date(year, month, 0).getDate();
+      return day > maxDay ? maxDay : day;
+    }, [year, month, day]);
+
+    // Handlers that adjust day when month/year changes
+    const handleMonthChange = (newMonth: number) => {
+      setMonth(newMonth);
+      const maxDay = new Date(year, newMonth, 0).getDate();
+      if (day > maxDay) {
+        setDay(maxDay);
+      }
     };
-  }, [currentValue]);
 
-  console.log({ currentDate });
+    const handleYearChange = (newYear: number) => {
+      setYear(newYear);
+      const maxDay = new Date(newYear, month, 0).getDate();
+      if (day > maxDay) {
+        setDay(maxDay);
+      }
+    };
 
-  const [year, setYear] = useState(currentDate.year);
-  const [month, setMonth] = useState(currentDate.month);
-  const [day, setDay] = useState(currentDate.day);
-  
-  const { updateProfile, isLoading } = useProfileOperations();
+    const isValid = year > 0 && month > 0 && adjustedDay > 0;
 
-  // Generate year options (last 80 years from current year)
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let i = 0; i <= 80; i++) {
-      const yearValue = currentYear - i;
-      years.push({ value: yearValue, label: yearValue.toString() });
-    }
-    return years;
-  }, []);
+    const handleSave = async () => {
+      const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(adjustedDay).padStart(2, '0')}`;
 
-  // Generate month options
-  const monthOptions = useMemo(() => {
-    const months = [
-      { value: 1, label: 'January' },
-      { value: 2, label: 'February' },
-      { value: 3, label: 'March' },
-      { value: 4, label: 'April' },
-      { value: 5, label: 'May' },
-      { value: 6, label: 'June' },
-      { value: 7, label: 'July' },
-      { value: 8, label: 'August' },
-      { value: 9, label: 'September' },
-      { value: 10, label: 'October' },
-      { value: 11, label: 'November' },
-      { value: 12, label: 'December' },
-    ];
-    return months;
-  }, []);
+      const result = await updateProfile({
+        birthday: formattedDate
+      });
 
-  // Generate day options based on selected month and year
-  const dayOptions = useMemo(() => {
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const days = [];
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push({ value: i, label: i.toString() });
-    }
-    return days;
-  }, [year, month]);
+      if (result.success) {
+        onSuccess && onSuccess(result.message);
+        onClose();
+      } else {
+        onError && onError(result.message);
+      }
+    };
 
-  // Adjust day if it's invalid for the selected month/year (e.g., Feb 30)
-  const adjustedDay = useMemo(() => {
-    const maxDay = new Date(year, month, 0).getDate();
-    return day > maxDay ? maxDay : day;
-  }, [year, month, day]);
+    useImperativeHandle(ref, () => ({ save: handleSave }));
 
-  // Handlers that adjust day when month/year changes
-  const handleMonthChange = (newMonth: number) => {
-    setMonth(newMonth);
-    const maxDay = new Date(year, newMonth, 0).getDate();
-    if (day > maxDay) {
-      setDay(maxDay);
-    }
-  };
+    useEffect(() => {
+      onStateChange?.({ isValid, isLoading });
+    }, [isValid, isLoading, onStateChange]);
 
-  const handleYearChange = (newYear: number) => {
-    setYear(newYear);
-    const maxDay = new Date(newYear, month, 0).getDate();
-    if (day > maxDay) {
-      setDay(maxDay);
-    }
-  };
-
-  const isValid = year > 0 && month > 0 && adjustedDay > 0;
-
-  const handleSave = async () => {
-    const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(adjustedDay).padStart(2, '0')}`;
-
-    const result = await updateProfile({
-      birthday: formattedDate
-    });
-    
-    if (result.success) {
-      onSuccess && onSuccess(result.message);
-      onClose();
-    } else {
-      onError && onError(result.message);
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.selectsContainer}>
-        <DateSelect
-          label="Month"
-          value={month}
-          options={monthOptions}
-          onSelect={handleMonthChange}
-        />
-        <DateSelect
-          label="Day"
-          value={adjustedDay}
-          options={dayOptions}
-          onSelect={setDay}
-        />
-        <DateSelect
-          label="Year"
-          value={year}
-          options={yearOptions}
-          onSelect={handleYearChange}
-        />
+    return (
+      <View style={styles.container}>
+        <View style={styles.selectsContainer}>
+          <DateSelect
+            label="Month"
+            value={month}
+            options={monthOptions}
+            onSelect={handleMonthChange}
+          />
+          <DateSelect
+            label="Day"
+            value={adjustedDay}
+            options={dayOptions}
+            onSelect={setDay}
+          />
+          <DateSelect
+            label="Year"
+            value={year}
+            options={yearOptions}
+            onSelect={handleYearChange}
+          />
+        </View>
       </View>
+    );
+  }
+);
 
-      <TouchableOpacity 
-        style={[
-          styles.saveButton,
-          (!isValid || isLoading) && styles.saveButtonDisabled
-        ]} 
-        onPress={handleSave}
-        disabled={!isValid || isLoading}
-      >
-        <Check color="white" size={20} />
-        <Text style={styles.saveButtonText}>
-          {isLoading ? 'Saving...' : 'Save Changes'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+BirthdayUpdateForm.displayName = 'BirthdayUpdateForm';
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
+    marginBottom: 8,
   },
   selectsContainer: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
     alignItems: 'flex-start',
     justifyContent: 'center'
   },
@@ -331,22 +325,4 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     fontWeight: '600',
   },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#8B5CF6',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
 });
-

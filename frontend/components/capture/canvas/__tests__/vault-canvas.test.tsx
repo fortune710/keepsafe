@@ -1,3 +1,6 @@
+jest.mock('@/components/entries/entry-audio-view', () => ({ __esModule: true, default: () => null }));
+jest.mock('expo-video', () => ({ VideoView: () => null }));
+jest.mock('@/components/entries/entry-video-view', () => ({ __esModule: true, default: () => null }));
 import { render } from "@testing-library/react-native";
 import VaultCanvas from "@/components/capture/canvas/vault-canvas";
 import { MediaType } from "@/types/media";

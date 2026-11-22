@@ -11,3 +11,8 @@ class DatabaseTables(str, Enum):
     INVITES = "invites"
     PUSH_TOKENS = "push_tokens"
     EXTERNAL_CONNECTIONS = "external_connections"
+    TIME_CAPSULES = "time_capsules"
+    VISIBLE_ENTRIES = "visible_entries"
+    SPOTIFY_CONNECTIONS = "spotify_connections"
+    SPOTIFY_LISTENING_EVENTS = "spotify_listening_events"
+    SPOTIFY_OAUTH_STATES = "spotify_oauth_states"

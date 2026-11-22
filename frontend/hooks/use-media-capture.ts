@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { MediaCapture, MediaType } from '@/types/media';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,63 +12,86 @@ interface UseCaptureResult {
   isCapturing: boolean;
   capturedMedia: MediaCapture | null;
   recordingDuration: number;
+  meteringLevel: number;
   startAudioRecording: () => Promise<void>;
   stopAudioRecording: () => Promise<MediaCapture | null>;
-  startVideoRecording: (cameraRef: React.RefObject<CameraView | null>) => Promise<{ data: MediaCapture, cleanup: Function } | undefined>;
-  stopVideoRecording: (cameraRef: React.RefObject<CameraView | null>) => Promise<void>;
+  startVideoRecording: (
+    cameraRef: React.RefObject<CameraView | null>,
+  ) => Promise<{ data: MediaCapture; cleanup: Function } | undefined>;
+  stopVideoRecording: (
+    cameraRef: React.RefObject<CameraView | null>,
+  ) => Promise<void>;
   uploadMedia: (mediaType: MediaType) => Promise<MediaCapture | null>;
   clearCapture: () => void;
 }
 
 export function useMediaCapture(): UseCaptureResult {
-  const { isCapturing, setIsCapturing } = useCaptureContext();
+  const {
+    isCapturing,
+    setIsCapturing,
+    recordingDuration,
+    setRecordingDuration,
+    meteringLevel,
+    setMeteringLevel,
+  } = useCaptureContext();
   const [capturedMedia, setCapturedMedia] = useState<MediaCapture | null>(null);
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(recorder, 500);
-  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const recorderState = useAudioRecorderState(recorder, 100);
+  useEffect(() => {
+    if (!recorderState.isRecording) return;
+    setRecordingDuration(Math.floor(recorderState.durationMillis / 1000));
+    setMeteringLevel(Math.max(0, Math.min(1, ((recorderState.metering ?? -60) + 60) / 60)));
+  }, [recorderState.isRecording, recorderState.durationMillis, recorderState.metering, setRecordingDuration, setMeteringLevel]);
 
   const generateId = () => {
     return Crypto.randomUUID();
   };
 
-  const startVideoRecording = useCallback(async (cameraRef: React.RefObject<CameraView | null>) => {
-    setIsCapturing(true);
-    setRecordingDuration(0);
+  const startVideoRecording = useCallback(
+    async (cameraRef: React.RefObject<CameraView | null>) => {
+      setIsCapturing(true);
+      setRecordingDuration(0);
 
-    try {
-      const capture = await MediaService.startVideoRecording(cameraRef);
+      try {
+        const capture = await MediaService.startVideoRecording(cameraRef);
 
-      if (!capture) {
-        console.warn("Error with camera or recorsing may not have started yet");
-        return;
+        if (!capture) {
+          console.warn(
+            'Error with camera or recorsing may not have started yet',
+          );
+          return;
+        }
+
+        // Start duration timer
+        const timer = setInterval(() => {
+          setRecordingDuration((prev) => prev + 1);
+        }, 1000);
+
+        const newCapture: MediaCapture = {
+          ...capture,
+          duration: recordingDuration,
+        };
+
+        return {
+          data: newCapture,
+          cleanup: () => clearInterval(timer),
+        };
+      } catch (error) {
+        console.error('Error starting recording', error);
+        Alert.alert('Error starting recording' + error);
+      } finally {
+        setIsCapturing(false);
       }
+    },
+    [],
+  );
 
-      // Start duration timer
-      const timer = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-
-      const newCapture: MediaCapture = {
-        ...capture,
-        duration: recordingDuration,
-      }
-
-      return {
-        data: newCapture,
-        cleanup: () => clearInterval(timer),
-      }
-    } catch (error) {
-      console.error('Error starting recording', error);
-      Alert.alert('Error starting recording' + error);
-    } finally {
-      setIsCapturing(false);
-    }
-
-  }, []);
-
-  const stopVideoRecording = useCallback(async (cameraRef: React.RefObject<CameraView | null>) => {
-    await MediaService.stopVideoRecording(cameraRef);
-  }, []);
+  const stopVideoRecording = useCallback(
+    async (cameraRef: React.RefObject<CameraView | null>) => {
+      await MediaService.stopVideoRecording(cameraRef);
+    },
+    [],
+  );
 
   const startAudioRecording = useCallback(async () => {
     setCapturedMedia(null);
@@ -100,6 +123,7 @@ export function useMediaCapture(): UseCaptureResult {
       const capture: MediaCapture = { id: generateId(), type: 'audio', uri: recorder.uri, duration, timestamp: new Date() };
       setCapturedMedia(capture);
       setRecordingDuration(0);
+      setMeteringLevel(0);
       return capture;
     } catch (error) {
       console.error('Failed to stop recording:', error);
@@ -110,74 +134,84 @@ export function useMediaCapture(): UseCaptureResult {
     }
   }, [recorder, setIsCapturing]);
 
-  const uploadMedia = useCallback(async (mediaType: MediaType): Promise<MediaCapture | null> => {
-    try {
-      // Return early for audio type
-      if (mediaType === 'audio') {
-        Alert.alert('Audio Not Supported', 'Audio upload from library is not currently supported. Please use the microphone to record audio.');
+  const uploadMedia = useCallback(
+    async (mediaType: MediaType): Promise<MediaCapture | null> => {
+      try {
+        // Return early for audio type
+        if (mediaType === 'audio') {
+          Alert.alert(
+            'Audio Not Supported',
+            'Audio upload from library is not currently supported. Please use the microphone to record audio.',
+          );
+          return null;
+        }
+
+        // Request media library permissions
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission Required',
+            'Please grant media library permission to access photos and videos.',
+          );
+          return null;
+        }
+
+        // Launch the image/video picker
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images', 'videos'],
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.7, // Highest quality
+          allowsMultipleSelection: false,
+          selectionLimit: 1,
+        });
+
+        if (result.canceled) {
+          return null;
+        }
+
+        const asset = result.assets[0];
+        const timestamp = new Date();
+
+        // Determine the capture type based on the selected asset
+        let captureType: MediaType;
+        if (asset.type === 'image') {
+          captureType = 'photo';
+        } else if (asset.type === 'video') {
+          captureType = 'video';
+        } else {
+          throw new Error('Unsupported media type');
+        }
+
+        const uploadedCapture: MediaCapture = {
+          id: generateId(),
+          type: captureType,
+          uri: asset.uri,
+          duration: asset?.duration || undefined,
+          timestamp,
+          metadata: {
+            width: asset.width,
+            height: asset.height,
+          },
+        };
+
+        setCapturedMedia(uploadedCapture);
+        return uploadedCapture;
+      } catch (error) {
+        console.error('Failed to pick media:', error);
+        Alert.alert('Error', 'Failed to access media library');
         return null;
       }
-
-      // Request media library permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant media library permission to access photos and videos.');
-        return null;
-      }
-
-      // Launch the image/video picker
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images", "videos"],
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.7, // Highest quality
-        allowsMultipleSelection: false,
-        selectionLimit: 1,
-      });
-
-      if (result.canceled) {
-        return null;
-      }
-
-      const asset = result.assets[0];
-      const timestamp = new Date();
-
-      // Determine the capture type based on the selected asset
-      let captureType: MediaType;
-      if (asset.type === 'image') {
-        captureType = 'photo';
-      } else if (asset.type === 'video') {
-        captureType = 'video';
-      } else {
-        throw new Error('Unsupported media type');
-      }
-
-      const uploadedCapture: MediaCapture = {
-        id: generateId(),
-        type: captureType,
-        uri: asset.uri,
-        duration: asset?.duration || undefined,
-        timestamp,
-        metadata: {
-          width: asset.width,
-          height: asset.height,
-        },
-      };
-
-      setCapturedMedia(uploadedCapture);
-      return uploadedCapture;
-    } catch (error) {
-      console.error('Failed to pick media:', error);
-      Alert.alert('Error', 'Failed to access media library');
-      return null;
-    }
-  }, [generateId]);
-
+    },
+    [generateId],
+  );
 
   const clearCapture = useCallback(async () => {
     setCapturedMedia(null);
     setIsCapturing(false);
     setRecordingDuration(0);
+    setMeteringLevel(0);
     try {
       if (recorder.isRecording) await recorder.stop();
       await setAudioModeAsync({ allowsRecording: false });
@@ -189,7 +223,8 @@ export function useMediaCapture(): UseCaptureResult {
   return {
     isCapturing,
     capturedMedia,
-    recordingDuration: recorderState.isRecording ? Math.floor(recorderState.durationMillis / 1000) : recordingDuration,
+    recordingDuration,
+    meteringLevel,
     startAudioRecording,
     stopAudioRecording,
     startVideoRecording,

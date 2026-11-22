@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: scale(24),
-        fontFamily: 'Outfit-Bold',
+        fontFamily: 'Figtree-Bold',
         color: '#1E293B',
         marginBottom: 8,
         textAlign: 'center',
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
         color: '#64748B',
         textAlign: 'center',
         lineHeight: 22,
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         paddingHorizontal: 16,
     },
     formContainer: {
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         borderWidth: 1,
         borderColor: '#E2E8F0',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
     },
     eyeButton: {
         position: 'absolute',
@@ -233,19 +233,19 @@ const styles = StyleSheet.create({
     hintText: {
         fontSize: 13,
         color: '#F59E0B',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         paddingHorizontal: 4,
     },
     errorText: {
         fontSize: 13,
         color: '#EF4444',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         paddingHorizontal: 4,
     },
     successText: {
         fontSize: 13,
         color: '#059669',
-        fontFamily: 'Outfit-Regular',
+        fontFamily: 'Figtree-Regular',
         paddingHorizontal: 4,
     },
     resetButton: {
@@ -262,6 +262,6 @@ const styles = StyleSheet.create({
     resetButtonText: {
         color: 'white',
         fontSize: 18,
-        fontFamily: 'Outfit-SemiBold',
+        fontFamily: 'Figtree-SemiBold',
     },
 });
