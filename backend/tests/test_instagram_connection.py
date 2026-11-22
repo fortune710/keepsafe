@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from io import BytesIO
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
@@ -159,3 +160,84 @@ def test_invalid_encryption_key_fails_closed(setup, monkeypatch):
     monkeypatch.setattr(service.settings, "INSTAGRAM_TOKEN_ENCRYPTION_KEY", "bad-key")
     assert client.get("/instagram/connect").status_code == 503
     assert redis.values == {}
+
+
+def test_structured_logs_cover_oauth_outcomes_without_secrets(setup, monkeypatch, caplog):
+    client, redis = setup
+    caplog.set_level(logging.INFO, logger=instagram.__name__)
+
+    state = begin(client)["state"][0]
+    assert client.get("/instagram/callback", params={"state": state, "error": "secret-provider-error"}).status_code == 400
+    assert client.get("/instagram/callback", params={"state": "private-state", "code": "private-code"}).status_code == 400
+    monkeypatch.setattr(instagram, "get_redis_client", lambda: None)
+    assert client.get("/instagram/connect").status_code == 503
+    client.app.dependency_overrides.clear()
+    assert client.get("/instagram/connect").status_code in (401, 403)
+
+    records = [record for record in caplog.records if getattr(record, "event", None) == "instagram_oauth_request"]
+    assert [(record.operation, record.outcome) for record in records] == [
+        ("connect", "success"),
+        ("callback", "authorization_incomplete"),
+        ("callback", "invalid_state"),
+        ("connect", "redis_unavailable"),
+        ("connect", "authentication_failed"),
+    ]
+    for record in records:
+        assert record.request_id and record.duration_ms >= 0
+        assert not any(secret in str(record.__dict__) for secret in (
+            state, "private-state", "private-code", "secret-provider-error", "user-1"
+        ))
+
+
+def test_structured_log_reaches_posthog_logging_handler(setup, monkeypatch):
+    from utils import logging as posthog_logging
+
+    client, _ = setup
+    received = []
+    monkeypatch.setattr(posthog_logging.handler, "emit", lambda record: received.append(record))
+    begin(client)
+
+    record = next(record for record in received if getattr(record, "event", None) == "instagram_oauth_request")
+    attributes = posthog_logging.handler._get_attributes(record)
+    assert attributes["message"] == "Instagram connection request completed successfully"
+    assert "diagnostic_message" not in attributes
+
+
+def test_provider_error_logs_safe_meta_codes(setup, monkeypatch, caplog):
+    client, _ = setup
+    caplog.set_level(logging.INFO, logger=instagram.__name__)
+    state = begin(client)["state"][0]
+    error = service._meta_error({"error": {
+        "message": "sensitive token secret-token",
+        "code": 190,
+        "error_subcode": 123,
+    }}, 400)
+    monkeypatch.setattr(service, "exchange_code", lambda code: (_ for _ in ()).throw(error))
+
+    assert client.get("/instagram/callback", params={"state": state, "code": "private-code"}).status_code == 502
+    record = next(record for record in caplog.records if getattr(record, "outcome", None) == "provider_error")
+    assert record.diagnostic_message == "Meta rejected the request during token exchange"
+    assert (record.meta_error_code, record.meta_error_subcode, record.meta_http_status) == (190, 123, 400)
+    assert "secret-token" not in str(record.__dict__)
+
+
+def test_database_error_logs_code_without_exception_details(setup, monkeypatch, caplog):
+    client, _ = setup
+    caplog.set_level(logging.INFO, logger=instagram.__name__)
+    state = begin(client)["state"][0]
+    monkeypatch.setattr(service, "exchange_code", lambda code: {"access_token": "secret-token"})
+    monkeypatch.setattr(service, "get_single_account", lambda token: "ig-1")
+    monkeypatch.setattr(instagram, "get_supabase_client", lambda: object())
+
+    class DatabaseError(Exception):
+        code = "23505"
+
+    def fail_save(*args):
+        raise DatabaseError("private connection data")
+
+    monkeypatch.setattr(ExternalConnectionsController, "save_instagram", fail_save)
+    assert client.get("/instagram/callback", params={"state": state, "code": "private-code"}).status_code == 503
+    record = next(record for record in caplog.records if getattr(record, "outcome", None) == "connection_storage_error")
+    assert record.diagnostic_message == "Unexpected error during connection persistence"
+    assert record.database_error_code == "23505"
+    assert "private connection data" not in str(record.__dict__)
