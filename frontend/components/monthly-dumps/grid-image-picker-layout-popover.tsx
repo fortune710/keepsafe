@@ -138,11 +138,11 @@ const styles = StyleSheet.create({
     borderColor: '#111B2C',
   },
   popoverOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 40,
   },
   popoverBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(7,17,31,0.34)',
   },
   layoutPopover: {

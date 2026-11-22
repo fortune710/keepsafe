@@ -1,8 +1,8 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
-import { PlatformPressable } from '@react-navigation/elements';
+import { getFocusedRouteNameFromRoute } from 'expo-router/react-navigation';
+import { PlatformPressable } from 'expo-router/react-navigation';
 import { Colors } from '@/lib/constants';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { CalendarIcon } from '@/components/icons/calendar-icon';
@@ -61,7 +61,7 @@ export default function TabsLayout() {
           </View>
         ),
         tabBarButton: (props) => (
-          <PlatformPressable {...props} style={[props.style, styles.tabButton]} />
+          <PlatformPressable {...props} pressColor={typeof props.pressColor === 'string' ? props.pressColor : undefined} style={[props.style, styles.tabButton]} />
         ),
       }}
     >
@@ -70,7 +70,7 @@ export default function TabsLayout() {
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
-              <CalendarIcon color={color} size={TAB_ICON_SIZE} />
+              <CalendarIcon color={typeof color === 'string' ? color : Colors.textMuted} size={TAB_ICON_SIZE} />
             </View>
           ),
         }}
@@ -82,7 +82,7 @@ export default function TabsLayout() {
           return {
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
-                <DiaryIcon color={color} size={TAB_ICON_SIZE} />
+                <DiaryIcon color={typeof color === 'string' ? color : Colors.textMuted} size={TAB_ICON_SIZE} />
               </View>
             ),
             tabBarStyle: focusedRouteName === 'index' ? TAB_BAR_STYLE : { display: 'none' },
@@ -96,7 +96,7 @@ export default function TabsLayout() {
           return {
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
-                <CaptureIcon color={color} size={TAB_ICON_SIZE} />
+                <CaptureIcon color={typeof color === 'string' ? color : Colors.textMuted} size={TAB_ICON_SIZE} />
               </View>
             ),
             tabBarStyle: focusedRouteName === 'details' ? { display: 'none' } : TAB_BAR_STYLE,
@@ -108,7 +108,7 @@ export default function TabsLayout() {
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
-              <FriendsIcon color={color} size={TAB_ICON_SIZE + 7} />
+              <FriendsIcon color={typeof color === 'string' ? color : Colors.textMuted} size={TAB_ICON_SIZE + 7} />
             </View>
           ),
         }}
@@ -120,7 +120,7 @@ export default function TabsLayout() {
           return {
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.tabIconWrapper, focused && styles.tabIconWrapperActive]}>
-                <SettingsIcon color={color} size={TAB_ICON_SIZE} />
+                <SettingsIcon color={typeof color === 'string' ? color : Colors.textMuted} size={TAB_ICON_SIZE} />
               </View>
             ),
             tabBarStyle: focusedRouteName === 'index' ? TAB_BAR_STYLE : { display: 'none' },
@@ -133,11 +133,11 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   glassSheen: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   glassBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: TAB_BAR_RADIUS,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.35)',

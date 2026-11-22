@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(7,17,31,0.22)',
   },
   cameraBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(7,17,31,0.34)',
   },
   cameraSheet: {
@@ -96,10 +96,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   cameraView: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   cameraLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,

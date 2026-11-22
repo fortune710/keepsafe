@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useFeatureFlag as usePostHogFeatureFlag } from 'posthog-react-native';
 import { posthog } from '@/constants/posthog';
 
 /**
@@ -9,26 +9,8 @@ import { posthog } from '@/constants/posthog';
  * @returns boolean indicating if the flag is enabled
  */
 export function useFeatureFlag(flagName: string): boolean {
-    const [isEnabled, setIsEnabled] = useState(() => !!posthog.getFeatureFlag(flagName));
-
-    useEffect(() => {
-        setIsEnabled(!!posthog.getFeatureFlag(flagName));
-
-        const unsubscribe =
-            typeof posthog.onFeatureFlags === 'function'
-                ? posthog.onFeatureFlags(() => {
-                    setIsEnabled(!!posthog.getFeatureFlag(flagName));
-                })
-                : undefined;
-
-        return () => {
-            if (typeof unsubscribe === 'function') {
-                unsubscribe();
-            }
-        };
-    }, [flagName]);
-
-    return isEnabled;
+    const isEnabled = usePostHogFeatureFlag(flagName, posthog);
+    return !!isEnabled;
 }
 
 /**

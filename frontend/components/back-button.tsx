@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
-import { HeaderBackButton } from '@react-navigation/elements';
+import { HeaderBackButton } from 'expo-router/react-navigation';
 import { scale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
 

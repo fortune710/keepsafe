@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   backgroundLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   purpleGlow: {
     position: 'absolute',

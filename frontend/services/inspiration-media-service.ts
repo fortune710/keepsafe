@@ -1,4 +1,4 @@
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { PersonDetectorService } from '@/services/person-detector-service';
 import { InspirationMediaItem } from '@/types/inspiration';
 

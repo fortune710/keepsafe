@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 
 import { MonthlyDumpGridPhoto } from '@/services/monthly-dump-service';
 import { monthSchema } from '@/lib/validations/monthly-dump';

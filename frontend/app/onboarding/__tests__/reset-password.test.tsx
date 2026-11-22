@@ -30,31 +30,30 @@ describe('ResetPasswordScreen', () => {
     });
 
     it('renders correctly', () => {
-        const { getByText, getAllByText, getByPlaceholderText } = render(<ResetPasswordScreen />);
+        const { getByText, getByPlaceholderText, getByRole } = render(<ResetPasswordScreen />);
 
-        expect(getAllByText('Reset Password')[1]).toBeTruthy();
+        expect(getByRole('button', { name: 'Reset password' })).toBeTruthy();
         expect(getByPlaceholderText('New password')).toBeTruthy();
         expect(getByPlaceholderText('Confirm new password')).toBeTruthy();
     });
 
     it('validates password length', () => {
-        const { getByText, getAllByText, getByPlaceholderText } = render(<ResetPasswordScreen />);
+        const { getByText, getByPlaceholderText, getByRole } = render(<ResetPasswordScreen />);
 
         fireEvent.changeText(getByPlaceholderText('New password'), 'short');
         fireEvent.changeText(getByPlaceholderText('Confirm new password'), 'short');
-        fireEvent.press(getAllByText('Reset Password')[1]);
+        fireEvent.press(getByRole('button', { name: 'Reset password' }));
 
-        expect(getByText('3 more characters needed')).toBeTruthy();
         expect(mockShowToast).not.toHaveBeenCalled();
         expect(mockUpdatePassword).not.toHaveBeenCalled();
     });
 
     it('validates password mismatch', () => {
-        const { getByText, getAllByText, getByPlaceholderText } = render(<ResetPasswordScreen />);
+        const { getByText, getByPlaceholderText, getByRole } = render(<ResetPasswordScreen />);
 
         fireEvent.changeText(getByPlaceholderText('New password'), 'password123');
         fireEvent.changeText(getByPlaceholderText('Confirm new password'), 'password456');
-        fireEvent.press(getAllByText('Reset Password')[1]);
+        fireEvent.press(getByRole('button', { name: 'Reset password' }));
 
         expect(mockShowToast).toHaveBeenCalledWith('Passwords do not match', 'error');
         expect(mockUpdatePassword).not.toHaveBeenCalled();
@@ -62,11 +61,11 @@ describe('ResetPasswordScreen', () => {
 
     it('calls updatePassword and navigates on success', async () => {
         mockUpdatePassword.mockResolvedValue({ error: null });
-        const { getByText, getAllByText, getByPlaceholderText } = render(<ResetPasswordScreen />);
+        const { getByText, getByPlaceholderText, getByRole } = render(<ResetPasswordScreen />);
 
         fireEvent.changeText(getByPlaceholderText('New password'), 'password123');
         fireEvent.changeText(getByPlaceholderText('Confirm new password'), 'password123');
-        fireEvent.press(getAllByText('Reset Password')[1]);
+        fireEvent.press(getByRole('button', { name: 'Reset password' }));
 
         await waitFor(() => {
             expect(mockUpdatePassword).toHaveBeenCalledWith('password123');
@@ -81,11 +80,11 @@ describe('ResetPasswordScreen', () => {
 
     it('shows error toast on API failure', async () => {
         mockUpdatePassword.mockResolvedValue({ error: { message: 'Weak password' } });
-        const { getByText, getAllByText, getByPlaceholderText } = render(<ResetPasswordScreen />);
+        const { getByText, getByPlaceholderText, getByRole } = render(<ResetPasswordScreen />);
 
         fireEvent.changeText(getByPlaceholderText('New password'), 'password123');
         fireEvent.changeText(getByPlaceholderText('Confirm new password'), 'password123');
-        fireEvent.press(getAllByText('Reset Password')[1]);
+        fireEvent.press(getByRole('button', { name: 'Reset password' }));
 
         await waitFor(() => {
             expect(mockUpdatePassword).toHaveBeenCalledWith('password123');

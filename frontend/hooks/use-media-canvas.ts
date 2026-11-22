@@ -1,7 +1,7 @@
 import { MediaCanvasItem, MusicTag } from "@/types/capture";
 import { useRef, useState } from "react";
 import { Platform, View } from "react-native";
-import ViewShot, { captureRef } from "react-native-view-shot";
+import ViewShot, { captureRef, type ViewShotRef } from "react-native-view-shot";
 
 /**
  * Manage a collection of media canvas items and provide utilities to capture the canvas as an image.
@@ -50,7 +50,7 @@ export function useMediaCanvas() {
         ));
     }
 
-    const viewShotRef = useRef<ViewShot | null>(null);
+    const viewShotRef = useRef<ViewShotRef | null>(null);
   
 
     const saveImage = async () => {
