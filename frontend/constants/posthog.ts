@@ -22,6 +22,7 @@ const noOpPostHog = {
     Promise.resolve(),
   alias: (_alias: string) => Promise.resolve(),
   reloadFeatureFlags: () => {},
+  onFeatureFlags: () => () => {},
   isFeatureEnabled: () => false,
   getFeatureFlag: () => null,
   getFeatureFlagPayload: () => null,

@@ -1,4 +1,5 @@
 import { useFeatureFlag as usePostHogFeatureFlag } from 'posthog-react-native';
+import { posthog } from '@/constants/posthog';
 
 /**
  * Hook to check if a PostHog feature flag is enabled.
@@ -8,7 +9,7 @@ import { useFeatureFlag as usePostHogFeatureFlag } from 'posthog-react-native';
  * @returns boolean indicating if the flag is enabled
  */
 export function useFeatureFlag(flagName: string): boolean {
-    const isEnabled = usePostHogFeatureFlag(flagName);
+    const isEnabled = usePostHogFeatureFlag(flagName, posthog);
     return !!isEnabled;
 }
 

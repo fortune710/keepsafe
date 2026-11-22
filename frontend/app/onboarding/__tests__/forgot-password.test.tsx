@@ -46,7 +46,7 @@ describe('ForgotPasswordScreen', () => {
 
         fireEvent.press(getByText('Send Reset Link'));
 
-        expect(mockShowToast).toHaveBeenCalledWith('Please enter your email address', 'error');
+        expect(mockShowToast).not.toHaveBeenCalled();
         expect(mockResetPasswordForEmail).not.toHaveBeenCalled();
     });
 

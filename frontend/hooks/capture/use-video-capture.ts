@@ -50,7 +50,7 @@ export function useVideoCapture({
     const [micPermission, requestMicPermission] = useMicrophonePermissions();
     const { isVideoRecording, setIsVideoRecording } = useCaptureContext();
     const [videoDuration, setVideoDuration] = useState(0);
-    const videoTimerRef = useRef<number | null>(null);
+    const videoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const videoStateRef = useRef<'idle' | 'starting' | 'failed'>('idle');
     const pendingVideoStartRef = useRef(false);
     const pendingVideoStopRef = useRef(false);

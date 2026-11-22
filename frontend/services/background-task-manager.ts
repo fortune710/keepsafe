@@ -142,6 +142,7 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
     const newEntry: EntryInsert = {
       id: data.entryId as any,
       user_id: data.userId,
+      diary_id: data.userId,
       type: data.capture.type as 'photo' | 'video' | 'audio',
       shared_with: sharedWith,
       content_url: finalContentUrl,

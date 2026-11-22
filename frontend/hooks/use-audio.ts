@@ -1,55 +1,29 @@
-import { Audio } from "expo-av";
-import { useEffect, useState } from "react";
-
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useRef } from 'react';
 
 export function useAudio() {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const player = useAudioPlayer(null);
+  const status = useAudioPlayerStatus(player);
+  const currentUri = useRef<string | null>(null);
 
-    // Cleanup sound on unmount
-    useEffect(() => {
-        return () => {
-            if (sound) sound.unloadAsync();
-        };
-    }, [sound]);
-
-
-    const playAudio = async (uri: string) => {
-        if (!uri) return;
-        try {
-            if (isPlaying) {
-              if (sound) {
-                await sound.pauseAsync();
-              }
-              setIsPlaying(false);
-            } else {
-              if (uri) {
-                if (sound) {
-                  await sound.replayAsync();
-                } else {
-                  const { sound: newSound } = await Audio.Sound.createAsync(
-                    { uri },
-                    { shouldPlay: true }
-                  );
-                  setSound(newSound);
-                  
-                  newSound.setOnPlaybackStatusUpdate((status) => {
-                    if (status.isLoaded && status.didJustFinish) {
-                      setIsPlaying(false);
-                    }
-                  });
-                }
-                setIsPlaying(true);
-              }
-            }
-        } catch (error) {
-            console.error('Audio playback error:', error);
-            setIsPlaying(false);
-        }
+  const playAudio = async (uri: string) => {
+    if (!uri) return;
+    try {
+      if (status.playing && currentUri.current === uri) {
+        player.pause();
+        return;
+      }
+      if (currentUri.current !== uri) {
+        player.replace({ uri });
+        currentUri.current = uri;
+      } else {
+        await player.seekTo(0);
+      }
+      player.play();
+    } catch (error) {
+      console.error('Audio playback error:', error);
     }
+  };
 
-    return {
-        isPlaying,
-        playAudio,
-    }
+  return { isPlaying: status.playing, playAudio };
 }

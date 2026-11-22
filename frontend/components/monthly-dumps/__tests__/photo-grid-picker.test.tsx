@@ -39,7 +39,7 @@ jest.mock('react-native-reanimated', () => {
   const { View } = require('react-native');
   return {
     __esModule: true,
-    default: View,
+    default: { View, FlatList: require('react-native').FlatList },
     FadeIn: { duration: jest.fn().mockReturnValue({}) },
     FadeOut: { duration: jest.fn().mockReturnValue({}) },
     LinearTransition: {

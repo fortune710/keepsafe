@@ -75,6 +75,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          diary_id: string
           type: 'photo' | 'video' | 'audio',
           shared_with?: string[],
           attachments: RenderedMediaCanvasItem[];

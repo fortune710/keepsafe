@@ -88,7 +88,6 @@ export default function RootLayout() {
                           }}
                           name="calendar"
                         />
-                        <Stack.Screen name="calendar/day" />
                         <Stack.Screen name="social" />
                         <Stack.Screen name="friends" />
                         <Stack.Screen name="dreamscape" />
@@ -100,7 +99,6 @@ export default function RootLayout() {
                             animation: "fade_from_bottom"
                           }}
                         />
-                        <Stack.Screen name="capture/details" />
                         <Stack.Screen name="+not-found" />
                       </Stack>
                       <StatusBar style="dark" />

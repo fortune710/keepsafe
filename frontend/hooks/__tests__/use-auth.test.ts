@@ -17,11 +17,7 @@ jest.mock('@/lib/supabase', () => ({
     },
 }));
 
-// Mock Platform
-jest.mock('react-native/Libraries/Utilities/Platform', () => ({
-    OS: 'ios',
-    select: jest.fn(),
-}));
+jest.mock('@/constants/posthog', () => ({ posthog: { capture: jest.fn(), identify: jest.fn(), reset: jest.fn() } }));
 
 describe('useAuth Hook', () => {
     beforeEach(() => {
@@ -59,8 +55,7 @@ describe('useAuth Hook', () => {
                 response = await result.current.resetPasswordForEmail('test@example.com');
             });
 
-            expect(response).toEqual({ error: expect.any(Error) });
-            expect(response.error.message).toBe('Network error');
+            expect(response).toEqual({ error: expect.objectContaining({ message: 'Network error' }) });
         });
     });
 
@@ -93,8 +88,7 @@ describe('useAuth Hook', () => {
                 response = await result.current.updatePassword('weak');
             });
 
-            expect(response).toEqual({ error: expect.any(Error) });
-            expect(response.error.message).toBe('Weak password');
+            expect(response).toEqual({ error: expect.objectContaining({ message: 'Weak password' }) });
         });
     });
 });

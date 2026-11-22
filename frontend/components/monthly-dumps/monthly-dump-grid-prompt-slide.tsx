@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   backgroundLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   topSheen: {
     position: 'absolute',

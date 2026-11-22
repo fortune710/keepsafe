@@ -1,6 +1,6 @@
 //import { countryToCallingCode } from "@/lib/country-codes";
 import { DeviceContact } from "@/types/contact";
-import * as Contacts from 'expo-contacts';
+import * as Contacts from 'expo-contacts/legacy';
 
 export class ContactsService {
     static async getDeviceContacts(): Promise<DeviceContact[]> {

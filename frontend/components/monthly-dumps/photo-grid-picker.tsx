@@ -12,7 +12,7 @@ import {
 import { Trash2, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import ViewShot from 'react-native-view-shot';
+import ViewShot, { type ViewShotRef } from 'react-native-view-shot';
 import { Image } from 'expo-image';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -113,7 +113,7 @@ export default function PhotoGridPicker({ month, onComplete, onCancel }: PhotoGr
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [pendingLayout, setPendingLayout] = useState<MonthlyDumpGridLayout | null>(null);
   const [removalIds, setRemovalIds] = useState<string[]>([]);
-  const gridShotRef = useRef<ViewShot | null>(null);
+  const gridShotRef = useRef<ViewShotRef | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
 
   const gridConfig = GRID_LAYOUTS[gridLayout];
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#07111f',
   },
   backgroundLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   purpleGlow: {
     position: 'absolute',
@@ -576,11 +576,11 @@ const styles = StyleSheet.create({
     alignContent: 'center',
   },
   sourceOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 50,
   },
   sourceBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(7,17,31,0.48)',
   },
   removalPanel: {
@@ -650,13 +650,13 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   sourceTileBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.04)',
   },
   removalTileOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(7,17,31,0.10)',

@@ -146,7 +146,7 @@ describe('CaptureScreen - Monthly Dump Banner Visibility', () => {
     const { getByText } = render(<CaptureScreen />);
     
     // Check if "April Recap🎉" chip is visible
-    expect(getByText('April Recap🎉')).toBeTruthy();
+    expect(getByText('April Recap')).toBeTruthy();
   });
 
   it('toggles the banner when the date/chip is pressed', async () => {

@@ -1,7 +1,7 @@
 import React, { RefObject, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
-import ViewShot from "react-native-view-shot";
+import ViewShot, { type ViewShotRef } from "react-native-view-shot";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { MediaType } from "@/types/media";
@@ -21,7 +21,7 @@ interface MediaCanvasProps {
   uri: string,
   items: Array<MediaCanvasItem>,
   removeElement: (itemId: number) => void,
-  ref: RefObject<ViewShot | null>,
+  ref: RefObject<ViewShotRef | null>,
   transformsRef: RefObject<Record<string, any>>,
   facing?: 'front' | 'back'
 }

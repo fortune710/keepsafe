@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import ViewShot from 'react-native-view-shot';
+import ViewShot, { type ViewShotRef } from 'react-native-view-shot';
 import { Image } from 'expo-image';
 
 import { MonthlyDumpGridPhoto } from '@/services/monthly-dump-service';
@@ -8,7 +8,7 @@ import { MonthlyDumpGridPhoto } from '@/services/monthly-dump-service';
 type GridCell = MonthlyDumpGridPhoto | null;
 
 interface GridImagePickerCaptureCanvasProps {
-  viewShotRef: React.RefObject<ViewShot | null>;
+  viewShotRef: React.RefObject<ViewShotRef | null>;
   cells: GridCell[];
   captureWidth: number;
   captureHeight: number;
