@@ -85,7 +85,7 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: animatedOpacity.value,
+      opacity: isLoading ? animatedOpacity.value : 1,
     };
 
   });
@@ -129,7 +129,7 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
   }, [center, radius]);
 
   return (
-    <Animated.View style={[styles.container, isLoading && animatedStyle]}>
+    <Animated.View style={[styles.container, animatedStyle]}>
       <Canvas style={{ width: size, height: size }}>
         <Group origin={{ x: center, y: center }} transform={[{ rotate: -Math.PI / 2 }]}>
           <Path

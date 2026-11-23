@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { MediaCapture, MediaType } from '@/types/media';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
@@ -36,6 +36,7 @@ export function useMediaCapture(): UseCaptureResult {
   } = useCaptureContext();
   const [capturedMedia, setCapturedMedia] = useState<MediaCapture | null>(null);
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const ownsAudioRecording = useRef(false);
   const recorderState = useAudioRecorderState(recorder, 100);
   useEffect(() => {
     if (!recorderState.isRecording) return;
@@ -105,6 +106,7 @@ export function useMediaCapture(): UseCaptureResult {
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
+      ownsAudioRecording.current = true;
       setIsCapturing(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -114,7 +116,8 @@ export function useMediaCapture(): UseCaptureResult {
   }, [recorder, setIsCapturing]);
 
   const stopAudioRecording = useCallback(async (): Promise<MediaCapture | null> => {
-    if (!recorder.isRecording) return null;
+    if (!ownsAudioRecording.current) return null;
+    ownsAudioRecording.current = false;
     try {
       const duration = recorder.currentTime;
       await recorder.stop();
@@ -213,7 +216,10 @@ export function useMediaCapture(): UseCaptureResult {
     setRecordingDuration(0);
     setMeteringLevel(0);
     try {
-      if (recorder.isRecording) await recorder.stop();
+      if (ownsAudioRecording.current) {
+        ownsAudioRecording.current = false;
+        await recorder.stop();
+      }
       await setAudioModeAsync({ allowsRecording: false });
     } catch (error) {
       console.error('Error cleaning up recording:', error);
