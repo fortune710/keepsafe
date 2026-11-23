@@ -1,4 +1,4 @@
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { PersonDetectorService } from '@/services/person-detector-service';
 import { InspirationMediaItem } from '@/types/inspiration';
 
@@ -6,6 +6,8 @@ const PAGE_SIZE = 36;
 
 export class InspirationMediaService {
   static async getRecentPeopleMedia(start: Date, end: Date): Promise<InspirationMediaItem[]> {
+    if (!PersonDetectorService.isAvailable()) return [];
+
     const response = await MediaLibrary.getAssetsAsync({
       first: PAGE_SIZE,
       createdAfter: start.getTime(),

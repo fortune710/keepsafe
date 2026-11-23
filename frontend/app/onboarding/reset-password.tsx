@@ -64,6 +64,7 @@ export default function ResetPasswordScreen() {
         }
     };
 
+
     const canSubmit = newPassword.length >= MIN_PASSWORD_LENGTH && confirmPassword.length > 0;
 
     return (
@@ -148,6 +149,8 @@ export default function ResetPasswordScreen() {
                         )}
 
                         <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Reset password"
                             style={[styles.resetButton, (!canSubmit || loading) && styles.resetButtonDisabled]}
                             onPress={handleResetPassword}
                             disabled={!canSubmit || loading}

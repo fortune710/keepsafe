@@ -32,7 +32,7 @@ export default function Typewriter({
   const [showCursor, setShowCursor] = useState(true);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cursorIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cursorIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Blinking cursor effect
   useEffect(() => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, TouchableOpacity, StyleSheet, Alert, Animated } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus, AudioPlayerOptions } from "expo-audio";
 import { Play, Pause } from "lucide-react-native";
 import {
@@ -8,7 +8,7 @@ import {
   Skia,
   Group,
 } from "@shopify/react-native-skia";
-import { useSharedValue, useDerivedValue, withTiming, cancelAnimation, runOnJS, useAnimatedStyle, withRepeat, Easing } from "react-native-reanimated";
+import Animated, { useSharedValue, useDerivedValue, withTiming, cancelAnimation, runOnJS, useAnimatedStyle, withRepeat, Easing } from "react-native-reanimated";
 import { scale, verticalScale } from "react-native-size-matters";
 import { Colors } from "@/lib/constants";
 
@@ -85,7 +85,7 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: animatedOpacity.value,
+      opacity: isLoading ? animatedOpacity.value : 1,
     };
 
   });
@@ -129,7 +129,7 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
   }, [center, radius]);
 
   return (
-    <View style={[styles.container, isLoading && animatedStyle]}>
+    <Animated.View style={[styles.container, animatedStyle]}>
       <Canvas style={{ width: size, height: size }}>
         <Group origin={{ x: center, y: center }} transform={[{ rotate: -Math.PI / 2 }]}>
           <Path
@@ -158,7 +158,7 @@ const AudioPreview: React.FC<AudioPreviewProps> = ({ audioSource, canvasRadius =
             <Play size={scale(canvasRadius + 3)} color={Colors.primary} />
         }
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 

@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { MediaCapture, MediaType } from '@/types/media';
-import { Audio } from 'expo-av';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import * as Crypto from 'expo-crypto';
@@ -35,7 +35,14 @@ export function useMediaCapture(): UseCaptureResult {
     setMeteringLevel,
   } = useCaptureContext();
   const [capturedMedia, setCapturedMedia] = useState<MediaCapture | null>(null);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const ownsAudioRecording = useRef(false);
+  const recorderState = useAudioRecorderState(recorder, 100);
+  useEffect(() => {
+    if (!recorderState.isRecording) return;
+    setRecordingDuration(Math.floor(recorderState.durationMillis / 1000));
+    setMeteringLevel(Math.max(0, Math.min(1, ((recorderState.metering ?? -60) + 60) / 60)));
+  }, [recorderState.isRecording, recorderState.durationMillis, recorderState.metering, setRecordingDuration, setMeteringLevel]);
 
   const generateId = () => {
     return Crypto.randomUUID();
@@ -88,151 +95,47 @@ export function useMediaCapture(): UseCaptureResult {
   );
 
   const startAudioRecording = useCallback(async () => {
-    // Ensure we stop and clean up any existing recording first
-    if (recording) {
-      try {
-        if ((recording as any)._timer) {
-          clearInterval((recording as any)._timer);
-        }
-        await recording.stopAndUnloadAsync();
-        setRecording(null);
-      } catch (error) {
-        console.error('Error stopping previous recording:', error);
-      }
-    }
-
-    setIsCapturing(true);
     setCapturedMedia(null);
     setRecordingDuration(0);
-
     try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'Please grant microphone permission to record audio.',
-        );
-        setIsCapturing(false);
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Required', 'Please grant microphone permission to record audio.');
         return;
       }
-
-      // Reset audio mode first, then set to recording mode
-      // This ensures we start from a clean state
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: false,
-      });
-
-      // Small delay to ensure mode reset completes
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Set to recording mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: false,
-      });
-
-      setMeteringLevel(0);
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        {
-          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-          isMeteringEnabled: true,
-        },
-        (status) => {
-          if (status.isRecording && typeof status.metering === 'number') {
-            // `metering` is reported in dB, roughly -160 (silence) to 0 (max).
-            // Clamp to a usable floor and normalize to 0-1 so the UI can react to voice level.
-            const normalized = Math.max(
-              0,
-              Math.min(1, (status.metering + 60) / 60),
-            );
-            setMeteringLevel(normalized);
-          }
-        },
-        100,
-      );
-
-      setRecording(newRecording);
-
-      // Start duration timer
-      const timer = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
-      }, 1000);
-
-      // Store timer reference for cleanup
-      (newRecording as any)._timer = timer;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      ownsAudioRecording.current = true;
+      setIsCapturing(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start audio recording');
       setIsCapturing(false);
     }
-  }, [recording]);
+  }, [recorder, setIsCapturing]);
 
-  const stopAudioRecording =
-    useCallback(async (): Promise<MediaCapture | null> => {
+  const stopAudioRecording = useCallback(async (): Promise<MediaCapture | null> => {
+    if (!ownsAudioRecording.current) return null;
+    ownsAudioRecording.current = false;
+    try {
+      const duration = recorder.currentTime;
+      await recorder.stop();
+      await setAudioModeAsync({ allowsRecording: false });
+      if (!recorder.uri) throw new Error('No recording URI available');
+      const capture: MediaCapture = { id: generateId(), type: 'audio', uri: recorder.uri, duration, timestamp: new Date() };
+      setCapturedMedia(capture);
+      setRecordingDuration(0);
+      setMeteringLevel(0);
+      return capture;
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      Alert.alert('Error', 'Failed to stop audio recording');
+      return null;
+    } finally {
       setIsCapturing(false);
-
-      if (!recording) return null;
-
-      try {
-        // Clear timer
-        if ((recording as any)._timer) {
-          clearInterval((recording as any)._timer);
-        }
-
-        await recording.stopAndUnloadAsync();
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-        });
-        const uri = recording.getURI();
-
-        if (!uri) {
-          throw new Error('No recording URI available');
-        }
-
-        const audioCapture: MediaCapture = {
-          id: generateId(),
-          type: 'audio',
-          uri,
-          duration: recordingDuration,
-          timestamp: new Date(),
-        };
-
-        setCapturedMedia(audioCapture);
-        setRecording(null);
-        setRecordingDuration(0);
-        setMeteringLevel(0);
-
-        return audioCapture;
-      } catch (error) {
-        console.error('Failed to stop recording:', error);
-        Alert.alert('Error', 'Failed to stop audio recording');
-
-        // Still try to reset audio mode even if stopping failed
-        try {
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: false,
-            playsInSilentModeIOS: true,
-            shouldDuckAndroid: false,
-            playThroughEarpieceAndroid: false,
-            staysActiveInBackground: false,
-          });
-        } catch (modeError) {
-          console.error('Failed to reset audio mode:', modeError);
-        }
-
-        setRecording(null);
-        setRecordingDuration(0);
-        setMeteringLevel(0);
-        return null;
-      }
-    }, [recording, recordingDuration, generateId]);
+    }
+  }, [recorder, setIsCapturing]);
 
   const uploadMedia = useCallback(
     async (mediaType: MediaType): Promise<MediaCapture | null> => {
@@ -312,28 +215,16 @@ export function useMediaCapture(): UseCaptureResult {
     setIsCapturing(false);
     setRecordingDuration(0);
     setMeteringLevel(0);
-    if (recording) {
-      try {
-        // Clear timer if exists
-        if ((recording as any)._timer) {
-          clearInterval((recording as any)._timer);
-        }
-        await recording.stopAndUnloadAsync();
-
-        // Reset audio mode back to normal playback mode
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: false,
-          playThroughEarpieceAndroid: false,
-          staysActiveInBackground: false,
-        });
-      } catch (error) {
-        console.error('Error cleaning up recording:', error);
+    try {
+      if (ownsAudioRecording.current) {
+        ownsAudioRecording.current = false;
+        await recorder.stop();
       }
-      setRecording(null);
+      await setAudioModeAsync({ allowsRecording: false });
+    } catch (error) {
+      console.error('Error cleaning up recording:', error);
     }
-  }, [recording]);
+  }, [recorder, setIsCapturing]);
 
   return {
     isCapturing,

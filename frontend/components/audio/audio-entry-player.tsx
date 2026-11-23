@@ -11,6 +11,7 @@ interface AudioEntryPlayerProps {
 
 export default function AudioEntryPlayer({ isPlaying, onTogglePlayback, duration }: AudioEntryPlayerProps) {
     const [durationLeft, setDurationLeft] = useState(duration);
+    const displaySeconds = Math.floor(Math.max(0, durationLeft));
 
     useEffect(() => {
         if (!isPlaying && durationLeft <= 0) {
@@ -44,7 +45,7 @@ export default function AudioEntryPlayer({ isPlaying, onTogglePlayback, duration
             </TouchableOpacity>
             <AudioWaveVisualier isRecording={isPlaying}/>
             <Text style={styles.durationText}>
-                {durationLeft ? `${Math.floor(durationLeft / 60)}:${(durationLeft % 60).toString().padStart(2, '0')}` : '0:00'}
+                {`${Math.floor(displaySeconds / 60)}:${(displaySeconds % 60).toString().padStart(2, '0')}`}
             </Text>
         </View>
     )

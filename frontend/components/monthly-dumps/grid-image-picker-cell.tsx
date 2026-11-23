@@ -98,13 +98,13 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   gridCellBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 0,
     borderWidth: 0,
     borderColor: 'rgba(255,255,255,0.04)',
   },
   gridCellActionLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(7,17,31,0.18)',
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Figtree-Medium',
   },
   removalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(239,68,68,0.18)',
   },
   emptyCell: {

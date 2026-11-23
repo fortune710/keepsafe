@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     height: '34%',
   },
   frame: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },

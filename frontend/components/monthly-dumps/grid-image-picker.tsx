@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   sourceTileBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',

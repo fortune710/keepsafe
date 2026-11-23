@@ -15,7 +15,7 @@ export function PlaceVisitCard({ item }: { item: InspirationPlaceItem }) {
 }
 
 const styles = StyleSheet.create({
-  card: { minHeight: 136, borderRadius: 16, overflow: 'hidden', backgroundColor: '#DCEAF6' }, map: { ...StyleSheet.absoluteFillObject },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,42,0.18)' }, copy: { position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  card: { minHeight: 136, borderRadius: 16, overflow: 'hidden', backgroundColor: '#DCEAF6' }, map: { ...StyleSheet.absoluteFill },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15,23,42,0.18)' }, copy: { position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { flex: 1, color: '#fff', fontFamily: 'Figtree-SemiBold', fontSize: 14, textShadowColor: 'rgba(15,23,42,0.55)', textShadowRadius: 4 },
 });

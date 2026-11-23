@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cover: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: scale(4),
     overflow: 'hidden',
   },

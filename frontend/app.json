@@ -2,20 +2,14 @@
   "expo": {
     "name": "Keepsafe",
     "slug": "keepsafe",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/keepsafe-logo.png",
-    "splash": {
-      "image": "./assets/images/keepsafe-logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#8B5CF6"
-    },
     "scheme": "keepsafe",
     "assetBundlePatterns": [
       "**/*"
     ],
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "associatedDomains": [
@@ -139,14 +133,30 @@
           "locationWhenInUsePermission": "Allow Keepsafe to access your location to privately remember places you visited",
           "isIosBackgroundLocationEnabled": true
         }
+      ],
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/keepsafe-logo.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#8B5CF6"
+        }
+      ],
+      "expo-status-bar",
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "notification": {
-      "icon": "./assets/images/keepsafe-logo.png",
-      "color": "#8B5CF6"
     },
     "owner": "fortune710",
     "runtimeVersion": {

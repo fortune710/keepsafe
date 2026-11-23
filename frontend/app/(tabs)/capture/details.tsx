@@ -683,17 +683,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modeButtonsBlur: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 999,
     overflow: 'hidden',
   },
   modeButtonsSheen: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   modeButtonsBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.35)',

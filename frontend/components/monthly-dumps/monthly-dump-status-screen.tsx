@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   backgroundLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   purpleGlow: {
     position: 'absolute',

@@ -6,6 +6,10 @@ import VaultCanvas from "@/components/capture/canvas/vault-canvas";
 import { MediaType } from "@/types/media";
 import { RenderedMediaCanvasItem } from "@/types/capture";
 
+jest.mock('@/components/entries/entry-video-view', () => () => null);
+jest.mock('@/components/entries/entry-audio-view', () => () => null);
+jest.mock('expo-video', () => ({ VideoView: () => null }));
+
 describe("Vault Canvas Tests", () => {
     test("renders only image when there are no canvas items", () => {
         const expectedTestId = "vault-canvas-image";

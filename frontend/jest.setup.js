@@ -29,8 +29,10 @@ process.env.EXPO_PUBLIC_SUPABASE_URL="https://supabase.test.co"
 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY="test-anon-key"
 process.env.EXPO_PUBLIC_NODE_ENV="development"
 
+jest.mock('react-native-worklets', () => require('react-native-worklets/lib/module/mock'));
+
 // Reanimated mock
-require('react-native-reanimated').setUpTests();
+jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
 // Expo Blur mock
 jest.mock('expo-blur', () => {
@@ -46,14 +48,15 @@ jest.mock('lucide-react-native', () => {
     const React = require('react');
     const { View } = require('react-native');
     return {
-        Camera: () => <View />,
         Trash2: () => <View />,
+        Camera: () => <View />,
+        ArrowLeft: () => <View />,
+        Mail: () => <View />,
         Lock: () => <View />,
         Eye: () => <View />,
         EyeOff: () => <View />,
-        ArrowLeft: () => <View />,
-        Mail: () => <View />,
         Check: () => <View />,
+        ChevronDown: () => <View />,
         Sparkles: () => <View />,
         Play: () => <View />,
         UserPlus: () => <View />,
