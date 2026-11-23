@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import MusicTab from '../music-tab';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
@@ -83,6 +83,18 @@ test('pauses a buffering preview when the reported playback status is playing', 
   expect(player.play).toHaveBeenCalledTimes(1);
 });
 
+test('cancels requested playback while the player is buffering', () => {
+  const player = { playing: false, pause: jest.fn(), play: jest.fn(), replace: jest.fn(), seekTo: jest.fn(), addListener: jest.fn(() => ({ remove: jest.fn() })) };
+  (useAudioPlayer as jest.Mock).mockReturnValue(player);
+  (useAudioPlayerStatus as jest.Mock).mockReturnValue({ playing: false, isBuffering: true, duration: 0, currentTime: 0 });
+  render(<MusicTab isLoading={false} musicQuery="" onMusicQueryChange={jest.fn()} musicTags={songs} onSelectMusic={jest.fn()} />);
+
+  fireEvent.press(screen.getByText('Preview First'));
+  fireEvent.press(screen.getByText('Preview First'));
+  expect(player.pause).toHaveBeenCalledTimes(2);
+  expect(player.play).toHaveBeenCalledTimes(1);
+});
+
 test('replaces a failed source when retrying the same preview', () => {
   const player = { playing: false, pause: jest.fn(), play: jest.fn(), replace: jest.fn(), seekTo: jest.fn(), addListener: jest.fn(() => ({ remove: jest.fn() })) };
   (useAudioPlayer as jest.Mock).mockReturnValue(player);
@@ -115,21 +127,27 @@ test('retries a failed preview even after a later idle status update', () => {
   (useAudioPlayerStatus as jest.Mock).mockReturnValue({ playing: false, duration: 0, currentTime: 0 });
   render(<MusicTab isLoading={false} musicQuery="" onMusicQueryChange={jest.fn()} musicTags={songs} onSelectMusic={jest.fn()} />);
   fireEvent.press(screen.getByText('Preview First'));
-  onStatusUpdate({ error: 'Network error' });
-  onStatusUpdate({ error: null });
+  act(() => {
+    onStatusUpdate({ error: 'Network error' });
+    onStatusUpdate({ error: null });
+  });
 
   fireEvent.press(screen.getByText('Preview First'));
   expect(player.replace).toHaveBeenCalledTimes(2);
 });
 
 test('restarts a finished preview from the beginning', async () => {
+  let onStatusUpdate: (status: { didJustFinish?: boolean }) => void = () => {};
   const player = {
     playing: false,
     pause: jest.fn(),
     play: jest.fn(),
     replace: jest.fn(),
     seekTo: jest.fn().mockResolvedValue(undefined),
-    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    addListener: jest.fn((_event, listener) => {
+      onStatusUpdate = listener;
+      return { remove: jest.fn() };
+    }),
   };
   (useAudioPlayer as jest.Mock).mockReturnValue(player);
   (useAudioPlayerStatus as jest.Mock).mockReturnValue({
@@ -138,6 +156,7 @@ test('restarts a finished preview from the beginning', async () => {
   render(<MusicTab isLoading={false} musicQuery="" onMusicQueryChange={jest.fn()} musicTags={songs} onSelectMusic={jest.fn()} />);
 
   fireEvent.press(screen.getByText('Preview First'));
+  act(() => onStatusUpdate({ didJustFinish: true }));
   fireEvent.press(screen.getByText('Preview First'));
 
   await waitFor(() => expect(player.seekTo).toHaveBeenCalledWith(0));

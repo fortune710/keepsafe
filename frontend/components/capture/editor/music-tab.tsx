@@ -20,12 +20,18 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
     const player = useAudioPlayer(null, { updateInterval: 100 });
     const status = useAudioPlayerStatus(player);
     const [activeId, setActiveId] = useState<number | null>(null);
+    const [playRequested, setPlayRequested] = useState(false);
+    const playRequestedRef = useRef(false);
     const activePreview = useRef<{ id: number; uri: string } | null>(null);
     const requestId = useRef(0);
 
     useEffect(() => {
         const subscription = player.addListener('playbackStatusUpdate', (update) => {
-            if (update.error) activePreview.current = null;
+            if (update.error || update.didJustFinish) {
+                if (update.error) activePreview.current = null;
+                playRequestedRef.current = false;
+                setPlayRequested(false);
+            }
         });
         return () => subscription.remove();
     }, [player]);
@@ -42,8 +48,10 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
             if (status.error) activePreview.current = null;
             const current = activePreview.current;
             if (current?.id === music.id && current.uri === music.preview) {
-                if (status.playing) {
+                if (playRequestedRef.current || status.playing) {
                     player.pause();
+                    playRequestedRef.current = false;
+                    setPlayRequested(false);
                     return;
                 }
                 if (status.didJustFinish || (status.duration > 0 && status.currentTime >= status.duration)) {
@@ -57,8 +65,12 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
                 setActiveId(music.id);
             }
             player.play();
+            playRequestedRef.current = true;
+            setPlayRequested(true);
         } catch {
             activePreview.current = null;
+            playRequestedRef.current = false;
+            setPlayRequested(false);
             Alert.alert('Audio Error', 'Unable to play this preview. Please try again.');
         }
     };
@@ -88,10 +100,12 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
                         onPress={(music) => {
                             requestId.current += 1;
                             player.pause();
+                            playRequestedRef.current = false;
+                            setPlayRequested(false);
                             onSelectMusic(music);
                         }}
                         music={item}
-                        isPreviewPlaying={activeId === item.id && status.playing}
+                        isPreviewPlaying={activeId === item.id && (playRequested || status.playing)}
                         previewProgress={activeId === item.id && status.duration > 0
                             ? Math.max(0, Math.min(1, status.currentTime / status.duration)) : 0}
                         onTogglePreview={togglePreview}
