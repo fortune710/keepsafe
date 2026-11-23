@@ -1,5 +1,7 @@
 import { MusicTag } from "@/types/capture";
-import { KeyboardAvoidingView, Text, TextInput, StyleSheet, View, FlatList, ActivityIndicator } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Alert, KeyboardAvoidingView, Text, StyleSheet, View, FlatList } from "react-native";
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { MusicListItem } from "../music/music-list-item";
 import { Music } from "lucide-react-native";
 import { Input } from "@/components/ui/input";
@@ -15,6 +17,51 @@ interface MusicTabProps {
 }
 
 export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, musicTags, onSelectMusic }: MusicTabProps) {
+    const player = useAudioPlayer(null, { updateInterval: 100 });
+    const status = useAudioPlayerStatus(player);
+    const [activeId, setActiveId] = useState<number | null>(null);
+    const activePreview = useRef<{ id: number; uri: string } | null>(null);
+    const requestId = useRef(0);
+
+    useEffect(() => {
+        const subscription = player.addListener('playbackStatusUpdate', (update) => {
+            if (update.error) activePreview.current = null;
+        });
+        return () => subscription.remove();
+    }, [player]);
+
+    useEffect(() => () => {
+        requestId.current += 1;
+    }, []);
+
+    const togglePreview = async (music: MusicTag) => {
+        if (!music.preview) return;
+        const request = ++requestId.current;
+        try {
+            // A failed source must be replaced before it can be retried.
+            if (status.error) activePreview.current = null;
+            const current = activePreview.current;
+            if (current?.id === music.id && current.uri === music.preview) {
+                if (status.playing) {
+                    player.pause();
+                    return;
+                }
+                if (status.didJustFinish || (status.duration > 0 && status.currentTime >= status.duration)) {
+                    await player.seekTo(0);
+                    if (request !== requestId.current) return;
+                }
+            } else {
+                player.pause();
+                player.replace({ uri: music.preview });
+                activePreview.current = { id: music.id, uri: music.preview };
+                setActiveId(music.id);
+            }
+            player.play();
+        } catch {
+            activePreview.current = null;
+            Alert.alert('Audio Error', 'Unable to play this preview. Please try again.');
+        }
+    };
 
     return (
         <FlatList
@@ -38,8 +85,16 @@ export default function MusicTab({ isLoading, musicQuery, onMusicQueryChange, mu
 
                 return (
                     <MusicListItem
-                        onPress={(music) => onSelectMusic(music)}
+                        onPress={(music) => {
+                            requestId.current += 1;
+                            player.pause();
+                            onSelectMusic(music);
+                        }}
                         music={item}
+                        isPreviewPlaying={activeId === item.id && status.playing}
+                        previewProgress={activeId === item.id && status.duration > 0
+                            ? Math.max(0, Math.min(1, status.currentTime / status.duration)) : 0}
+                        onTogglePreview={togglePreview}
                     />
                 )
             }}
