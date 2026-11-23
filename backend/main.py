@@ -12,6 +12,7 @@ from config import settings
 from schedulers.scheduler_manager import SchedulerManager
 from schedulers.spotify_sync_scheduler import SpotifySyncScheduler
 import logging
+import utils.logging  # Register the shared PostHog log handler.
 
 # Configure logging
 logging.basicConfig(
