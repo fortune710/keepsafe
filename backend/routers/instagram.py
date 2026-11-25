@@ -64,7 +64,7 @@ class InstagramLoggingRoute(APIRoute):
                     "diagnostic_message": diagnostic_message,
                 }
                 context.update(getattr(request.state, "instagram_error_details", {}))
-                logger.log(level, diagnostic_message, extra=context)
+                logger.log(level, "Instagram connection request completed", extra=context)
 
         return logged_handler
 
