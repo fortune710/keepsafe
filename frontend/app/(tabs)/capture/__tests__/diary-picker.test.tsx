@@ -1,0 +1,78 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import DetailsScreen from '../details';
+import { useDiaries } from '@/hooks/use-diaries';
+
+jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() }, useLocalSearchParams: () => ({ captureId: 'capture-1', type: 'photo', uri: 'file://photo.jpg', diary_id: 'diary-2' }) }));
+jest.mock('@/providers/auth-provider', () => ({ useAuthContext: () => ({ user: { id: 'user-1' } }) }));
+jest.mock('@/hooks/use-diaries', () => ({ useDiaries: jest.fn() }));
+jest.mock('@/hooks/use-entry-operations', () => ({ useEntryOperations: () => ({ saveEntry: jest.fn() }) }));
+jest.mock('@/providers/save-lock-provider', () => ({ useSaveLock: () => ({ isSaveLocked: false, lockSave: jest.fn() }) }));
+jest.mock('@/hooks/use-friends', () => ({ useFriends: () => ({ friends: [] }) }));
+jest.mock('@/hooks/use-user-entries', () => ({ useUserEntries: () => ({ addOptimisticEntry: jest.fn(), replaceOptimisticEntry: jest.fn() }) }));
+jest.mock('@/hooks/use-time-capsules', () => ({ useTimeCapsules: () => ({ addOptimisticCapsule: jest.fn(), removeOptimisticCapsule: jest.fn() }) }));
+jest.mock('@/hooks/use-privacy-settings', () => ({ usePrivacySettings: () => ({ settings: {} }) }));
+jest.mock('@/hooks/use-device-location', () => ({ useDeviceLocation: () => ({ location: null }) }));
+jest.mock('@/providers/capture-provider', () => ({ useCaptureContext: () => ({ setPendingLocationAttachment: jest.fn() }) }));
+jest.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: jest.fn() }) }));
+jest.mock('@/hooks/use-media-canvas', () => ({ useMediaCanvas: () => ({ items: [], viewShotRef: { current: null } }) }));
+jest.mock('expo-video', () => ({ useVideoPlayer: () => ({ playing: false }), VideoView: () => null }));
+jest.mock('expo', () => ({ ...jest.requireActual('expo'), useEvent: () => ({ isPlaying: false }) }));
+jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
+jest.mock('expo-blur', () => ({ BlurView: () => null }));
+jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: ({ children }: any) => children }));
+jest.mock('@/components/ui/bottom-sheet', () => ({ BottomSheet: ({ visible, children }: any) => visible ? children : null }));
+jest.mock('@/components/back-button', () => ({ BackButton: () => null }));
+jest.mock('@/components/capture/media-canvas', () => () => null);
+jest.mock('@/components/capture/editor-popover', () => () => null);
+jest.mock('@/components/audio/audio-entry', () => () => null);
+jest.mock('@/components/friends/entry-share-list', () => () => null);
+jest.mock('@/components/capture/entry-attachment-list', () => () => null);
+jest.mock('@/components/icons/diary-icon', () => ({ DiaryIcon: () => null }));
+jest.mock('@/components/capture/future-date-picker', () => ({ FutureDatePicker: () => null }));
+jest.mock('@/services/local-notification-service', () => ({ LocalNotificationService: {} }));
+jest.mock('@/constants/posthog', () => ({ posthog: { capture: jest.fn() } }));
+
+const diaries = [
+  { id: 'user-1', name: 'My Diary', cover_color: '#4285F4', is_default: true },
+  { id: 'diary-2', name: 'Summer', cover_color: '#FFA000', is_default: false },
+];
+beforeEach(() => (useDiaries as jest.Mock).mockReturnValue({ diaries, isLoading: false, error: null }));
+
+test('the diary popover renders the diaries and highlights the selected diary', () => {
+  const screen = render(<DetailsScreen />);
+  fireEvent.press(screen.getByLabelText('Choose a diary'));
+  expect(screen.getByText('My Diary')).toBeTruthy();
+  expect(screen.getByText('Summer')).toBeTruthy();
+  expect(screen.getAllByRole('radio')[0].props.accessibilityState.selected).toBe(true);
+  expect(screen.getByRole('radio', { name: 'Summer' }).props.accessibilityState.selected).toBe(true);
+  fireEvent.press(screen.getByText('My Diary'));
+  expect(screen.getByRole('radio', { name: 'My Diary' }).props.accessibilityState.selected).toBe(true);
+});
+
+test('enabling the time capsule switch opens its settings', () => {
+  const screen = render(<DetailsScreen />);
+  fireEvent.press(screen.getByLabelText('Choose a diary'));
+  fireEvent(screen.getByRole('switch', { name: 'Save as time capsule' }), 'valueChange', true);
+  expect(screen.getByText('When should this memory be revealed?')).toBeTruthy();
+  fireEvent.press(screen.getByText('When a condition is met'));
+  expect(screen.getByText('Choose a condition')).toBeTruthy();
+});
+
+test('the diary popover has the time capsule toggle available', () => {
+  const screen = render(<DetailsScreen />);
+  fireEvent.press(screen.getByLabelText('Choose a diary'));
+  expect(screen.getByText('Save as time capsule')).toBeTruthy();
+  fireEvent.press(screen.getByText('Save as time capsule'));
+  expect(screen.getByText('When should this memory be revealed?')).toBeTruthy();
+  fireEvent.press(screen.getByText('On a date'));
+  expect(screen.getByText('Choose a date')).toBeTruthy();
+});
+
+test('the picker always includes the default My Diary if the returned list omits it', () => {
+  (useDiaries as jest.Mock).mockReturnValue({ diaries: [diaries[1]], isLoading: false, error: null });
+  const screen = render(<DetailsScreen />);
+  fireEvent.press(screen.getByLabelText('Choose a diary'));
+  expect(screen.getByText('My Diary')).toBeTruthy();
+});

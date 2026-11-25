@@ -4,11 +4,45 @@ on:
   pull_request_target:
     types: [closed]
     branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/supabase/migrations/**'
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  changed-files:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - name: Check for backend changes
+        id: filter
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const backend = files.some(file =>
+              file.filename.startsWith('backend/') ||
+              (file.previous_filename || '').startsWith('backend/')
+            );
+            core.setOutput('backend', String(backend));
+
+  backend-deployment-eligible:
+    needs: changed-files
+    if: needs.changed-files.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Backend changes detected.'
+
   migrate:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest

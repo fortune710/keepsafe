@@ -1,6 +1,7 @@
 import { waitFor } from '@testing-library/react-native';
 import { scheduleEntryProcessing } from '../background-task-manager';
 import { EntryService } from '../entry-service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
@@ -43,4 +44,18 @@ test('assigns queued entries to the user’s default diary', async () => {
   await waitFor(() => expect(EntryService.createEntry).toHaveBeenCalledWith(
     'user-1', expect.objectContaining({ user_id: 'user-1', diary_id: 'user-1' })
   ));
+});
+
+test('preserves the selected diary when processing an entry', async () => {
+  await scheduleEntryProcessing({
+    entryId: 'entry-2', userId: 'user-1', diaryId: 'diary-2',
+    capture: { id: 'capture-2', type: 'photo', uri: 'file://photo.jpg', timestamp: new Date() },
+    textContent: '', isPrivate: true, isEveryone: false,
+    selectedFriends: [], attachments: [], idempotencyKey: 'queue-2',
+  });
+
+  await waitFor(() => expect(EntryService.createEntry).toHaveBeenCalledWith(
+    'user-1', expect.objectContaining({ user_id: 'user-1', diary_id: 'diary-2' })
+  ));
+  await waitFor(async () => expect(await AsyncStorage.getItem('last_used_diary')).toBe('diary-2'));
 });

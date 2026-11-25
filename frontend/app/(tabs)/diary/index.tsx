@@ -17,6 +17,7 @@ import { EditDiarySheet } from '@/components/vault/edit-diary-sheet';
 import { Database } from '@/types/database';
 import { InspirationTimeline } from '@/components/inspiration/inspiration-timeline';
 import { useWeeklyInspiration } from '@/hooks/use-weekly-inspiration';
+import { HeaderFade } from '@/components/ui/header-fade';
 
 type HubChip = 'diaries' | 'capsules' | 'inspiration';
 type Diary = Database['public']['Tables']['diaries']['Row'];
@@ -143,6 +144,7 @@ export default function DiaryHubScreen() {
             isPlacesUpdating={inspiration.isPlacesUpdating}
           />
         )}
+        <HeaderFade style={styles.headerFade} />
       </View>
       <CreateDiarySheet
         visible={isCreateSheetVisible}
@@ -227,13 +229,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  headerFade: { height: 8 },
   diaryGridContent: {
     paddingHorizontal: scale(16),
     paddingTop: verticalScale(4),
     paddingBottom: verticalScale(24),
   },
   diaryGridRow: {
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    columnGap: '3.5%',
     marginBottom: verticalScale(20),
   },
   loading: { marginTop: verticalScale(42) },

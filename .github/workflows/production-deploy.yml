@@ -10,10 +10,32 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  eligibility:
     if: >-
       github.event.workflow_run.event == 'pull_request_target' &&
       github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.check.outputs.backend }}
+    steps:
+      - name: Check backend deployment eligibility
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIGRATION_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          [[ "$MIGRATION_RUN_ID" =~ ^[0-9]+$ ]]
+          jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$MIGRATION_RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name == "backend-deployment-eligible" and .conclusion == "success") | .id')"
+          if [[ -n "$jobs" ]]; then
+            echo 'backend=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'backend=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: eligibility
+    if: needs.eligibility.outputs.backend == 'true'
     runs-on: ubuntu-latest
     environment: production
     concurrency:
@@ -108,6 +130,13 @@ jobs:
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_FROM_NUMBER: ${{ secrets.TWILIO_FROM_NUMBER }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          META_INSTAGRAM_CONFIG_ID: ${{ secrets.META_INSTAGRAM_CONFIG_ID }}
+          META_INSTAGRAM_REDIRECT_URI: ${{ secrets.META_INSTAGRAM_REDIRECT_URI }}
+          META_INSTAGRAM_LOGIN_URL: ${{ secrets.META_INSTAGRAM_LOGIN_URL }}
+          META_GRAPH_API_VERSION: ${{ secrets.META_GRAPH_API_VERSION }}
+          INSTAGRAM_TOKEN_ENCRYPTION_KEY: ${{ secrets.INSTAGRAM_TOKEN_ENCRYPTION_KEY }}
         run: python3 .github/scripts/render-production-env.py "$RUNNER_TEMP/keepsafe-production.env"
 
       - name: Transfer candidate environment

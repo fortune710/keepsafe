@@ -1,4 +1,4 @@
-export type InspirationItemType = 'media' | 'place' | 'contact';
+export type InspirationItemType = 'media' | 'place' | 'contact' | 'birthday';
 
 export interface InspirationMediaItem {
   id: string;
@@ -27,7 +27,14 @@ export interface InspirationContactItem {
   initials: string;
 }
 
-export type InspirationItem = InspirationMediaItem | InspirationPlaceItem | InspirationContactItem;
+export interface InspirationBirthdayItem {
+  id: string;
+  type: 'birthday';
+  occurredAt: string;
+  name: string;
+}
+
+export type InspirationItem = InspirationMediaItem | InspirationPlaceItem | InspirationContactItem | InspirationBirthdayItem;
 
 export interface InspirationDay {
   key: string;

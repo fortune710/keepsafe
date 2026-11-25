@@ -34,6 +34,7 @@ interface UseEntryOperationsResult {
     selectedFriends: string[];
     attachments: RenderedMediaCanvasItem[];
     tempId?: string;
+    diaryId?: string;
     timeCapsule?: TimeCapsuleDraft | null;
   }) => Promise<ShareResult>;
   uploadMedia: (file: File | string, userId: string, fileName: string, contentType: string) => Promise<string | null>;
@@ -46,6 +47,7 @@ interface UseEntryOperationsResult {
 export async function generateIdempotencyKey(params: {
   captureUri: string;
   userId: string;
+  diaryId?: string;
   selectedFriends: string[];
   isPrivate: boolean;
   isEveryone: boolean;
@@ -68,6 +70,7 @@ export async function generateIdempotencyKey(params: {
   const dataString = JSON.stringify({
     captureUri: params.captureUri,
     userId: params.userId,
+    ...(params.diaryId && params.diaryId !== params.userId ? { diaryId: params.diaryId } : {}),
     selectedFriends: sortedFriends,
     isPrivate: params.isPrivate,
     isEveryone: params.isEveryone,
@@ -205,6 +208,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
     selectedFriends: string[];
     attachments: RenderedMediaCanvasItem[];
     tempId?: string;
+    diaryId?: string;
     timeCapsule?: TimeCapsuleDraft | null;
   }): Promise<ShareResult> => {
     setIsLoading(true);
@@ -224,6 +228,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
       const idempotencyKey = await generateIdempotencyKey({
         captureUri: entryData.capture.uri,
         userId: user.id,
+        diaryId: entryData.diaryId,
         selectedFriends: entryData.selectedFriends,
         isPrivate: entryData.isPrivate,
         isEveryone: entryData.isEveryone,
@@ -237,6 +242,7 @@ export function useEntryOperations(): UseEntryOperationsResult {
       const processingData = {
         entryId: tempId,
         userId: user.id,
+        diaryId: entryData.diaryId,
         capture: entryData.capture,
         textContent: entryData.textContent,
         musicTag: entryData.musicTag,

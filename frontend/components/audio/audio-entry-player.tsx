@@ -2,14 +2,16 @@ import { Pause, Play } from "lucide-react-native";
 import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
 import AudioWaveVisualier from "./audio-wave-visualier";
 import { useEffect, useState } from "react";
+import { formatAudioDuration } from '@/lib/audio-duration';
 
 interface AudioEntryPlayerProps {
     isPlaying: boolean;
     onTogglePlayback: () => void;
     duration: number;
+    meteringLevel?: number;
 }
 
-export default function AudioEntryPlayer({ isPlaying, onTogglePlayback, duration }: AudioEntryPlayerProps) {
+export default function AudioEntryPlayer({ isPlaying, onTogglePlayback, duration, meteringLevel = 0 }: AudioEntryPlayerProps) {
     const [durationLeft, setDurationLeft] = useState(duration);
 
     useEffect(() => {
@@ -42,9 +44,9 @@ export default function AudioEntryPlayer({ isPlaying, onTogglePlayback, duration
                 <Play color="#8B5CF6" size={24} fill="#8B5CF6" />
                 )}
             </TouchableOpacity>
-            <AudioWaveVisualier isRecording={isPlaying}/>
+            <AudioWaveVisualier isRecording={isPlaying} meteringLevel={meteringLevel}/>
             <Text style={styles.durationText}>
-                {durationLeft ? `${Math.floor(durationLeft / 60)}:${(durationLeft % 60).toString().padStart(2, '0')}` : '0:00'}
+                {formatAudioDuration(durationLeft)}
             </Text>
         </View>
     )
@@ -52,7 +54,7 @@ export default function AudioEntryPlayer({ isPlaying, onTogglePlayback, duration
 
 const styles = StyleSheet.create({
     audioPreview: {
-        height: 300,
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#F8FAFC',

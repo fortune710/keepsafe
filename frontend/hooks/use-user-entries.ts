@@ -761,6 +761,7 @@ export function useUserEntries(friendId?: string, diaryId?: string): UseUserEntr
       const idempotencyKey = await generateIdempotencyKey({
         captureUri: entry.content_url,
         userId: user.id,
+        diaryId: entry.diary_id,
         selectedFriends: entry.shared_with?.filter((id: string) => id !== user.id) || [],
         isPrivate: entry.is_private,
         isEveryone: entry.shared_with_everyone,
@@ -774,6 +775,7 @@ export function useUserEntries(friendId?: string, diaryId?: string): UseUserEntr
       const retryData = {
         entryId: entry.id,
         userId: user.id,
+        diaryId: entry.diary_id,
         capture: {
           id: entry.id,
           type: entry.type,

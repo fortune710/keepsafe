@@ -24,8 +24,18 @@ logger_provider.add_log_record_processor(
 )
 
 # Use environment-driven log level for the OTLP handler
+class StructuredLoggingHandler(LoggingHandler):
+    @staticmethod
+    def _get_attributes(record):
+        attributes = LoggingHandler._get_attributes(record)
+        diagnostic = attributes.pop("diagnostic_message", None)
+        if diagnostic is not None:
+            attributes["message"] = diagnostic
+        return attributes
+
+
 log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
-handler = LoggingHandler(level=log_level, logger_provider=logger_provider)
+handler = StructuredLoggingHandler(level=log_level, logger_provider=logger_provider)
 logging.getLogger().addHandler(handler)
 
 

@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -17,6 +18,31 @@ REQUIRED = (
 
 
 class RenderProductionEnvTests(unittest.TestCase):
+    def test_instagram_settings_reach_backend_container(self):
+        instagram_values = {
+            'META_APP_ID': 'example-app-id',
+            'META_APP_SECRET': 'example-secret',
+            'META_INSTAGRAM_CONFIG_ID': 'example-config-id',
+            'META_INSTAGRAM_REDIRECT_URI': 'https://example.com/instagram/callback',
+            'META_INSTAGRAM_LOGIN_URL': 'https://facebook.com/dialog/oauth?client_id=123&state=placeholder',
+            'META_GRAPH_API_VERSION': 'v27.0',
+            'INSTAGRAM_TOKEN_ENCRYPTION_KEY': 'example-encryption-key',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'env'
+            env = {key: 'placeholder' for key in REQUIRED}
+            env.update(instagram_values)
+            env['PATH'] = os.environ['PATH']
+            subprocess.run([sys.executable, str(RENDERER), str(output)], env=env, check=True)
+            result = subprocess.run(
+                ['docker', 'compose', '--env-file', str(output), '-f', str(ROOT / 'compose.production.yaml'),
+                 'config', '--format', 'json'],
+                env={'PATH': os.environ['PATH']}, check=True, capture_output=True, text=True,
+            )
+            backend_environment = json.loads(result.stdout)['services']['backend']['environment']
+            for name, value in instagram_values.items():
+                self.assertEqual(backend_environment[name], value)
+
     def test_redis_url_and_password_are_required(self):
         for missing in ('REDIS_URL', 'REDIS_PASSWORD'):
             with self.subTest(missing=missing), tempfile.TemporaryDirectory() as directory:

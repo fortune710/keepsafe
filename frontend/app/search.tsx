@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   FlatList,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -14,7 +13,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sparkles, ArrowLeft, SendHorizonal, Video as VideoIcon, Mic } from 'lucide-react-native';
+import { Sparkles, ChevronLeft, Video as VideoIcon, Mic } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useSearch } from '@/hooks/use-search';
 import { useUserEntries } from '@/hooks/use-user-entries';
@@ -22,6 +21,7 @@ import { Colors } from '@/lib/constants';
 import { Image } from 'expo-image';
 import Markdown from 'react-native-markdown-display';
 import { scale, verticalScale } from 'react-native-size-matters';
+import { SearchComposer } from '@/components/search/search-composer';
 
 const SAMPLE_QUERIES = [
   'Show me my happiest memories',
@@ -246,8 +246,8 @@ export default function SearchScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 16 : 0}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft color="#64748B" size={24} />
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back">
+            <ChevronLeft color="#64748B" size={24} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Go Back In Time</Text>
@@ -333,27 +333,7 @@ export default function SearchScreen() {
 
         <View style={styles.inputContainer}>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Ask anything about your memories…"
-              placeholderTextColor="#94A3B8"
-              value={input}
-              onChangeText={setInput}
-              onSubmitEditing={handleSubmit}
-              returnKeyType="search"
-            />
-            <TouchableOpacity
-              style={[
-                styles.searchButton,
-                (!input.trim() || isLoading) && styles.searchButtonDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={!input.trim() || isLoading}
-            >
-              <SendHorizonal color="white" size={20} />
-            </TouchableOpacity>
-          </View>
+          <SearchComposer value={input} onChangeText={setInput} onSubmit={handleSubmit} isLoading={isLoading} />
           <Text style={styles.hintText}>
             Results are generated from your memories and what you’ve shared with friends.
           </Text>
@@ -377,10 +357,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: verticalScale(4),
-    backgroundColor: 'rgba(240, 249, 255, 0.96)',
+    backgroundColor: Colors.background,
   },
   backButton: {
-    padding: 8,
+    padding: scale(10),
+    backgroundColor: Colors.white,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: 100,
   },
   headerTitleContainer: {
     flexDirection: 'row',
@@ -393,7 +377,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   headerSpacer: {
-    width: 32,
+    width: scale(44),
   },
   content: {
     flex: 1,
@@ -488,47 +472,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 8,
     paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-    height: verticalScale(110),
-    marginBottom: verticalScale(-30)
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    fontSize: 14,
-    color: '#111827',
-    fontFamily: 'Figtree-Regular',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  searchButton: {
-    borderRadius: 999,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-  searchButtonDisabled: {
-    backgroundColor: '#CBD5F5',
-  },
-  searchButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    backgroundColor: Colors.background,
   },
   hintText: {
     marginTop: 6,
+    textAlign: 'center',
     fontSize: 11,
     color: '#9CA3AF',
     fontFamily: 'Figtree-Regular',

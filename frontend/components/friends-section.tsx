@@ -16,6 +16,7 @@ interface FriendsSectionProps {
   onBlockFriend?: (friendshipId: string) => void;
   isLoading?: boolean;
   searchQuery?: string;
+  bottomPadding?: number;
 }
 
 export default function FriendsSection({ 
@@ -26,7 +27,8 @@ export default function FriendsSection({
   onDeclineRequest,
   onBlockFriend,
   isLoading = false,
-  searchQuery = ''
+  searchQuery = '',
+  bottomPadding = 0,
 }: FriendsSectionProps) {
   const filteredFriends = friends.filter(friend => 
     friend.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -65,7 +67,7 @@ export default function FriendsSection({
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: bottomPadding }} showsVerticalScrollIndicator={false}>
       {pendingFriends.length > 0 && (
         <>
           <View style={styles.sectionHeader}>

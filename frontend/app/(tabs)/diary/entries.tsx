@@ -14,9 +14,9 @@ import { DateContainer } from '@/components/date-container';
 import AudioPreviewPopover from '@/components/capture/music/audio-preview-popover';
 import { MusicTag } from '@/types/capture';
 import { useResponsive } from '@/hooks/use-responsive';
-import { ChevronLeft, Filter } from 'lucide-react-native';
+import { ChevronLeft, Filter, MoreHorizontal, Pencil, Trash2 } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
 import { Colors } from '@/lib/constants';
-import { CircleIconButton } from '@/components/ui/circle-icon-button';
 import NewEntriesIndicator from '@/components/new-entries-indicator';
 import { useToast } from '@/hooks/use-toast';
 import { EntryWithProfile } from '@/types/entries';
@@ -33,6 +33,8 @@ import EmptyFriendVault from '@/components/vault/empty-friend-vault';
 import { deviceStorage } from '@/services/device-storage';
 import { posthog } from '@/constants/posthog';
 import { DiaryOpeningTransition } from '@/components/vault/diary-opening-transition';
+import { EditDiarySheet } from '@/components/vault/edit-diary-sheet';
+import { useDiaries } from '@/hooks/use-diaries';
 
 const MUSIC_PLAYER_ANIMATION_DURATION = 300;
 const MUSIC_PLAYER_CLEANUP_DELAY = MUSIC_PLAYER_ANIMATION_DURATION + 50;
@@ -43,6 +45,7 @@ export default function DiaryEntriesScreen() {
   const params = useLocalSearchParams<{
     friendId?: string | string[];
     diaryId?: string | string[];
+    title?: string | string[];
     color?: string | string[];
     style?: string | string[];
     transitionX?: string | string[];
@@ -52,6 +55,9 @@ export default function DiaryEntriesScreen() {
   }>();
   const selectedFriendId = Array.isArray(params.friendId) ? params.friendId[0] : params.friendId;
   const selectedDiaryId = Array.isArray(params.diaryId) ? params.diaryId[0] : params.diaryId;
+  const { diaries, updateDiary, isUpdating } = useDiaries();
+  const currentDiary = diaries.find((diary) => diary.id === selectedDiaryId) ?? null;
+  const diaryName = currentDiary?.name || (Array.isArray(params.title) ? params.title[0] : params.title)?.trim();
   const transitionColor = Array.isArray(params.color) ? params.color[0] : params.color;
   const transitionStyle = Array.isArray(params.style) ? params.style[0] : params.style;
   const transitionSource = useMemo(() => {
@@ -65,6 +71,14 @@ export default function DiaryEntriesScreen() {
   }, [params.transitionHeight, params.transitionWidth, params.transitionX, params.transitionY]);
   const responsive = useResponsive();
   const { toast } = useToast();
+  const handleStartCapturing = () => {
+    try {
+      if (!selectedDiaryId?.trim()) throw new Error('Diary ID is missing');
+      router.push({ pathname: '/capture', params: { diary_id: selectedDiaryId } });
+    } catch {
+      toast('An error occurred while setting things up.', 'error');
+    }
+  };
   const { friends, blockFriend: blockFriendAction } = useFriends(profile?.id);
   const { reportedPostIds } = useReportedEntries();
   const {
@@ -95,6 +109,9 @@ export default function DiaryEntriesScreen() {
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
   const [isMusicPlayerVisible, setIsMusicPlayerVisible] = useState(false);
   const [isFriendFilterVisible, setIsFriendFilterVisible] = useState(false);
+  const [isDiaryMenuVisible, setIsDiaryMenuVisible] = useState(false);
+  const [isEditDiaryVisible, setIsEditDiaryVisible] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(verticalScale(110));
 
   const musicPlayerCleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashListRef = useRef<FlashListRef<string>>(null);
@@ -345,6 +362,62 @@ export default function DiaryEntriesScreen() {
     />
   );
 
+  const renderHeader = (showFilter: boolean) => (
+    <View
+      style={styles.header}
+      pointerEvents="box-none"
+      onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
+    >
+      <Pressable
+        style={styles.headerBackButton}
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        accessibilityHint="Returns to the previous screen"
+      >
+        <ChevronLeft color="#64748B" size={24} />
+      </Pressable>
+      {(showFilter || currentDiary) && (
+        <View style={styles.headerActionsAnchor}>
+          <View style={styles.headerActions}>
+            <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+            <View style={styles.headerActionsSheen} pointerEvents="none" />
+            <View style={styles.headerActionsBorder} pointerEvents="none" />
+            {showFilter && (
+              <Pressable style={styles.headerAction} onPress={() => { setIsDiaryMenuVisible(false); setIsFriendFilterVisible(true); }} accessibilityRole="button" accessibilityLabel={friendFilterAccessibilityLabel} accessibilityHint="Opens the friend filter menu">
+                <Filter color={selectedFriend ? '#8B5CF6' : '#64748B'} size={24} />
+              </Pressable>
+            )}
+            {currentDiary && (
+              <Pressable style={styles.headerAction} onPress={() => setIsDiaryMenuVisible((open) => !open)} accessibilityRole="button" accessibilityLabel="Diary options" accessibilityState={{ expanded: isDiaryMenuVisible }}>
+                <MoreHorizontal color="#64748B" size={24} />
+              </Pressable>
+            )}
+          </View>
+          {isDiaryMenuVisible && currentDiary && (
+            <View style={styles.diaryMenu}>
+              <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+              <View style={styles.menuSheen} pointerEvents="none" />
+              <Pressable style={styles.menuItem} accessibilityRole="button" onPress={() => { setIsDiaryMenuVisible(false); setIsEditDiaryVisible(true); }}>
+                <Pencil color="#475569" size={19} /><Text style={styles.menuText}>Edit Diary</Text>
+              </Pressable>
+              <Pressable style={styles.menuItem} accessibilityRole="button" onPress={() => { setIsDiaryMenuVisible(false); Alert.alert('Delete diary', 'Deleting diaries is not available yet.'); }}>
+                <Trash2 color="#DC2626" size={19} /><Text style={[styles.menuText, styles.deleteText]}>Delete Diary</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
+  const diaryMenuOverlays = (
+    <>
+      {isDiaryMenuVisible && <Pressable style={styles.menuDismiss} onPress={() => setIsDiaryMenuVisible(false)} accessibilityRole="button" accessibilityLabel="Close diary options" />}
+      <EditDiarySheet visible={isEditDiaryVisible} diary={currentDiary} isSaving={isUpdating} onClose={() => setIsEditDiaryVisible(false)} onSave={updateDiary} />
+    </>
+  );
+
   if (error) {
     return (
       <View style={styles.errorContainer}>
@@ -370,15 +443,26 @@ export default function DiaryEntriesScreen() {
 
   if ((!entries || visibleEntriesCount === 0) && !params.friendId) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No entries yet</Text>
-        <Text style={styles.emptySubtext}>Start capturing moments to see them here</Text>
-        <TouchableOpacity
-          style={styles.captureButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.captureButtonText}>Start Capturing</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        {renderHeader(false)}
+        {diaryMenuOverlays}
+        <View style={styles.emptyContainer}>
+          <Image
+            source={require('@/assets/illustrations/empty-diary.png')}
+            style={styles.emptyIllustration}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+            accessible={false}
+          />
+          <Text style={styles.emptyText}>No entries in {diaryName || 'this diary'}</Text>
+          <Text style={styles.emptySubtext}>Capture memories to see them here.</Text>
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={handleStartCapturing}
+          >
+            <Text style={styles.captureButtonText}>Start Capturing</Text>
+          </TouchableOpacity>
+        </View>
         {openingTransition}
       </View>
     );
@@ -387,23 +471,8 @@ export default function DiaryEntriesScreen() {
   return (
     <EntryPage>
       <Animated.View style={styles.container}>
-        <View style={styles.header}>
-          <Pressable
-            style={styles.headerBackButton}
-            onPress={() => router.back()}
-            accessibilityLabel="Go back"
-            accessibilityHint="Returns to the previous screen"
-          >
-            <ChevronLeft color="#64748B" size={24} />
-          </Pressable>
-          <CircleIconButton
-            onPress={() => setIsFriendFilterVisible(true)}
-            accessibilityLabel={friendFilterAccessibilityLabel}
-            accessibilityHint="Opens the friend filter menu"
-          >
-            <Filter color={selectedFriend ? '#8B5CF6' : '#64748B'} size={18} />
-          </CircleIconButton>
-        </View>
+        {renderHeader(true)}
+        {diaryMenuOverlays}
 
         <View style={styles.content}>
           <FlashList
@@ -411,6 +480,7 @@ export default function DiaryEntriesScreen() {
             data={Object.keys(filteredEntriesByDate)}
             contentContainerStyle={{
               ...styles.contentContainer,
+              paddingTop: Math.max(0, headerHeight - verticalScale(16)),
               ...(responsive.isTablet && {
                 paddingHorizontal: responsive.contentPadding,
                 maxWidth: responsive.maxContentWidth,
@@ -533,9 +603,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-    marginVertical: verticalScale(24)
+    marginVertical: verticalScale(8)
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -550,6 +625,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 100,
   },
+  headerActionsAnchor: { position: 'relative' },
+  headerActions: { flexDirection: 'row', borderRadius: 999, overflow: 'hidden' },
+  headerActionsSheen: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255, 255, 255, 0.2)' },
+  headerActionsBorder: { ...StyleSheet.absoluteFill, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.35)' },
+  headerAction: { paddingHorizontal: scale(16), paddingVertical: verticalScale(10), alignItems: 'center', justifyContent: 'center' },
+  menuDismiss: { ...StyleSheet.absoluteFill, zIndex: 2 },
+  diaryMenu: { position: 'absolute', right: 0, top: '100%', marginTop: verticalScale(8), minWidth: scale(180), borderRadius: scale(18), overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.35)' },
+  menuSheen: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255, 255, 255, 0.35)' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: scale(12), paddingHorizontal: scale(16), paddingVertical: verticalScale(10) },
+  menuText: { color: '#334155', fontFamily: 'Figtree-SemiBold', fontSize: scale(14) },
+  deleteText: { color: '#DC2626' },
   friendAvatar: {
     width: scale(24),
     height: scale(24),
@@ -605,6 +691,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 32,
   },
+  emptyIllustration: {
+    width: scale(150),
+    height: scale(150),
+    marginBottom: verticalScale(12),
+  },
   emptyText: {
     fontSize: 20,
     fontWeight: '600',
@@ -623,7 +714,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8B5CF6',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 36,
   },
   captureButtonText: {
     color: 'white',

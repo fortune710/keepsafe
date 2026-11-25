@@ -4,6 +4,8 @@ import { CameraType, CameraView } from "expo-camera";
 import { useRouter } from "expo-router";
 import { RefObject, useRef, useEffect } from "react";
 import { Alert } from "react-native";
+import { useAuthContext } from '@/providers/auth-provider';
+import { resolveCaptureDiaryId } from '@/lib/last-used-diary';
 
 interface VideoCaptureParams {
     cameraRef: RefObject<CameraView | null>;
@@ -12,6 +14,7 @@ interface VideoCaptureParams {
     cameraMode: 'picture' | 'video';
     updateCameraMode: (mode: 'picture' | 'video') => void;
     isTimeCapsule: boolean;
+    diaryId?: string;
 }
 
 /**
@@ -50,8 +53,10 @@ export function usePhotoCapture({
     cameraMode,
     updateCameraMode,
     isTimeCapsule,
+    diaryId,
 }: VideoCaptureParams) {
     const router = useRouter();
+    const { user } = useAuthContext();
     const isCameraReadyRef = useRef(isCameraReady);
 
     // Sync ref with prop
@@ -94,6 +99,7 @@ export function usePhotoCapture({
                         uri: encodeURIComponent(capture.uri),
                         facing: facing,
                         timeCapsule: isTimeCapsule ? 'true' : undefined,
+                        diary_id: await resolveCaptureDiaryId(diaryId, user?.id),
                     }
                 });
             }

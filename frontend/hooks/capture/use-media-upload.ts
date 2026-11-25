@@ -1,6 +1,8 @@
 import { logger } from "@/lib/logger";
 import { router } from "expo-router";
 import { useMediaCapture } from "@/hooks/use-media-capture";
+import { useAuthContext } from '@/providers/auth-provider';
+import { resolveCaptureDiaryId } from '@/lib/last-used-diary';
 
 /**
  * A custom hook to handle the media upload workflow based on the selected mode.
@@ -16,7 +18,8 @@ import { useMediaCapture } from "@/hooks/use-media-capture";
  * Triggers navigation via `router.push` and logs debug information about the capture.
  * May indirectly trigger media permission requests and hardware access via `useMediaCapture`.
  */
-export function useMediaUpload(selectedMode: 'camera' | 'microphone', isTimeCapsule = false) {
+export function useMediaUpload(selectedMode: 'camera' | 'microphone', isTimeCapsule = false, diaryId?: string) {
+    const { user } = useAuthContext();
 
     const {
         uploadMedia
@@ -37,6 +40,7 @@ export function useMediaUpload(selectedMode: 'camera' | 'microphone', isTimeCaps
                     uri: encodeURIComponent(capture.uri),
                     duration: capture.duration?.toString(),
                     timeCapsule: isTimeCapsule ? 'true' : undefined,
+                    diary_id: await resolveCaptureDiaryId(diaryId, user?.id),
                 }
             });
         }

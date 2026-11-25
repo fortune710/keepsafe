@@ -4,12 +4,13 @@ import { BlurView } from 'expo-blur';
 import { getFocusedRouteNameFromRoute } from 'expo-router/react-navigation';
 import { PlatformPressable } from 'expo-router/react-navigation';
 import { Colors } from '@/lib/constants';
-import { scale, verticalScale } from 'react-native-size-matters';
+import { scale } from 'react-native-size-matters';
 import { CalendarIcon } from '@/components/icons/calendar-icon';
 import { DiaryIcon } from '@/components/icons/diary-icon';
 import { CaptureIcon } from '@/components/icons/capture-icon';
 import { FriendsIcon } from '@/components/icons/friends-icon';
 import { SettingsIcon } from '@/components/icons/settings-icon';
+import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/tab-bar';
 
 const TAB_BAR_RADIUS = scale(42);
 const TAB_ICON_SIZE = scale(22);
@@ -22,8 +23,8 @@ const TAB_BAR_STYLE = {
   paddingBottom: 0,
   left: scale(100),
   right: scale(100),
-  bottom: verticalScale(28),
-  height: verticalScale(64),
+  bottom: TAB_BAR_BOTTOM,
+  height: TAB_BAR_HEIGHT,
   borderRadius: TAB_BAR_RADIUS,
   backgroundColor: 'transparent',
   overflow: 'hidden' as const,

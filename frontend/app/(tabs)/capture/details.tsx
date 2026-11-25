@@ -9,11 +9,16 @@ import {
   Platform,
   Pressable,
   Dimensions,
+  ScrollView,
+  Switch,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
-import { X, Sticker, UserPlus2, Hourglass } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { X, Sticker, UserPlus2, Check, ChevronLeft, Hourglass } from 'lucide-react-native';
+import { DiaryIcon } from '@/components/icons/diary-icon';
+import { useDiaries } from '@/hooks/use-diaries';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { BackButton } from '@/components/back-button';
 import { useEntryOperations } from '@/hooks/use-entry-operations';
@@ -47,6 +52,7 @@ import EntryShareList from '@/components/friends/entry-share-list';
 import EntryAttachmentList from '@/components/capture/entry-attachment-list';
 import { MediaCanvasItemType } from '@/types/capture';
 import { useCaptureContext } from '@/providers/capture-provider';
+import { DiaryCoverVisual } from '@/components/vault/diary-cover-card';
 
 interface Friend {
   id: string;
@@ -71,8 +77,9 @@ const PHOTO_CARD_HEIGHT = SCREEN_HEIGHT * 0.5;
  * @returns The Details screen UI for adding details to a capture, managing attachments and privacy, and submitting the entry.
  */
 export default function DetailsScreen() {
+  const timeCapsuleScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams();
-  const { captureId, type, uri, duration, facing, timeCapsule } = params;
+  const { captureId, type, uri, duration, facing, timeCapsule, diary_id } = params;
 
   const capture: MediaCapture = {
     id: captureId as string,
@@ -86,6 +93,11 @@ export default function DetailsScreen() {
   };
 
   const { user } = useAuthContext();
+  const { diaries, isLoading: diariesLoading, error: diariesError } = useDiaries();
+  const [selectedDiaryId, setSelectedDiaryId] = useState(
+    Array.isArray(diary_id) ? diary_id[0] : diary_id,
+  );
+  const effectiveDiaryId = selectedDiaryId || user?.id;
   const { saveEntry, isLoading } = useEntryOperations();
   const { isSaveLocked, lockSave } = useSaveLock();
   const { friends } = useFriends(user?.id);
@@ -135,8 +147,9 @@ export default function DetailsScreen() {
   const { toast } = useToast();
 
   const [showEditorPopover, setShowEditorPopover] = useState<boolean>(false);
+  const pendingAttachment = useRef<MediaCanvasItemType | null>(null);
   const [activeSheet, setActiveSheet] = useState<
-    'attachments' | 'friends' | 'timeCapsule' | null
+    'attachments' | 'friends' | 'diaries' | 'timeCapsule' | null
   >(null);
   const [timeCapsuleDraft, setTimeCapsuleDraft] = useState<TimeCapsuleDraft | null>(
     timeCapsule === 'true' ? { revealType: 'date', unlockAt: tomorrowIso() } : null,
@@ -150,7 +163,7 @@ export default function DetailsScreen() {
   );
   const [pendingTextValue, setPendingTextValue] = useState<string>('');
 
-  const player = useVideoPlayer(uri as string, (player) => {
+  const player = useVideoPlayer(capture.uri, (player) => {
     player.loop = false;
     // Don't auto-play video - let user control playback
     // player.play();
@@ -232,7 +245,15 @@ export default function DetailsScreen() {
 
   // Handle attachment type selection
   const handleAttachmentSelect = (type: MediaCanvasItemType) => {
+    if (pendingAttachment.current !== null) return;
+    pendingAttachment.current = type;
     setActiveSheet(null);
+  };
+
+  const handleAttachmentDismissed = () => {
+    const type = pendingAttachment.current;
+    if (!type) return;
+    pendingAttachment.current = null;
     if (type === 'text') {
       // Auto-add text with default value
       const defaultText = 'Enter text';
@@ -351,7 +372,7 @@ export default function DetailsScreen() {
       const optimisticEntry = {
         id: tempId,
         user_id: user.id,
-        diary_id: user.id,
+        diary_id: effectiveDiaryId || user.id,
         type: capture.type as 'photo' | 'video' | 'audio',
         shared_with: [user.id, ...selectedFriends],
         attachments: entryAttachments,
@@ -403,6 +424,7 @@ export default function DetailsScreen() {
 
       const result = await saveEntry({
         capture,
+        diaryId: effectiveDiaryId,
         textContent: caption,
         musicTag: '',
         locationTag: locationTag || undefined,
@@ -519,11 +541,13 @@ export default function DetailsScreen() {
           <TouchableOpacity
             style={[
               styles.modeButton,
-              activeSheet === 'timeCapsule' && styles.modeButtonActive,
+              (activeSheet === 'diaries' || activeSheet === 'timeCapsule') && styles.modeButtonActive,
             ]}
-            onPress={() => setActiveSheet('timeCapsule')}
+            onPress={() => setActiveSheet('diaries')}
+            accessibilityRole="button"
+            accessibilityLabel="Choose a diary"
           >
-            <Hourglass color={timeCapsuleDraft ? '#8B5CF6' : '#64748B'} size={24} />
+            <DiaryIcon color={timeCapsuleDraft ? '#8B5CF6' : '#64748B'} size={24} />
           </TouchableOpacity>
         </View>
       </View>
@@ -587,6 +611,7 @@ export default function DetailsScreen() {
       <BottomSheet
         visible={activeSheet === 'attachments'}
         onClose={() => setActiveSheet(null)}
+        onDismiss={handleAttachmentDismissed}
       >
         <View style={styles.sheetBody}>
           <View style={styles.sheetHeader}>
@@ -631,12 +656,20 @@ export default function DetailsScreen() {
       </BottomSheet>
 
       <BottomSheet
-        visible={activeSheet === 'timeCapsule'}
+        visible={activeSheet === 'diaries' || activeSheet === 'timeCapsule'}
         onClose={() => setActiveSheet(null)}
+        height="55%"
+        maxHeight="55%"
       >
-        <View style={styles.sheetBody}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Time Capsule</Text>
+        <View style={styles.diarySheetBody}>
+          <View style={styles.diarySheetHeader}>
+            <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} pointerEvents="none" />
+            {activeSheet === 'timeCapsule' ? (
+              <TouchableOpacity onPress={() => setActiveSheet('diaries')} accessibilityRole="button" accessibilityLabel="Back to diaries" hitSlop={12}>
+                <ChevronLeft color="#64748B" size={24} />
+              </TouchableOpacity>
+            ) : null}
+            <Text style={styles.sheetTitle}>{activeSheet === 'diaries' ? 'Choose a diary' : 'Time Capsule'}</Text>
             <TouchableOpacity
               style={styles.sheetCloseButton}
               onPress={() => setActiveSheet(null)}
@@ -645,7 +678,59 @@ export default function DetailsScreen() {
               <X color="#64748B" size={20} />
             </TouchableOpacity>
           </View>
-          <TimeCapsuleConfig value={timeCapsuleDraft} onChange={setTimeCapsuleDraft} />
+          {activeSheet === 'diaries' ? (
+            <>
+              <View style={styles.diaryListWrapper}>
+              <ScrollView style={styles.diaryList} contentContainerStyle={styles.diaryListContent} keyboardShouldPersistTaps="handled">
+                {diariesLoading && diaries.length === 0 ? <Text style={styles.diaryMessage}>Loading diaries...</Text> : null}
+                {diariesError && diaries.length === 0 ? <Text style={styles.diaryMessage}>Unable to load diaries. Please try again.</Text> : null}
+                {!diariesLoading && !diariesError && diaries.length === 0 ? <Text style={styles.diaryMessage}>No diaries available.</Text> : null}
+                {[...diaries.filter((diary) => diary.id === effectiveDiaryId), ...diaries.filter((diary) => diary.id !== effectiveDiaryId)].map((diary) => {
+                  const selected = diary.id === effectiveDiaryId;
+                  return (
+                    <TouchableOpacity
+                      key={diary.id}
+                      style={[styles.diaryRow, selected && styles.diaryRowSelected]}
+                      onPress={() => setSelectedDiaryId(diary.id)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                    >
+                      <DiaryCoverVisual color={diary.cover_color || diary.color || '#8B5CF6'} diaryStyle={diary.style} borderRadius={scale(3)} style={styles.diaryCover} />
+                      <Text style={styles.diaryName}>{diary.name}</Text>
+                      {selected ? <Check color="#8B5CF6" size={20} /> : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <LinearGradient pointerEvents="none" colors={['rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} style={styles.diaryFadeTop} />
+              <LinearGradient pointerEvents="none" colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)']} style={styles.diaryFadeBottom} />
+              </View>
+              <View style={styles.capsuleFooter}>
+                <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} pointerEvents="none" />
+                <Pressable style={styles.capsuleFooterLabel} accessibilityRole="button" onPress={() => {
+                  setTimeCapsuleDraft((draft) => draft ?? { revealType: 'date', unlockAt: tomorrowIso() });
+                  setActiveSheet('timeCapsule');
+                }}>
+                  <Hourglass color="#8B5CF6" size={18} />
+                  <Text style={styles.capsuleFooterText}>Save as time capsule</Text>
+                </Pressable>
+                <Switch
+                  accessibilityLabel="Save as time capsule"
+                  value={timeCapsuleDraft !== null}
+                  onValueChange={(enabled) => {
+                    if (!enabled) { setTimeCapsuleDraft(null); return; }
+                    setTimeCapsuleDraft((draft) => draft ?? { revealType: 'date', unlockAt: tomorrowIso() });
+                    setActiveSheet('timeCapsule');
+                  }}
+                  trackColor={{ true: '#8B5CF6', false: Colors.border }}
+                />
+              </View>
+            </>
+          ) : (
+            <ScrollView ref={timeCapsuleScrollRef} style={styles.diaryListWrapper} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets>
+              <TimeCapsuleConfig value={timeCapsuleDraft} onChange={setTimeCapsuleDraft} onCustomInputLayout={() => requestAnimationFrame(() => timeCapsuleScrollRef.current?.scrollToEnd({ animated: true }))} />
+            </ScrollView>
+          )}
         </View>
       </BottomSheet>
 
@@ -761,6 +846,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  diarySheetBody: { flex: 1, paddingHorizontal: scale(12), paddingTop: verticalScale(8), paddingBottom: verticalScale(16) },
+  diarySheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(8), paddingBottom: verticalScale(12), overflow: 'hidden' },
+  diaryListWrapper: { flex: 1 },
+  diaryList: { flex: 1 },
+  diaryListContent: { paddingHorizontal: scale(2) },
+  diaryFadeTop: { position: 'absolute', top: 0, left: 0, right: 0, height: verticalScale(8) },
+  diaryFadeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: verticalScale(8) },
+  diaryRow: {
+    flexDirection: 'row', alignItems: 'center', padding: scale(10),
+    borderRadius: scale(12), marginBottom: verticalScale(6),
+  },
+  diaryRowSelected: { backgroundColor: '#F3EFFF', marginBottom: verticalScale(16) },
+  diaryCover: {
+    width: scale(28), marginRight: scale(12),
+  },
+  diaryName: { flex: 1, fontFamily: 'Figtree-SemiBold', fontSize: 15, color: '#1E293B' },
+  diaryMessage: { fontFamily: 'Figtree-Regular', color: '#64748B', paddingVertical: verticalScale(16) },
+  capsuleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(8), paddingTop: verticalScale(12), overflow: 'hidden' },
+  capsuleFooterLabel: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: scale(10), paddingVertical: verticalScale(8) },
+  capsuleFooterText: { fontFamily: 'Figtree-SemiBold', fontSize: 15, color: '#8B5CF6' },
   mediaPreview: {
     width: '100%',
     height: PHOTO_CARD_HEIGHT,

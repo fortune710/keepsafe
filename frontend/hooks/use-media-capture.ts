@@ -7,6 +7,7 @@ import * as Crypto from 'expo-crypto';
 import { CameraView } from 'expo-camera';
 import { MediaService } from '@/services/media-service';
 import { useCaptureContext } from '@/providers/capture-provider';
+import { isAudioDurationAllowed } from '@/lib/audio-duration';
 
 interface UseCaptureResult {
   isCapturing: boolean;
@@ -119,6 +120,10 @@ export function useMediaCapture(): UseCaptureResult {
       const duration = recorder.currentTime;
       await recorder.stop();
       await setAudioModeAsync({ allowsRecording: false });
+      if (!isAudioDurationAllowed(duration)) {
+        Alert.alert('Recording too long', 'Audio recordings must be 30 minutes or less.');
+        return null;
+      }
       if (!recorder.uri) throw new Error('No recording URI available');
       const capture: MediaCapture = { id: generateId(), type: 'audio', uri: recorder.uri, duration, timestamp: new Date() };
       setCapturedMedia(capture);

@@ -45,7 +45,7 @@ export default function CaptureScreen() {
   const RECAP_CHIP_REVEAL_EARLY_MS = 140;
 
   const responsive = useResponsive();
-  const { timeCapsule, locationAttachment } = useLocalSearchParams<{ timeCapsule?: string; locationAttachment?: string }>();
+  const { timeCapsule, locationAttachment, diary_id } = useLocalSearchParams<{ timeCapsule?: string; locationAttachment?: string; diary_id?: string }>();
   const insets = useSafeAreaInsets();
   const [captureUIMode, setCaptureUIMode] = useState<CaptureUIMode>('photo');
   const selectedMode: 'camera' | 'microphone' =
@@ -86,6 +86,7 @@ export default function CaptureScreen() {
     cameraMode,
     captureMode: selectedMode,
     isTimeCapsule: timeCapsule === 'true',
+    diaryId: diary_id,
     updateCameraMode: setCameraMode,
     updateCameraReady: setIsCameraReady,
   });
@@ -97,15 +98,17 @@ export default function CaptureScreen() {
     facing,
     updateCameraMode: setCameraMode,
     isTimeCapsule: timeCapsule === 'true',
+    diaryId: diary_id,
   });
 
   const { toggleRecording } = useAudioCapture({
     cameraRef,
     setVideoDuration,
     isTimeCapsule: timeCapsule === 'true',
+    diaryId: diary_id,
   });
 
-  const { handleUpload } = useMediaUpload(selectedMode, timeCapsule === 'true');
+  const { handleUpload } = useMediaUpload(selectedMode, timeCapsule === 'true', diary_id);
 
   // Release save lock when capture screen mounts (after navigating back from details)
   useVaultPreloader();

@@ -9,6 +9,7 @@ import { EntryService } from './entry-service';
 import { TimeCapsuleService } from './time-capsule-service';
 import { TimeCapsuleDraft } from '@/components/capture/time-capsule-config';
 import { logger } from '@/lib/logger';
+import { rememberLastUsedDiary } from '@/lib/last-used-diary';
 
 type Entry = Database['public']['Tables']['entries']['Row'];
 type EntryInsert = Database['public']['Tables']['entries']['Insert'];
@@ -16,6 +17,7 @@ type EntryInsert = Database['public']['Tables']['entries']['Insert'];
 interface EntryProcessingData {
   entryId: string;
   userId: string;
+  diaryId?: string;
   capture: MediaCapture;
   textContent: string;
   musicTag?: string;
@@ -186,7 +188,7 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
       const newEntry: EntryInsert = {
         id: data.entryId as any,
         user_id: data.userId,
-        diary_id: data.userId,
+        diary_id: data.diaryId || data.userId,
         type: data.capture.type as 'photo' | 'video' | 'audio',
         shared_with: sharedWith,
         content_url: finalContentUrl,
@@ -218,6 +220,12 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
       if (!capsuleCreated) {
         throw new Error('Entry saved, but sealing it in your Time Capsule failed. Please retry.');
       }
+    }
+
+    try {
+      await rememberLastUsedDiary(data.userId, data.diaryId || data.userId);
+    } catch (error) {
+      logger.warn('Unable to remember the last used diary', error);
     }
 
     if (isTimeCapsule) {

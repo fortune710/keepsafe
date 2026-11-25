@@ -1,23 +1,30 @@
-import { useCallback, RefObject } from 'react';
+import { useCallback, useEffect, useRef, RefObject } from 'react';
 import { router } from 'expo-router';
 import { useCaptureContext } from '@/providers/capture-provider';
 import { useMediaCapture } from '@/hooks/use-media-capture';
 import { logger } from '@/lib/logger';
 import { CameraView } from 'expo-camera';
+import { useAuthContext } from '@/providers/auth-provider';
+import { resolveCaptureDiaryId } from '@/lib/last-used-diary';
+import { MAX_AUDIO_DURATION_SECONDS } from '@/lib/audio-duration';
 
 interface AudioCaptureParams {
     cameraRef: RefObject<CameraView | null>;
     setVideoDuration: (duration: number) => void;
     isTimeCapsule: boolean;
+    diaryId?: string;
 }
 
 export function useAudioCapture({
     cameraRef,
     setVideoDuration,
     isTimeCapsule,
+    diaryId,
 }: AudioCaptureParams) {
     const { isCapturing, isVideoRecording, setIsVideoRecording } = useCaptureContext();
+    const { user } = useAuthContext();
     const { startAudioRecording, stopAudioRecording } = useMediaCapture();
+    const toggleRef = useRef<() => Promise<void>>(async () => {});
 
     const toggleRecording = useCallback(async () => {
         if (isCapturing) {
@@ -31,6 +38,7 @@ export function useAudioCapture({
                         uri: encodeURIComponent(capture.uri),
                         duration: capture.duration?.toString() || '0',
                         timeCapsule: isTimeCapsule ? 'true' : undefined,
+                        diary_id: await resolveCaptureDiaryId(diaryId, user?.id),
                     }
                 });
             }
@@ -63,7 +71,16 @@ export function useAudioCapture({
         setIsVideoRecording,
         setVideoDuration,
         isTimeCapsule,
+        diaryId,
+        user?.id,
     ]);
+
+    toggleRef.current = toggleRecording;
+    useEffect(() => {
+        if (!isCapturing) return;
+        const timer = setTimeout(() => { void toggleRef.current(); }, (MAX_AUDIO_DURATION_SECONDS - 1) * 1000);
+        return () => clearTimeout(timer);
+    }, [isCapturing]);
 
     return { toggleRecording };
 }

@@ -7,6 +7,7 @@ import SuggestedFriendsList from '@/components/friends/suggested-friends-list';
 import AddFriendsSection from '@/components/friends/add-friends-section';
 import { SearchMode, SuggestedFriend } from '@/types/friends';
 import { Colors } from '@/lib/constants';
+import { TAB_BAR_CONTENT_PADDING } from '@/constants/tab-bar';
 
 interface FriendsDefaultViewProps {
     allFriends: any[];
@@ -46,6 +47,7 @@ export function FriendsDefaultView({
     return (
         <ScrollView
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
             refreshControl={
                 <RefreshControl
                     refreshing={refreshing}
@@ -85,9 +87,11 @@ export function FriendsDefaultView({
 }
 
 const styles = StyleSheet.create({
+    scrollContent: {
+        paddingBottom: TAB_BAR_CONTENT_PADDING,
+    },
     content: {
         flex: 1,
-        paddingBottom: 40,
         maxWidth: 900,
         alignSelf: 'center',
         width: '100%',

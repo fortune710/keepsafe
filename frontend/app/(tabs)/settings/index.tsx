@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Alert, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ChevronRight, Bell, Shield, HardDrive, Info, LogOut } from 'lucide-react-native';
+import { ChevronRight, Bell, Shield, Info, LogOut } from 'lucide-react-native';
 import { UserIcon } from '@/components/icons/user-icon';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useAuthContext } from '@/providers/auth-provider';
@@ -10,8 +10,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
-import { logger } from '@/lib/logger';
 import { Colors } from '@/lib/constants';
+import { HeaderFade } from '@/components/ui/header-fade';
 
 // Every settings icon/row shares the Sign Out row's neutral slate color.
 const SETTINGS_ICON_COLOR = '#64748B';
@@ -78,9 +78,6 @@ export default function SettingsScreen() {
     .onStart((event) => {
       startY.current = event.absoluteY;
     })
-    .onUpdate((event) => {
-      // Optional: Add visual feedback logic here if needed
-    })
     .onEnd((event) => {
       // Check if swipe started at the top area and moved down rapidly
       if (startY.current < SWIPE_THRESHOLD && event.translationY > 100 && event.velocityY > 500) {
@@ -128,59 +125,60 @@ export default function SettingsScreen() {
     >
       <StatusBar style="dark" />
       <GestureDetector gesture={swipeDownGesture}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Settings</Text>
-          </View>
-
-          <View style={styles.content}>
-            <TouchableOpacity
-              style={styles.profileSection}
-              onPress={() => router.push('/settings/profile')}
-            >
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>
-                  {profile?.full_name || 'Add your name'}
-                </Text>
-                <Text style={styles.profileUsername}>
-                  @{profile?.username || 'username'}
-                </Text>
-              </View>
-              <Image
-                source={{
-                  uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || 'Unknown User')
-                }}
-                style={styles.profileImage}
-              />
-            </TouchableOpacity>
-
-            <Text style={styles.groupLabel}>Account Settings</Text>
-            <View style={styles.settingsSection}>
-              {accountSettingsItems.map(renderSettingsItem)}
-            </View>
-
-            <Text style={styles.groupLabel}>Help</Text>
-            <View style={styles.settingsSection}>
-              {helpItems.map(renderSettingsItem)}
-            </View>
-
-            <View style={styles.settingsSection}>
-              <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
-                <View style={styles.iconContainer}>
-                  <LogOut color={SETTINGS_ICON_COLOR} size={20} />
-                </View>
-
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle}>Sign Out</Text>
-                  <Text style={styles.itemSubtitle}>Sign out of your account</Text>
-                </View>
-
-                <View style={{ width: 20 }} />
-              </TouchableOpacity>
-            </View>
-          </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Settings</Text>
         </View>
       </GestureDetector>
+
+      <View style={styles.scrollArea}>
+      <ScrollView>
+        <TouchableOpacity
+          style={styles.profileSection}
+          onPress={() => router.push('/settings/profile')}
+        >
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>
+              {profile?.full_name || 'Add your name'}
+            </Text>
+            <Text style={styles.profileUsername}>
+              @{profile?.username || 'username'}
+            </Text>
+          </View>
+          <Image
+            source={{
+              uri: profile?.avatar_url || getDefaultAvatarUrl(profile?.full_name || 'Unknown User')
+            }}
+            style={styles.profileImage}
+          />
+        </TouchableOpacity>
+
+        <Text style={styles.groupLabel}>Account Settings</Text>
+        <View style={styles.settingsSection}>
+          {accountSettingsItems.map(renderSettingsItem)}
+        </View>
+
+        <Text style={styles.groupLabel}>Help</Text>
+        <View style={styles.settingsSection}>
+          {helpItems.map(renderSettingsItem)}
+        </View>
+
+        <View style={styles.settingsSection}>
+          <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
+            <View style={styles.iconContainer}>
+              <LogOut color={SETTINGS_ICON_COLOR} size={20} />
+            </View>
+
+            <View style={styles.itemContent}>
+              <Text style={styles.itemTitle}>Sign Out</Text>
+              <Text style={styles.itemSubtitle}>Sign out of your account</Text>
+            </View>
+
+            <View style={{ width: 20 }} />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+      <HeaderFade style={styles.headerFade} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -196,13 +194,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     backgroundColor: Colors.background,
   },
+  scrollArea: { flex: 1 },
+  headerFade: { height: 12 },
   title: {
     fontSize: 20,
     fontFamily: 'Figtree-SemiBold',
     color: '#1E293B',
-  },
-  content: {
-    flex: 1,
   },
   profileSection: {
     flexDirection: 'row',

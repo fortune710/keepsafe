@@ -24,6 +24,7 @@ import { FriendsDefaultView } from '@/components/friends/friends-default-view';
 import { ContactSearchView } from '@/components/friends/contact-search-view';
 import { FriendsSearchView } from '@/components/friends/friends-search-view';
 import { SearchMode } from '@/types/friends';
+import { HeaderFade } from '@/components/ui/header-fade';
 
 
 
@@ -223,6 +224,7 @@ export default function FriendsScreen() {
             handleRefresh={handleRefresh}
           />
         )}
+        {!isSearching && <HeaderFade style={styles.headerFade} />}
       </Animated.View>
     </SafeAreaView>
   );
@@ -236,5 +238,10 @@ const styles = StyleSheet.create({
   viewContainer: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  headerFade: {
+    left: -20,
+    right: -20,
+    height: 12,
   },
 });
