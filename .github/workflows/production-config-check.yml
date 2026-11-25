@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'compose.production.yaml'
+      - 'config/nginx/**'
+      - '.github/scripts/**'
+      - 'frontend/supabase/tests/**'
 
 permissions:
   contents: read

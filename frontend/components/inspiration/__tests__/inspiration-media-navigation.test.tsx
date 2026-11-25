@@ -7,7 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 const mockPush = jest.fn();
 const mockToast = jest.fn();
 const mockUnlockSave = jest.fn();
-jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
+jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]), router: { push: (...args: unknown[]) => mockPush(...args) } }));
 jest.mock('expo-media-library/legacy', () => ({ getAssetInfoAsync: jest.fn() }));
 jest.mock('expo-file-system/legacy', () => ({ getInfoAsync: jest.fn() }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'capture-id' }));

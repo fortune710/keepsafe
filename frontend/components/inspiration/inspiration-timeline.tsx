@@ -4,8 +4,8 @@ import { InspirationDay, InspirationItem } from '@/types/inspiration';
 import { MediaMemoryCard } from './media-memory-card';
 import { NewContactCard } from './new-contact-card';
 import { PlaceVisitCard } from './place-visit-card';
-import { useRef } from 'react';
-import { router } from 'expo-router';
+import { useCallback, useRef } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Crypto from 'expo-crypto';
@@ -29,6 +29,11 @@ export function InspirationTimeline({ days, isLoading, error, placesError, onEna
   const { unlockSave } = useSaveLock();
   const { toast } = useToast();
   const openingMedia = useRef(false);
+  const requestGeneration = useRef(0);
+  useFocusEffect(useCallback(() => () => {
+    requestGeneration.current += 1;
+    openingMedia.current = false;
+  }, []));
   const handlePlacePress = (item: InspirationPlaceItem) => {
     try {
       const location = typeof item.name === 'string' ? item.name.trim() : '';
@@ -41,17 +46,21 @@ export function InspirationTimeline({ days, isLoading, error, placesError, onEna
   const handleMediaPress = async (item: InspirationMediaItem) => {
     if (openingMedia.current) return;
     openingMedia.current = true;
+    const generation = requestGeneration.current;
     try {
       if (!item.id.startsWith('media-')) throw new Error('Media is not a library asset');
       const assetId = item.id.slice('media-'.length);
       const asset = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: true });
-      const localUri = asset.localUri;
+      if (generation !== requestGeneration.current) return;
+      const localUri = asset.localUri || (item.mediaType === 'video' && item.uri?.startsWith('content://') ? item.uri : undefined);
       if (!localUri || (!localUri.startsWith('file://') && !localUri.startsWith('content://'))) throw new Error('Media is unavailable');
       if (localUri.startsWith('file://')) {
         const info = await FileSystem.getInfoAsync(localUri);
+        if (generation !== requestGeneration.current) return;
         if (!info.exists || info.isDirectory) throw new Error('Media file is unavailable');
       }
       const diaryId = await resolveCaptureDiaryId(undefined, user?.id);
+      if (generation !== requestGeneration.current) return;
       unlockSave();
       router.push({
         pathname: '/capture/details',
@@ -64,9 +73,9 @@ export function InspirationTimeline({ days, isLoading, error, placesError, onEna
         },
       });
     } catch {
-      toast('Unable to open this media. Please try again.', 'error');
+      if (generation === requestGeneration.current) toast('Unable to open this media. Please try again.', 'error');
     } finally {
-      openingMedia.current = false;
+      if (generation === requestGeneration.current) openingMedia.current = false;
     }
   };
   if (isLoading) return <View style={styles.center}><ActivityIndicator color="#8B5CF6" /><Text style={styles.muted}>Gathering this week’s moments…</Text></View>;

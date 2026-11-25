@@ -5,7 +5,7 @@ import { InspirationTimeline } from '../inspiration-timeline';
 import { InspirationPlaceItem } from '@/types/inspiration';
 
 const mockPush = jest.fn();
-jest.mock('expo-router', () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
+jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]), router: { push: (...args: unknown[]) => mockPush(...args) } }));
 jest.mock('expo-media-library/legacy', () => ({ getAssetInfoAsync: jest.fn() }));
 jest.mock('expo-file-system/legacy', () => ({ getInfoAsync: jest.fn() }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'capture-id' }));

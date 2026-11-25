@@ -7,6 +7,10 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/supabase/migrations/**'
+      - 'compose.production.yaml'
+      - 'config/nginx/**'
+      - '.github/scripts/**'
+      - '.github/workflows/production-deploy.yml'
 
 permissions:
   contents: read
@@ -30,10 +34,8 @@ jobs:
               pull_number: context.payload.pull_request.number,
               per_page: 100,
             });
-            const backend = files.some(file =>
-              file.filename.startsWith('backend/') ||
-              (file.previous_filename || '').startsWith('backend/')
-            );
+            const deployPath = path => path.startsWith('backend/') || path === 'compose.production.yaml' || path.startsWith('config/nginx/') || path.startsWith('.github/scripts/') || path === '.github/workflows/production-deploy.yml';
+            const backend = files.some(file => deployPath(file.filename) || deployPath(file.previous_filename || ''));
             core.setOutput('backend', String(backend));
 
   backend-deployment-eligible:
