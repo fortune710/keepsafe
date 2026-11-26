@@ -154,6 +154,7 @@ export default function DetailsScreen() {
   const [timeCapsuleDraft, setTimeCapsuleDraft] = useState<TimeCapsuleDraft | null>(
     timeCapsule === 'true' ? { revealType: 'date', unlockAt: tomorrowIso() } : null,
   );
+  const [hasChosenCapsuleType, setHasChosenCapsuleType] = useState(false);
   const [caption, setCaption] = useState<string>('');
   const [editorActiveTab, setEditorActiveTab] = useState<
     MediaCanvasItemType | undefined
@@ -718,7 +719,7 @@ export default function DetailsScreen() {
                   accessibilityLabel="Save as time capsule"
                   value={timeCapsuleDraft !== null}
                   onValueChange={(enabled) => {
-                    if (!enabled) { setTimeCapsuleDraft(null); return; }
+                    if (!enabled) { setTimeCapsuleDraft(null); setHasChosenCapsuleType(false); return; }
                     setTimeCapsuleDraft((draft) => draft ?? { revealType: 'date', unlockAt: tomorrowIso() });
                     setActiveSheet('timeCapsule');
                   }}
@@ -728,7 +729,7 @@ export default function DetailsScreen() {
             </>
           ) : (
             <ScrollView ref={timeCapsuleScrollRef} style={styles.diaryListWrapper} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets>
-              <TimeCapsuleConfig value={timeCapsuleDraft} onChange={setTimeCapsuleDraft} onCustomInputLayout={() => requestAnimationFrame(() => timeCapsuleScrollRef.current?.scrollToEnd({ animated: true }))} />
+              <TimeCapsuleConfig value={timeCapsuleDraft} onChange={setTimeCapsuleDraft} startUnselected={!hasChosenCapsuleType} onSelectRevealType={() => setHasChosenCapsuleType(true)} onCustomInputLayout={() => requestAnimationFrame(() => timeCapsuleScrollRef.current?.scrollToEnd({ animated: true }))} />
             </ScrollView>
           )}
         </View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { FutureDatePicker } from '@/components/capture/future-date-picker';
@@ -12,6 +12,8 @@ interface TimeCapsuleConfigProps {
   value: TimeCapsuleDraft | null;
   onChange: (value: TimeCapsuleDraft | null) => void;
   onCustomInputLayout?: () => void;
+  startUnselected?: boolean;
+  onSelectRevealType?: () => void;
 }
 
 const CONDITION_PRESETS = [
@@ -30,8 +32,9 @@ export function tomorrowIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export default function TimeCapsuleConfig({ value, onChange, onCustomInputLayout }: TimeCapsuleConfigProps) {
-  const [selectedStep, setSelectedStep] = useState<'date' | 'condition' | null>(null);
+export default function TimeCapsuleConfig({ value, onChange, onCustomInputLayout, startUnselected = false, onSelectRevealType }: TimeCapsuleConfigProps) {
+  const [selectedStep, setSelectedStep] = useState<'date' | 'condition' | null>(startUnselected ? null : value?.revealType ?? null);
+  useEffect(() => { if (!value) setSelectedStep(null); }, [value]);
   const revealType = value?.revealType ?? 'date';
   const conditionLabel = value?.revealType === 'condition' ? value.conditionLabel : '';
   const isCustomCondition = revealType === 'condition' && !CONDITION_PRESETS.includes(conditionLabel);
@@ -39,6 +42,7 @@ export default function TimeCapsuleConfig({ value, onChange, onCustomInputLayout
 
   const handleRevealTypeChange = (nextType: 'date' | 'condition') => {
     setSelectedStep(nextType);
+    onSelectRevealType?.();
     if (value?.revealType === nextType) return;
     onChange(
       nextType === 'date'
@@ -70,10 +74,10 @@ export default function TimeCapsuleConfig({ value, onChange, onCustomInputLayout
         <View style={styles.stepRow}>
           <View style={styles.stepMarkerColumn}><View style={styles.stepMarker}><Text style={styles.stepNumber}>2</Text></View></View>
           <View style={styles.stepContent}>
-            <Text style={styles.question}>{!selectedStep ? 'Choose the details' : selectedStep === 'date' ? 'Choose a date' : 'Choose a condition'}</Text>
-          {!selectedStep ? null : revealType === 'date' ? (
+            <Text style={styles.question}>{!selectedStep || !value ? 'Choose the details' : selectedStep === 'date' ? 'Choose a date' : 'Choose a condition'}</Text>
+          {!selectedStep || !value ? null : revealType === 'date' ? (
             <FutureDatePicker
-              value={value!.revealType === 'date' ? value!.unlockAt : tomorrowIso()}
+              value={value?.revealType === 'date' ? value.unlockAt : tomorrowIso()}
               onChange={(iso) => onChange({ revealType: 'date', unlockAt: iso })}
             />
           ) : (

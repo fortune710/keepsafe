@@ -6,7 +6,7 @@ import { useMediaUpload } from '../use-media-upload';
 
 const mockPush = jest.fn();
 const mockCapture = { id: 'capture-1', type: 'photo', uri: 'file://photo.jpg' };
-jest.mock('expo-router', () => ({ router: { push: (...args: any[]) => mockPush(...args) }, useRouter: () => ({ push: mockPush }) }));
+jest.mock('expo-router', () => ({ router: { push: (...args: any[]) => mockPush(...args) }, useRouter: () => ({ push: mockPush }), useFocusEffect: (effect: any) => require('react').useEffect(effect, [effect]) }));
 jest.mock('expo-camera', () => ({ useMicrophonePermissions: () => [{ status: 'granted' }, jest.fn()] }));
 jest.mock('@/providers/capture-provider', () => ({ useCaptureContext: () => ({ isCapturing: true, isVideoRecording: false, setIsVideoRecording: jest.fn() }) }));
 jest.mock('@/providers/auth-provider', () => ({ useAuthContext: () => ({ user: { id: 'user-1' } }) }));

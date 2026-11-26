@@ -119,20 +119,13 @@ export default function CaptureScreen() {
     }, []),
   );
 
-  const { isCapturing, recordingDuration, meteringLevel, clearCapture } =
+  const { isCapturing, recordingDuration, meteringLevel } =
     useMediaCapture();
 
   useEffect(() => {
     if (!locationAttachment) return;
     setPendingLocationAttachment(locationAttachment);
   }, [locationAttachment, setPendingLocationAttachment]);
-
-  // Cleanup audio recording when component unmounts (navigating away)
-  useEffect(() => {
-    return () => {
-      clearCapture();
-    };
-  }, []);
 
   // Pre-configure the camera pipeline for the selected mode as soon as the user
   // swipes/taps it, rather than waiting for the first capture attempt.
