@@ -35,7 +35,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@infinitered/react-native-mlkit-face-detection": "^5.0.0",
     "@lucide/lab": "^0.1.2",
-    "@posthog/react-native-plugin": "^2.0.1",
+    "@posthog/react-native-plugin": "2.13.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/slider": "5.2.0",
     "@react-navigation/bottom-tabs": "^7.2.0",
@@ -131,5 +131,8 @@
   "trustedDependencies": [
     "@shopify/react-native-skia",
     "unrs-resolver"
-  ]
+  ],
+  "patchedDependencies": {
+    "@posthog/react-native-plugin@2.13.3": "patches/@posthog%2Freact-native-plugin@2.13.3.patch"
+  }
 }

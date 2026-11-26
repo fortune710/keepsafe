@@ -441,9 +441,6 @@ export default function DetailsScreen() {
         try {
           posthog.capture('entry_captured', {
             type: capture.type,
-            is_private: isPrivate,
-            is_everyone: isEveryone,
-            friends_count: selectedFriends.length,
           });
         } catch (error) {
           if (__DEV__) console.warn('Analytics capture failed:', error);
@@ -476,6 +473,7 @@ export default function DetailsScreen() {
           router.replace('/capture');
         }
       } else {
+        posthog.capture('entry_save_failed');
         // Remove the optimistic entry/capsule on failure
         if (timeCapsuleDraft) {
           removeOptimisticCapsule(tempId);
@@ -485,6 +483,7 @@ export default function DetailsScreen() {
         toast(result.message, 'error');
       }
     } catch (error) {
+      posthog.capture('entry_save_failed');
       // Remove the optimistic entry/capsule on error
       if (tempId) {
         if (timeCapsuleDraft) {

@@ -55,7 +55,7 @@ export default function TimeCapsuleRevealScreen() {
         setError('This entry could not be found.');
       } else {
         setEntry(data as Entry);
-        posthog.capture('time_capsule_unlocked_viewed', { entry_id: entryId });
+        posthog.capture('time_capsule_unlocked_viewed');
       }
       setIsLoading(false);
     })();

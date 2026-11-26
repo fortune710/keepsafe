@@ -1,8 +1,12 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
+import { isReplaySafeNavigatorScreen } from '@/lib/analytics/replay';
 import { Stack } from 'expo-router';
 
 export default function SettingsLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false }} screenLayout={({ route, children }) => (
+      <ReplayScreenShield allow={isReplaySafeNavigatorScreen('settings', route.name)}>{children}</ReplayScreenShield>
+    )}>
       <Stack.Screen name="index" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="notifications" />

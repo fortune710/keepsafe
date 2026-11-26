@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
 import { Check } from 'lucide-react-native';
@@ -26,7 +27,7 @@ function DateSelect({ label, value, options, onSelect }: DateSelectProps) {
         <Text style={styles.selectButtonText}>{selectedOption?.label || 'Select'}</Text>
       </TouchableOpacity>
 
-      <Modal visible={isOpen} transparent animationType="slide" onRequestClose={() => setIsOpen(false)}>
+      <Modal visible={isOpen} transparent animationType="slide" onRequestClose={() => setIsOpen(false)}><ReplayScreenShield allow={false}>
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setIsOpen(false)} />
           <View style={styles.modalContent}>
@@ -55,7 +56,7 @@ function DateSelect({ label, value, options, onSelect }: DateSelectProps) {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </ReplayScreenShield></Modal>
     </View>
   );
 }

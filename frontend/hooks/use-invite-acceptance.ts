@@ -138,10 +138,7 @@ export function useInviteAcceptance(inviteCode?: string): UseInviteAcceptanceRes
       });
 
       if (inviteeId && userId) {
-        posthog.capture('invite_accepted', {
-          inviter_id: inviteeId,
-          invitee_id: userId
-        });
+        posthog.capture('invite_accepted');
       }
 
       return {

@@ -1,6 +1,28 @@
 const { withPodfile } = require('expo/config-plugins');
 
 module.exports = ({ config }) => {
+  // The native push-open hook runs before JavaScript and bypasses before_send.
+  config = {
+    ...config,
+    ios: {
+      ...config.ios,
+      infoPlist: {
+        ...config.ios?.infoPlist,
+        'com.posthog.posthog.CAPTURE_PUSH_NOTIFICATION_OPENED': false,
+      },
+    },
+  };
+  // Opt in on release builders after configuring PostHog CLI credentials.
+  if (process.env.POSTHOG_UPLOAD_SYMBOLS === '1') {
+    config = {
+      ...config,
+      plugins: [
+        ...(config.plugins || []),
+        ['posthog-react-native/expo', { uploadNativeSymbols: true, disableSandboxing: false }],
+      ],
+    };
+  }
+
   if (process.env.KEEPSAFE_IOS_SIMULATOR === '1') {
     config = withPodfile(config, (podfileConfig) => {
       const autolinking = '  use_expo_modules!';

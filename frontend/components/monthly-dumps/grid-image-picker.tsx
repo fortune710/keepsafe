@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -83,7 +84,7 @@ export default function GridImagePicker({ visible, month, onClose, onSelectPhoto
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent><ReplayScreenShield allow={false}>
       <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={styles.modalOverlay}>
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHandle} />
@@ -175,7 +176,7 @@ export default function GridImagePicker({ visible, month, onClose, onSelectPhoto
           ) : null}
         </View>
       </Animated.View>
-    </Modal>
+    </ReplayScreenShield></Modal>
   );
 }
 
