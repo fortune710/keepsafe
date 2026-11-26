@@ -15,12 +15,7 @@
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production",
-      "ios": {
-        "env": {
-          "POSTHOG_UPLOAD_SYMBOLS": "1"
-        }
-      }
+      "channel": "production"
     }
   },
   "submit": {

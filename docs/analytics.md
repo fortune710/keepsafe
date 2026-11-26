@@ -27,7 +27,7 @@ Replay remains disabled unless `EXPO_PUBLIC_POSTHOG_REPLAY_VERIFIED=true`. Do no
 
 Mobile replay has no pre-trigger buffer. To see activity before a bounce or exception, recording must start before it happens. A recording on a selected screen may therefore be sent even if the user does not bounce or hit an exception. Filter recordings by `screen_left` and `$exception` events in PostHog.
 
-In an iPhone 18 Pro simulator release fixture, replay stopped while synthetic private modal and portal content was visible, resumed after each closed, and stopped on navigation to a private screen. This is not a full test of every private route, gesture, notification, or overlay.
+In an iPhone 18 Pro simulator release fixture, replay stopped while synthetic private modal and portal content was visible, resumed after each closed, and stopped on navigation to a private screen. A synthetic notification tap opened the private authentication screen without sending replay frames or a native push-open event. This is not a full test of every private route, gesture, or overlay.
 
 ## Page review for replay
 
@@ -72,4 +72,4 @@ The recommendations below are based on the page and its imported components. Tex
 
 Set `POSTHOG_UPLOAD_SYMBOLS=1` for release build configuration to enable the PostHog Expo plugin, Hermes source-map serializer, and native symbol upload. The project includes the PostHog CLI; the build environment needs `POSTHOG_CLI_PROJECT_ID`, `POSTHOG_CLI_HOST`, and `POSTHOG_CLI_API_KEY`. The API key needs error tracking write and organization read access. Store it as a private build secret, never in an `EXPO_PUBLIC_` variable. See [PostHog's React Native source-map setup](https://posthog.com/docs/error-tracking/upload-source-maps/react-native).
 
-The EAS production iOS profile sets this flag. Other builds leave it off unless explicitly configured. An isolated EAS iOS simulator build uploaded its source map and native symbol files to PostHog. The uploaded native identifiers match both simulator executable architectures. A separate local simulator crash was symbolicated with `atos`; PostHog-side crash symbolication has not been verified. Over-the-air updates need their own upload configuration. Android native crash capture remains off pending Android privacy tests. Physical-device crashes have not been tested.
+The flag is off by default. An isolated EAS iOS simulator build uploaded its source map and native symbol files to PostHog. The uploaded native identifiers match both simulator executable architectures. A later build failed when PostHog reported a symbol content conflict, so production upload remains off until repeat builds are reliable. A separate local simulator crash was symbolicated with `atos`; PostHog-side crash symbolication has not been verified. Over-the-air updates need their own upload configuration. Android native crash capture remains off pending Android privacy tests. Physical-device crashes have not been tested.
