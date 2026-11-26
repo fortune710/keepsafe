@@ -107,7 +107,7 @@ describe('selective replay', () => {
     await replay.beginPrivateOverlay();
     await replay.setScreen('/settings/profile', true);
     replay.endPrivateOverlay();
-    await replay.setScreen('/settings/profile', true);
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(client.startSessionRecording).toHaveBeenCalledTimes(1);
   });
 

@@ -10,7 +10,7 @@ const apiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 const host = process.env.EXPO_PUBLIC_POSTHOG_HOST;
 
 // Avoid initializing the SDK at all in development, including development update channels.
-const enabled = analyticsEnabled({
+export const analyticsIsEnabled = analyticsEnabled({
   dev: __DEV__, environment: process.env.EXPO_PUBLIC_NODE_ENV, channel: Updates.channel,
   platform: Platform.OS, apiKey, host,
 });
@@ -33,7 +33,7 @@ const noOpPostHog = {
   getFeatureFlagPayload: () => null,
 } as unknown as PostHog;
 
-export const posthog = enabled
+export const posthog = analyticsIsEnabled
   ? new PostHog(apiKey!, {
       host,
       // Isolate the sanitized queue from any older, potentially sensitive queued events.
@@ -63,6 +63,7 @@ export const posthog = enabled
       captureAppLifecycleEvents: false,
       capturePushNotificationOpened: false,
       capturePushNotificationSubscriptions: false,
+      rageClickConfig: { enabled: false },
       errorTracking: {
         autocapture: { uncaughtExceptions: true, unhandledRejections: true, console: [], nativeCrashes: Platform.OS === 'ios' },
         exceptionSteps: { enabled: false },
