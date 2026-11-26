@@ -111,4 +111,15 @@ describe('selective replay', () => {
     expect(client.startSessionRecording).toHaveBeenCalledTimes(1);
   });
 
+  it('does not resume when an overlay closes while the app is in the background', async () => {
+    const client = { startSessionRecording: jest.fn(async () => {}), stopSessionRecording: jest.fn(async () => {}) };
+    const replay = new ReplayController(client, true);
+    await replay.setScreen('/settings/about', true);
+    await replay.beginPrivateOverlay();
+    await replay.setScreen('/settings/about', false);
+    replay.endPrivateOverlay();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(client.startSessionRecording).toHaveBeenCalledTimes(1);
+  });
+
 });
