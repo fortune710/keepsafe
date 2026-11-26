@@ -115,6 +115,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
+    "@posthog/cli": "0.20.1",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "29.5.14",
     "@types/react": "~19.2.10",
@@ -129,6 +130,7 @@
     "typescript": "~6.0.3"
   },
   "trustedDependencies": [
+    "@posthog/cli",
     "@shopify/react-native-skia",
     "unrs-resolver"
   ],

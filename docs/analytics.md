@@ -70,6 +70,6 @@ The recommendations below are based on the page and its imported components. Tex
 
 ## Source maps and native symbols
 
-Set `POSTHOG_UPLOAD_SYMBOLS=1` for release build configuration to enable the PostHog Expo plugin, Hermes source-map serializer, and native symbol upload. The build environment also needs an authenticated PostHog CLI, the project ID, and a token with the required upload permissions. Use the private build environment for the token. Do not put it in an `EXPO_PUBLIC_` variable. See [PostHog's React Native source-map setup](https://posthog.com/docs/error-tracking/upload-source-maps/react-native).
+Set `POSTHOG_UPLOAD_SYMBOLS=1` for release build configuration to enable the PostHog Expo plugin, Hermes source-map serializer, and native symbol upload. The project includes the PostHog CLI; the build environment needs `POSTHOG_CLI_PROJECT_ID`, `POSTHOG_CLI_HOST`, and `POSTHOG_CLI_API_KEY`. The API key needs error tracking write and organization read access. Store it as a private build secret, never in an `EXPO_PUBLIC_` variable. See [PostHog's React Native source-map setup](https://posthog.com/docs/error-tracking/upload-source-maps/react-native).
 
 The flag is off by default. No source maps or native symbols have been uploaded or verified by this change. Builds and over-the-air updates need separate upload verification. Android native crash capture remains off pending Android privacy tests. The iOS simulator test did not verify symbolication or physical-device crashes.
