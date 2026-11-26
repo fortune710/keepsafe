@@ -28,6 +28,32 @@ describe('replay screen shield', () => {
     expect(screen.queryByText('Private content')).toBeNull();
   });
 
+  it('retries a failed stop without exposing private content', async () => {
+    let finish!: () => void;
+    mockStop.mockRejectedValueOnce(new Error('native stop failed'))
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    render(<ReplayScreenShield allow={false}><Text>Private content</Text></ReplayScreenShield>);
+    await act(async () => {});
+    fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    expect(screen.queryByText('Private content')).toBeNull();
+    await act(async () => { finish(); });
+    expect(screen.getByText('Private content')).toBeVisible();
+  });
+
+  it('keeps the overlay lease during a retry', async () => {
+    mockBeginOverlay.mockRejectedValueOnce(new Error('native stop failed'));
+    mockStop.mockResolvedValueOnce();
+    const view = render(<ReplayScreenShield allow={false} overlay><Text>Private overlay</Text></ReplayScreenShield>);
+    await act(async () => {});
+    fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    await act(async () => {});
+    expect(mockBeginOverlay).toHaveBeenCalledTimes(1);
+    expect(mockEndOverlay).not.toHaveBeenCalled();
+    expect(screen.getByText('Private overlay')).toBeVisible();
+    view.unmount();
+    expect(mockEndOverlay).toHaveBeenCalledTimes(1);
+  });
+
   it('holds an overlay lease until the private overlay unmounts', async () => {
     mockBeginOverlay.mockResolvedValueOnce();
     const view = render(<ReplayScreenShield allow={false} overlay><Text>Private overlay</Text></ReplayScreenShield>);
