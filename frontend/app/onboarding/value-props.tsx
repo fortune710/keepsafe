@@ -1,3 +1,4 @@
+import { posthog } from '@/constants/posthog';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { router } from 'expo-router';
@@ -28,6 +29,7 @@ export default function ValuePropsScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const handleNext = () => {
+    posthog.capture('onboarding_value_prop_action', { action: 'next', step: currentIndex + 1 });
     if (currentIndex < valueProps.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -36,6 +38,7 @@ export default function ValuePropsScreen() {
   };
 
   const handleSkip = () => {
+    posthog.capture('onboarding_value_prop_action', { action: 'skip', step: currentIndex + 1 });
     router.push('/onboarding/auth');
   };
 

@@ -352,6 +352,7 @@ export default function DetailsScreen() {
 
     // Generate a proper UUID for optimistic entry
     const tempId = Crypto.randomUUID();
+    let saved = false;
 
     try {
       const entryAttachments: RenderedMediaCanvasItem[] = items.map((item) => {
@@ -438,12 +439,10 @@ export default function DetailsScreen() {
       });
 
       if (result.success) {
+        saved = true;
         try {
           posthog.capture('entry_captured', {
             type: capture.type,
-            is_private: isPrivate,
-            is_everyone: isEveryone,
-            friends_count: selectedFriends.length,
           });
         } catch (error) {
           if (__DEV__) console.warn('Analytics capture failed:', error);
@@ -463,11 +462,15 @@ export default function DetailsScreen() {
           notificationBody = 'Entry saved successfully';
         }
 
-        await LocalNotificationService.sendNotification({
-          title: 'New Diary Entry Created',
-          body: notificationBody,
-          sound: true,
-        });
+        try {
+          await LocalNotificationService.sendNotification({
+            title: 'New Diary Entry Created',
+            body: notificationBody,
+            sound: true,
+          });
+        } catch {
+          // The entry is already saved; a notification failure must not undo it.
+        }
 
         lockSave();
         if (router.canGoBack()) {
@@ -476,6 +479,7 @@ export default function DetailsScreen() {
           router.replace('/capture');
         }
       } else {
+        posthog.capture('entry_save_failed');
         // Remove the optimistic entry/capsule on failure
         if (timeCapsuleDraft) {
           removeOptimisticCapsule(tempId);
@@ -485,6 +489,8 @@ export default function DetailsScreen() {
         toast(result.message, 'error');
       }
     } catch (error) {
+      if (saved) return;
+      posthog.capture('entry_save_failed');
       // Remove the optimistic entry/capsule on error
       if (tempId) {
         if (timeCapsuleDraft) {

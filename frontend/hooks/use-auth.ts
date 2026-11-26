@@ -60,12 +60,12 @@ export function useAuth(): UseAuthResult {
     // Add this auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        logger.info('Auth state changed:', { event, session });
+        logger.info('Auth state changed:', { event });
         setAuthEvent(event);
         if (session) {
-          posthog.identify(session.user.id, {
-            email: session.user.email ?? '',
-          });
+          posthog.identify(session.user.id);
+        } else if (event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
+          posthog.reset();
         }
         setSession(session);
         setUser(session?.user ?? null);
@@ -81,6 +81,8 @@ export function useAuth(): UseAuthResult {
     password: string,
     userData?: Partial<Profile>
   ) => {
+    let outcome = 'failure';
+    posthog.capture('auth_attempt', { operation: 'sign_up' });
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -125,16 +127,20 @@ export function useAuth(): UseAuthResult {
 
       // Always return the userId so the caller can fetch the invite that
       // was created by the Supabase trigger.
+      outcome = 'success';
       return { error: null, data: { userId } };
 
     } catch (error) {
       return { error: error as Error };
     } finally {
+      posthog.capture('auth_result', { operation: 'sign_up', outcome });
       setLoading(false);
     }
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    let outcome = 'failure';
+    posthog.capture('auth_attempt', { operation: 'sign_in' });
     setLoading(true);
     try {
       const { error, data } = await supabase.auth.signInWithPassword({
@@ -174,6 +180,7 @@ export function useAuth(): UseAuthResult {
         throw new EmailNotVerifiedError();
       }
 
+      outcome = 'success';
       return { error: null };
     } catch (error) {
       if (error instanceof EmailNotVerifiedError ||
@@ -184,16 +191,20 @@ export function useAuth(): UseAuthResult {
       }
       return { error: error as Error };
     } finally {
+      posthog.capture('auth_result', { operation: 'sign_in', outcome });
       setLoading(false);
     }
   }, []);
 
   const signOut = useCallback(async () => {
+    let outcome = 'failure';
+    posthog.capture('auth_attempt', { operation: 'sign_out' });
     setLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
 
       if (!error) {
+        outcome = 'success';
         setUser(null);
         setSession(null);
       }
@@ -202,11 +213,14 @@ export function useAuth(): UseAuthResult {
     } catch (error) {
       return { error: error as Error };
     } finally {
+      posthog.capture('auth_result', { operation: 'sign_out', outcome });
       setLoading(false);
     }
   }, []);
 
   const resetPasswordForEmail = useCallback(async (email: string) => {
+    let outcome = 'failure';
+    posthog.capture('auth_attempt', { operation: 'password_reset_request' });
     try {
       // Build redirect URL based on platform
       const redirectTo = Platform.OS === 'web'
@@ -221,13 +235,18 @@ export function useAuth(): UseAuthResult {
         return { error: new Error(error.message) };
       }
 
+      outcome = 'success';
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      posthog.capture('auth_result', { operation: 'password_reset_request', outcome });
     }
   }, []);
 
   const updatePassword = useCallback(async (newPassword: string) => {
+    let outcome = 'failure';
+    posthog.capture('auth_attempt', { operation: 'password_update' });
     try {
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
@@ -237,9 +256,12 @@ export function useAuth(): UseAuthResult {
         return { error: new Error(error.message) };
       }
 
+      outcome = 'success';
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      posthog.capture('auth_result', { operation: 'password_update', outcome });
     }
   }, []);
 

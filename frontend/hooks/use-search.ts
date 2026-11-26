@@ -2,7 +2,6 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { SearchService, SearchStreamEvent } from '@/services/search-service';
 import { useAuthContext } from '@/providers/auth-provider';
 import { posthog } from '@/constants/posthog';
-import { Platform } from 'react-native';
 import { logger } from '@/lib/logger';
 
 export type SearchRole = 'user' | 'assistant' | 'system';
@@ -90,11 +89,9 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInput('');
 
+      let failureReported = false;
       try {
-        posthog.capture('ai_search', {
-          query: userMessage.content,
-          platform: Platform.OS
-        })
+        posthog.capture('ai_search');
         await SearchService.streamSearch({
           query,
           signal: controller.signal,
@@ -166,10 +163,13 @@ export function useSearch(params: UseSearchParams = {}): UseSearchResult {
             }
           },
           onError: (err) => {
+            if (!failureReported) posthog.capture('ai_search_failed');
+            failureReported = true;
             logger.error('Search stream error', { error: err.message });
             setError(err.message || 'Something went wrong while searching.');
           },
           onFinish: () => {
+            posthog.capture('ai_search_completed');
             setIsLoading(false);
             setLoadingText('');
             abortRef.current = null;

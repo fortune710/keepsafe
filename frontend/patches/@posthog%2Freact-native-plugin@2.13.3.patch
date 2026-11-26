@@ -1,0 +1,185 @@
+diff --git a/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt b/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt
+index 62d6b2aad114dd9c16e90de186f502fbe2f939c3..99deccf12bbe6971f9fab08211ceab1ebecaaa55 100644
+--- a/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt
++++ b/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt
+@@ -182,6 +182,7 @@ class PosthogReactNativePluginModule(
+                 errorTrackingConfig.ignoredExceptionTypes.add(JavascriptException::class.java)
+               }
+               addBeforeSend { restoreJsFatalCaptureProperties(it) }
++              addBeforeSend { keepsafeNativeCrash(it) }
+ 
+               // Always apply the session replay configuration so that recording started later
+               // (e.g. startRecording or a linked feature flag) uses the right mode and masking;
+@@ -776,6 +777,50 @@ internal fun <T> withJsFatalCaptureProperties(
+   }
+ }
+ 
++
++// Native crash events never pass through the JavaScript privacy filter.
++private fun keepsafeNativeCrash(event: PostHogEvent): PostHogEvent {
++  if (event.event != "\$exception") return event
++  val old = event.properties ?: return event
++  val jsProperties = jsFatalCaptureProperties.get()
++  if (jsProperties != null) {
++    old.clear()
++    old.putAll(jsProperties)
++    return event
++  }
++  fun address(value: Any?): String? = (value as? String)?.takeIf { it.matches(Regex("0x[0-9a-fA-F]{1,16}")) }
++  val exceptions = (old["\$exception_list"] as? List<*>)?.take(20)?.mapNotNull { raw ->
++    val entry = raw as? Map<*, *> ?: return@mapNotNull null
++    val item = mutableMapOf<String, Any>("type" to "NativeCrash", "value" to "Native crash (details redacted)", "mechanism" to mapOf("type" to "generic", "handled" to false))
++    val stack = entry["stacktrace"] as? Map<*, *>
++    val frames = stack?.get("frames") as? List<*>
++    if (frames != null) {
++      item["stacktrace"] = mapOf("type" to "raw", "frames" to frames.take(200).mapNotNull { rawFrame ->
++        val frame = rawFrame as? Map<*, *> ?: return@mapNotNull null
++        val safe = mutableMapOf<String, Any>("platform" to "android")
++        for (key in listOf("instruction_addr", "image_addr")) address(frame[key])?.let { safe[key] = it }
++        (frame["in_app"] as? Boolean)?.let { safe["in_app"] = it }
++        safe
++      })
++    }
++    item
++  } ?: emptyList()
++  val processPerson = old["\$process_person_profile"] as? Boolean
++  val session = old["\$session_id"] as? String
++  val versions = listOf("\$os_version", "\$app_version", "\$app_build").mapNotNull { key ->
++    (old[key] as? String)?.takeIf { it.matches(Regex("[0-9]{1,6}(\\.[0-9]{1,6}){0,3}")) }?.let { key to it }
++  }
++  old.clear()
++  versions.forEach { (key, value) -> old[key] = value }
++  old["\$exception_list"] = exceptions
++  old["\$exception_source"] = "android.crash_reporter"
++  old["\$os_name"] = "Android"
++  if (processPerson != null) old["\$process_person_profile"] = processPerson
++  old["\$ip"] = "0.0.0.0"
++  if (session != null && runCatching { java.util.UUID.fromString(session) }.isSuccess) old["\$session_id"] = session
++  return event
++}
++
+ internal fun restoreJsFatalCaptureProperties(event: PostHogEvent): PostHogEvent {
+   val jsProperties = jsFatalCaptureProperties.get()
+   if (event.event != "\$exception" || jsProperties == null) {
+diff --git a/ios/PosthogReactNativePlugin.swift b/ios/PosthogReactNativePlugin.swift
+index ae37702002f84315184235e8e505f7cc16bcac5c..123b9855c68d4403c9628066bec960900c817521 100644
+--- a/ios/PosthogReactNativePlugin.swift
++++ b/ios/PosthogReactNativePlugin.swift
+@@ -1,6 +1,85 @@
+ @_spi(PostHogInternal) import PostHog
+ import React
+ 
++
++
++// Queued records from older SDKs bypass beforeSend. Quarantine them before
++// setup starts the native queues, keeping the files on device for recovery.
++private let keepsafeMigrationLock = NSLock()
++private func keepsafePrepareNativeStorage(projectToken: String) -> Bool {
++    guard !projectToken.isEmpty,
++          projectToken.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil,
++          let bundle = Bundle.main.bundleIdentifier,
++          let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return false }
++    keepsafeMigrationLock.lock()
++    defer { keepsafeMigrationLock.unlock() }
++    let base = support.appendingPathComponent(bundle, isDirectory: true)
++    let project = base.appendingPathComponent(projectToken, isDirectory: true)
++    let marker = project.appendingPathComponent("keepsafe.native-privacy-v1")
++    let manager = FileManager.default
++    if manager.fileExists(atPath: marker.path) { return true }
++    let queues = ["posthog.queueFolder.uuid", "posthog.queueFolder", "posthog.queue.plist", "posthog.replayFolder.uuid", "posthog.replayFolder", "posthog.replayBufferFolder", "posthog.logsFolder"]
++    do {
++        let quarantine = project.appendingPathComponent("keepsafe.unfiltered-native-queues", isDirectory: true)
++        try manager.createDirectory(at: quarantine, withIntermediateDirectories: true)
++        for folder in [base, project] {
++            for name in queues {
++                let source = folder.appendingPathComponent(name)
++                if !manager.fileExists(atPath: source.path) { continue }
++                let destination = quarantine.appendingPathComponent(UUID().uuidString + "-" + name)
++                try manager.moveItem(at: source, to: destination)
++            }
++        }
++        try Data("1".utf8).write(to: marker, options: .atomic)
++        return true
++    } catch {
++        // Never print paths or start analytics when migration has failed.
++        return false
++    }
++}
++
++// Native crashes bypass the JavaScript before_send hook. Keep only structured,
++// non-user-controlled crash data, including the addresses needed for symbolication.
++private func keepsafeNativeCrash(_ event: PostHogEvent) -> PostHogEvent {
++    guard event.event == "$exception" else { return event }
++    func address(_ value: Any?) -> String? {
++        guard let value = value as? String, value.range(of: "^0x[0-9a-fA-F]{1,16}$", options: .regularExpression) != nil else { return nil }
++        return value
++    }
++    let old = event.properties
++    let exceptions = (old["$exception_list"] as? [[String: Any]] ?? []).prefix(20).map { entry -> [String: Any] in
++        var item: [String: Any] = ["type": "NativeCrash", "value": "Native crash (details redacted)"]
++        if let stack = entry["stacktrace"] as? [String: Any], let frames = stack["frames"] as? [[String: Any]] {
++            item["stacktrace"] = ["type": "raw", "frames": frames.prefix(200).map { frame -> [String: Any] in
++                var safe: [String: Any] = ["platform": "apple"]
++                for key in ["instruction_addr", "image_addr"] { if let value = address(frame[key]) { safe[key] = value } }
++                if let inApp = frame["in_app"] as? Bool { safe["in_app"] = inApp }
++                return safe
++            }]
++        }
++        item["mechanism"] = ["type": "generic", "handled": false]
++        return item
++    }
++    var safe: [String: Any] = ["$exception_list": exceptions, "$exception_source": "ios.crash_reporter", "$os_name": "iOS", "$ip": "0.0.0.0"]
++    for key in ["$os_version", "$app_version", "$app_build"] {
++        if let value = old[key] as? String, value.range(of: "^[0-9]{1,6}(\\.[0-9]{1,6}){0,3}$", options: .regularExpression) != nil { safe[key] = value }
++    }
++    if let processPerson = old["$process_person_profile"] as? Bool { safe["$process_person_profile"] = processPerson }
++    if let session = old["$session_id"] as? String, UUID(uuidString: session) != nil { safe["$session_id"] = session }
++    if let images = old["$debug_images"] as? [[String: Any]] {
++        safe["$debug_images"] = images.prefix(500).compactMap { image -> [String: Any]? in
++            guard let id = image["debug_id"] as? String, UUID(uuidString: id) != nil,
++                  let base = address(image["image_addr"]) else { return nil }
++            var result: [String: Any] = ["debug_id": id, "image_addr": base, "type": "macho"]
++            if let size = image["image_size"] as? NSNumber { result["image_size"] = size }
++            if let arch = image["arch"] as? String, ["arm64", "arm64e", "x86_64"].contains(arch) { result["arch"] = arch }
++            return result
++        }
++    }
++    event.properties = safe
++    return event
++}
++
+ /// Meant for internally logging PostHog related things
+ private func hedgeLog(_ message: String) {
+     print("[PostHog] \(message)")
+@@ -314,6 +393,11 @@ public class PosthogReactNativePlugin: RCTEventEmitter {
+             (sdkOptions["projectToken"] as? String)
+                 ?? (sdkOptions["apiKey"] as? String)
+                 ?? ""
++        guard keepsafePrepareNativeStorage(projectToken: projectToken) else {
++            hedgeLog("Native analytics storage migration failed; native analytics disabled.")
++            resolve(nil)
++            return
++        }
+         let host = sdkOptions["host"] as? String ?? PostHogConfig.defaultHost
+         let debug = sdkOptions["debug"] as? Bool ?? false
+ 
+@@ -380,14 +464,15 @@ public class PosthogReactNativePlugin: RCTEventEmitter {
+                 // app's `before_send` rewrote. Put the JS-approved values back. On Android,
+                 // caller properties already win apart from SDK debug properties, so the
+                 // module there only restores `$process_person_profile` and `$is_identified`.
+-                for (key, value) in jsProperties {
+-                    event.properties[key] = value
+-                }
++                // JS has already applied its allowlist. Do not retain extra native
++                // enrichment that never passed through that allowlist.
++                event.properties = jsProperties
+                 return event
+             }
+             if let texts = reactNativeFatalJsErrorTexts(event) {
+-                return jsFatalMarkers.isJsHandledFatal(texts) ? nil : event
++                return jsFatalMarkers.isJsHandledFatal(texts) ? nil : keepsafeNativeCrash(event)
+             }
++            if event.event == "$exception" { return keepsafeNativeCrash(event) }
+             // Only the replayed tap. `setup()` also replays the previous launch's crash report,
+             // and that `$exception` carries the distinct id recorded at crash time, which stands.
+             if event.event == "$push_notification_opened", let distinctId = setupWindow.pendingDistinctId {

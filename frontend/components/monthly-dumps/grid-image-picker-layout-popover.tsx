@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React, { useMemo, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Portal } from 'react-native-portalize';
@@ -83,7 +84,7 @@ export default function GridImagePickerLayoutPopover({
       </View>
 
       {isPopoverVisible && popoverAnchor ? (
-        <Portal>
+        <Portal><ReplayScreenShield allow={false} overlay onDismiss={() => setIsPopoverVisible(false)}>
           <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(100)} style={styles.popoverOverlay}>
             <TouchableOpacity style={styles.popoverBackdrop} activeOpacity={1} onPress={() => setIsPopoverVisible(false)} />
 
@@ -120,7 +121,7 @@ export default function GridImagePickerLayoutPopover({
               })}
             </View>
           </Animated.View>
-        </Portal>
+        </ReplayScreenShield></Portal>
       ) : null}
     </>
   );

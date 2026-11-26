@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, FlatList, StyleSheet, SafeAreaView } from 'react-native';
 import { X, Search } from 'lucide-react-native';
@@ -41,7 +42,7 @@ export function CountryPickerModal({ visible, onClose, onSelect, selectedCountry
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Select Country</Text>
@@ -70,7 +71,7 @@ export function CountryPickerModal({ visible, onClose, onSelect, selectedCountry
           keyboardShouldPersistTaps="handled"
         />
       </SafeAreaView>
-    </Modal>
+    </ReplayScreenShield></Modal>
   );
 }
 

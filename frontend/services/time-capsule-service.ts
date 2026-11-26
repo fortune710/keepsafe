@@ -96,7 +96,7 @@ export class TimeCapsuleService {
       return { success: false, error: result?.message || 'Unable to request release' };
     }
 
-    posthog.capture('time_capsule_release_requested', { capsule_id: capsuleId, reveal_type: revealType });
+    posthog.capture('time_capsule_release_requested', { reveal_type: revealType });
 
     return { success: true, data: { release_available_at: result.release_available_at! } };
   }
@@ -124,7 +124,7 @@ export class TimeCapsuleService {
       return { success: false, error: result?.message || 'Unable to cancel release' };
     }
 
-    posthog.capture('time_capsule_release_cancelled', { capsule_id: capsuleId });
+    posthog.capture('time_capsule_release_cancelled');
 
     return { success: true };
   }

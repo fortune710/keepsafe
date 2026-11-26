@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, Modal, SafeAreaView } from 'react-native';
 import { Check, Users, X } from 'lucide-react-native';
@@ -37,7 +38,7 @@ export default function FriendFilterPopover({
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}
-    >
+    ><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <View style={styles.handle} />
       <View style={styles.header}>
         <Text style={styles.title}>Filter by friend</Text>
@@ -77,7 +78,7 @@ export default function FriendFilterPopover({
           );
         }}
       />
-    </Modal>
+    </ReplayScreenShield></Modal>
   );
 }
 
