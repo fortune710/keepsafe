@@ -13,7 +13,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 import { useDeepLinking } from '@/hooks/use-deep-linking';
 import { Host } from 'react-native-portalize';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { AppState, View } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { ScreenTracker } from '@/lib/analytics/screen-tracker';
@@ -62,7 +62,7 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!fontsLoaded && !fontError) return;
     tracker.current?.setScreen(currentScreen);
     void replayController.setScreen(currentScreen, AppState.currentState === 'active');

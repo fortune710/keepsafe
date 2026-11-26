@@ -38,7 +38,7 @@ export default function FriendFilterPopover({
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}
-    ><ReplayScreenShield allow={false}>
+    ><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <View style={styles.handle} />
       <View style={styles.header}>
         <Text style={styles.title}>Filter by friend</Text>

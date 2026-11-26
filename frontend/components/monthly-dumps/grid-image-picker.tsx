@@ -84,7 +84,7 @@ export default function GridImagePicker({ visible, month, onClose, onSelectPhoto
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent><ReplayScreenShield allow={false}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={styles.modalOverlay}>
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHandle} />

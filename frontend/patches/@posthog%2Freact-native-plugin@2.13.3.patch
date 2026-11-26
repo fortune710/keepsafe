@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt b/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt
-index 62d6b2aad114dd9c16e90de186f502fbe2f939c3..d64fd7a669bb39315233960a83239705eb8e7c5e 100644
+index 62d6b2aad114dd9c16e90de186f502fbe2f939c3..99deccf12bbe6971f9fab08211ceab1ebecaaa55 100644
 --- a/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt
 +++ b/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt
 @@ -182,6 +182,7 @@ class PosthogReactNativePluginModule(
@@ -10,7 +10,7 @@ index 62d6b2aad114dd9c16e90de186f502fbe2f939c3..d64fd7a669bb39315233960a83239705
  
                // Always apply the session replay configuration so that recording started later
                // (e.g. startRecording or a linked feature flag) uses the right mode and masking;
-@@ -776,6 +777,48 @@ internal fun <T> withJsFatalCaptureProperties(
+@@ -776,6 +777,50 @@ internal fun <T> withJsFatalCaptureProperties(
    }
  }
  
@@ -42,6 +42,7 @@ index 62d6b2aad114dd9c16e90de186f502fbe2f939c3..d64fd7a669bb39315233960a83239705
 +    }
 +    item
 +  } ?: emptyList()
++  val processPerson = old["\$process_person_profile"] as? Boolean
 +  val session = old["\$session_id"] as? String
 +  val versions = listOf("\$os_version", "\$app_version", "\$app_build").mapNotNull { key ->
 +    (old[key] as? String)?.takeIf { it.matches(Regex("[0-9]{1,6}(\\.[0-9]{1,6}){0,3}")) }?.let { key to it }
@@ -51,6 +52,7 @@ index 62d6b2aad114dd9c16e90de186f502fbe2f939c3..d64fd7a669bb39315233960a83239705
 +  old["\$exception_list"] = exceptions
 +  old["\$exception_source"] = "android.crash_reporter"
 +  old["\$os_name"] = "Android"
++  if (processPerson != null) old["\$process_person_profile"] = processPerson
 +  old["\$ip"] = "0.0.0.0"
 +  if (session != null && runCatching { java.util.UUID.fromString(session) }.isSuccess) old["\$session_id"] = session
 +  return event
@@ -60,10 +62,10 @@ index 62d6b2aad114dd9c16e90de186f502fbe2f939c3..d64fd7a669bb39315233960a83239705
    val jsProperties = jsFatalCaptureProperties.get()
    if (event.event != "\$exception" || jsProperties == null) {
 diff --git a/ios/PosthogReactNativePlugin.swift b/ios/PosthogReactNativePlugin.swift
-index ae37702002f84315184235e8e505f7cc16bcac5c..d8e6adab9fc80c1dc576891113890f23be996e44 100644
+index ae37702002f84315184235e8e505f7cc16bcac5c..123b9855c68d4403c9628066bec960900c817521 100644
 --- a/ios/PosthogReactNativePlugin.swift
 +++ b/ios/PosthogReactNativePlugin.swift
-@@ -1,6 +1,84 @@
+@@ -1,6 +1,85 @@
  @_spi(PostHogInternal) import PostHog
  import React
  
@@ -130,6 +132,7 @@ index ae37702002f84315184235e8e505f7cc16bcac5c..d8e6adab9fc80c1dc576891113890f23
 +    for key in ["$os_version", "$app_version", "$app_build"] {
 +        if let value = old[key] as? String, value.range(of: "^[0-9]{1,6}(\\.[0-9]{1,6}){0,3}$", options: .regularExpression) != nil { safe[key] = value }
 +    }
++    if let processPerson = old["$process_person_profile"] as? Bool { safe["$process_person_profile"] = processPerson }
 +    if let session = old["$session_id"] as? String, UUID(uuidString: session) != nil { safe["$session_id"] = session }
 +    if let images = old["$debug_images"] as? [[String: Any]] {
 +        safe["$debug_images"] = images.prefix(500).compactMap { image -> [String: Any]? in
@@ -148,7 +151,7 @@ index ae37702002f84315184235e8e505f7cc16bcac5c..d8e6adab9fc80c1dc576891113890f23
  /// Meant for internally logging PostHog related things
  private func hedgeLog(_ message: String) {
      print("[PostHog] \(message)")
-@@ -314,6 +392,11 @@ public class PosthogReactNativePlugin: RCTEventEmitter {
+@@ -314,6 +393,11 @@ public class PosthogReactNativePlugin: RCTEventEmitter {
              (sdkOptions["projectToken"] as? String)
                  ?? (sdkOptions["apiKey"] as? String)
                  ?? ""
@@ -160,7 +163,7 @@ index ae37702002f84315184235e8e505f7cc16bcac5c..d8e6adab9fc80c1dc576891113890f23
          let host = sdkOptions["host"] as? String ?? PostHogConfig.defaultHost
          let debug = sdkOptions["debug"] as? Bool ?? false
  
-@@ -380,14 +463,15 @@ public class PosthogReactNativePlugin: RCTEventEmitter {
+@@ -380,14 +464,15 @@ public class PosthogReactNativePlugin: RCTEventEmitter {
                  // app's `before_send` rewrote. Put the JS-approved values back. On Android,
                  // caller properties already win apart from SDK debug properties, so the
                  // module there only restores `$process_person_profile` and `$is_identified`.

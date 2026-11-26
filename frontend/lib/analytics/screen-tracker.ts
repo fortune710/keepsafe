@@ -10,7 +10,12 @@ export class ScreenTracker {
   private pickupId = '';
   private hasOpened = false;
 
-  constructor(private emit: AnalyticsSink, private id: () => string, private now: () => number = Date.now) {}
+  constructor(
+    private emit: AnalyticsSink,
+    private id: () => string,
+    private now: () => number = () => performance.now(),
+    private wallNow: () => number = Date.now,
+  ) {}
 
   setScreen(screen: string | null) {
     if (screen === this.screen) return;
@@ -23,7 +28,7 @@ export class ScreenTracker {
     if (this.active) return;
     this.active = true;
     this.pickupId = this.id();
-    const date = new Date(this.now());
+    const date = new Date(this.wallNow());
     this.emit('app_pickup', {
       pickup_id: this.pickupId,
       pickup_kind: this.hasOpened ? 'resume' : 'cold_start',

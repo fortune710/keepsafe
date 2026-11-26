@@ -36,6 +36,11 @@ export default function MediaCanvas({ type, removeElement, uri, ref, items, tran
   const [showMusicPopover, setShowMusicPopover] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
 
+  const closeMusicPopover = () => {
+    setShowMusicPopover(false);
+    setSelectedMusic(null);
+  };
+
   if (!uri) return null;
 
   const removeItemFromCanvas = (deletedItem: MediaCanvasItem) => {
@@ -73,13 +78,10 @@ export default function MediaCanvas({ type, removeElement, uri, ref, items, tran
       </ViewShot>
 
       {showMusicPopover && selectedMusic && (
-        <Portal><ReplayScreenShield allow={false}>
+        <Portal><ReplayScreenShield allow={false} overlay onDismiss={closeMusicPopover}>
           <AudioPreviewPopover
             music={selectedMusic}
-            onClose={() => {
-              setShowMusicPopover(false);
-              setSelectedMusic(null);
-            }}
+            onClose={closeMusicPopover}
             isVisible={showMusicPopover}
           />
         </ReplayScreenShield></Portal>

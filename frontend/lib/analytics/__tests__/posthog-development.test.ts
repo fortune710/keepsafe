@@ -22,6 +22,7 @@ describe('development analytics client', () => {
     else process.env.EXPO_PUBLIC_POSTHOG_API_KEY = previousKey;
     if (previousHost === undefined) delete process.env.EXPO_PUBLIC_POSTHOG_HOST;
     else process.env.EXPO_PUBLIC_POSTHOG_HOST = previousHost;
-    process.env.EXPO_PUBLIC_NODE_ENV = previousEnvironment;
+    if (previousEnvironment === undefined) delete process.env.EXPO_PUBLIC_NODE_ENV;
+    else process.env.EXPO_PUBLIC_NODE_ENV = previousEnvironment;
   });
 });

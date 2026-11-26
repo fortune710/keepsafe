@@ -115,7 +115,7 @@ export function BottomSheet({
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
       onDismiss={onDismiss}
-    ><ReplayScreenShield allow={false}>
+    ><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <View style={styles.root}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />

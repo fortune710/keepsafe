@@ -31,7 +31,7 @@ export default function GridImagePickerCameraModal({
   onCapture,
 }: GridImagePickerCameraModalProps) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent><ReplayScreenShield allow={false}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <View style={styles.cameraModalOverlay}>
         <View style={styles.cameraBackdrop} />
 

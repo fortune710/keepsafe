@@ -42,7 +42,7 @@ export function CountryPickerModal({ visible, onClose, onSelect, selectedCountry
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}><ReplayScreenShield allow={false}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Select Country</Text>

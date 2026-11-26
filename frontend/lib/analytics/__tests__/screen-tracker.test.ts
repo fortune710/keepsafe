@@ -59,4 +59,17 @@ describe('screen analytics', () => {
     expect(events.filter((event) => event.name === '$screen')).toHaveLength(1);
     expect(left()).toBeUndefined();
   });
+
+  it('measures visits with a monotonic clock when wall time changes', () => {
+    let elapsed = 0;
+    let wall = Date.now();
+    const result: Record<string, string | number | boolean>[] = [];
+    const clockTracker = new ScreenTracker((name, properties) => { if (name === 'screen_left') result.push(properties); }, () => 'pickup', () => elapsed, () => wall);
+    clockTracker.setScreen('/capture');
+    clockTracker.foreground();
+    elapsed = 20000;
+    wall -= 60000;
+    clockTracker.background();
+    expect(result[0]).toMatchObject({ foreground_duration_ms: 20000, is_bounce: false });
+  });
 });

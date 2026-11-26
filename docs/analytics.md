@@ -27,6 +27,8 @@ Replay remains disabled unless `EXPO_PUBLIC_POSTHOG_REPLAY_VERIFIED=true`. Do no
 
 Mobile replay has no pre-trigger buffer. To see activity before a bounce or exception, recording must start before it happens. A recording on a selected screen may therefore be sent even if the user does not bounce or hit an exception. Filter recordings by `screen_left` and `$exception` events in PostHog.
 
+In an iPhone 18 Pro simulator release fixture, replay stopped while synthetic private modal and portal content was visible, resumed after each closed, and stopped on navigation to a private screen. This is not a full test of every private route, gesture, notification, or overlay.
+
 ## Page review for replay
 
 The recommendations below are based on the page and its imported components. Text and image masks reduce exposure, but cameras, video, canvases, native modals, and portals need separate checks. "Candidate" means a screen to consider after those checks. It does not mean the screen is currently enabled.

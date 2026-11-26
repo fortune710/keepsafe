@@ -27,7 +27,7 @@ function DateSelect({ label, value, options, onSelect }: DateSelectProps) {
         <Text style={styles.selectButtonText}>{selectedOption?.label || 'Select'}</Text>
       </TouchableOpacity>
 
-      <Modal visible={isOpen} transparent animationType="slide" onRequestClose={() => setIsOpen(false)}><ReplayScreenShield allow={false}>
+      <Modal visible={isOpen} transparent animationType="slide" onRequestClose={() => setIsOpen(false)}><ReplayScreenShield allow={false} overlay onDismiss={() => setIsOpen(false)}>
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setIsOpen(false)} />
           <View style={styles.modalContent}>

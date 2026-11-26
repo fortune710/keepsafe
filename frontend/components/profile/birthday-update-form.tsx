@@ -41,7 +41,7 @@ function DateSelect({ label, value, options, onSelect }: DateSelectProps) {
         transparent
         animationType="slide"
         onRequestClose={() => setIsOpen(false)}
-      ><ReplayScreenShield allow={false}>
+      ><ReplayScreenShield allow={false} overlay onDismiss={() => setIsOpen(false)}>
         <View style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}

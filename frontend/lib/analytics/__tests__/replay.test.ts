@@ -84,4 +84,31 @@ describe('selective replay', () => {
     expect(replay.isPrivateContentSafe()).toBe(true);
   });
 
+  it('resumes a reviewed screen only after all private overlays close', async () => {
+    const client = { startSessionRecording: jest.fn(async () => {}), stopSessionRecording: jest.fn(async () => {}) };
+    const replay = new ReplayController(client, true);
+    await replay.setScreen('/settings/about', true);
+    await replay.beginPrivateOverlay();
+    await replay.beginPrivateOverlay();
+    await replay.setScreen('/settings/legal', true);
+    expect(client.startSessionRecording).toHaveBeenCalledTimes(1);
+    replay.endPrivateOverlay();
+    await Promise.resolve();
+    expect(client.startSessionRecording).toHaveBeenCalledTimes(1);
+    replay.endPrivateOverlay();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(client.startSessionRecording).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not resume after an overlay closes over a private screen', async () => {
+    const client = { startSessionRecording: jest.fn(async () => {}), stopSessionRecording: jest.fn(async () => {}) };
+    const replay = new ReplayController(client, true);
+    await replay.setScreen('/settings/about', true);
+    await replay.beginPrivateOverlay();
+    await replay.setScreen('/settings/profile', true);
+    replay.endPrivateOverlay();
+    await replay.setScreen('/settings/profile', true);
+    expect(client.startSessionRecording).toHaveBeenCalledTimes(1);
+  });
+
 });

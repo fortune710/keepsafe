@@ -80,7 +80,7 @@ const SearchEntryPreview: React.FC<SearchEntryPreviewProps> = ({ entry }) => {
         transparent
         animationType="fade"
         onRequestClose={close}
-      ><ReplayScreenShield allow={false}>
+      ><ReplayScreenShield allow={false} overlay onDismiss={close}>
         <View style={styles.fullscreenOverlay}>
           <TouchableOpacity style={styles.fullscreenBackdrop} onPress={close} />
           <View style={styles.fullscreenContent}>

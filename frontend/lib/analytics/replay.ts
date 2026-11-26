@@ -31,6 +31,9 @@ export class ReplayController {
   private generation = 0;
   private privateContentSafe = true;
   private listeners = new Set<() => void>();
+  private privateOverlays = 0;
+  private currentScreen: string | null = null;
+  private active = false;
 
   constructor(private client: ReplayClient, private enabled: boolean) {}
 
@@ -57,10 +60,26 @@ export class ReplayController {
     if (generation === this.generation) this.setPrivateContentSafe(true);
   }
 
+  /** Prevent recording while an app-owned modal or portal is present. */
+  beginPrivateOverlay(): Promise<void> {
+    if (!this.enabled) return Promise.resolve();
+    this.privateOverlays += 1;
+    return this.stopBeforePrivateView();
+  }
+
+  /** Resume on the current reviewed screen only after every overlay closes. */
+  endPrivateOverlay(): void {
+    if (!this.enabled || this.privateOverlays === 0) return;
+    this.privateOverlays -= 1;
+    if (this.privateOverlays === 0) void this.setScreen(this.currentScreen, this.active);
+  }
+
   setScreen(screen: string | null, active: boolean): Promise<void> {
     if (!this.enabled) return Promise.resolve();
+    this.currentScreen = screen;
+    this.active = active;
     const generation = ++this.generation;
-    const shouldRecord = this.enabled && active && isReplaySafeScreen(screen);
+    const shouldRecord = active && this.privateOverlays === 0 && isReplaySafeScreen(screen);
     if (shouldRecord) this.setPrivateContentSafe(false);
     this.pending = this.pending.catch(() => {}).then(async () => {
       if (!shouldRecord || generation !== this.generation) {

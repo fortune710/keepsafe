@@ -84,7 +84,7 @@ export default function GridImagePickerLayoutPopover({
       </View>
 
       {isPopoverVisible && popoverAnchor ? (
-        <Portal><ReplayScreenShield allow={false}>
+        <Portal><ReplayScreenShield allow={false} overlay onDismiss={() => setIsPopoverVisible(false)}>
           <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(100)} style={styles.popoverOverlay}>
             <TouchableOpacity style={styles.popoverBackdrop} activeOpacity={1} onPress={() => setIsPopoverVisible(false)} />
 
