@@ -52,6 +52,15 @@ describe('native replay stop verification', () => {
     expect(replayController.isPrivateContentSafe()).toBe(false);
   });
 
+  it('fails closed when the native stop fails', async () => {
+    const plugin = require('@posthog/react-native-plugin') as typeof import('@posthog/react-native-plugin');
+    jest.mocked(plugin.stopRecording).mockRejectedValueOnce(new Error('bridge unavailable'));
+    const { replayController } = require('../replay-client') as typeof import('../replay-client');
+    await replayController.setScreen('/settings/about', true);
+    await expect(replayController.stopBeforePrivateView()).rejects.toThrow('bridge unavailable');
+    expect(replayController.isPrivateContentSafe()).toBe(false);
+  });
+
   it('does not invoke the native recorder when analytics is disabled', async () => {
     jest.doMock('@/constants/posthog', () => ({ analyticsIsEnabled: false, posthog: {} }));
     const plugin = require('@posthog/react-native-plugin') as typeof import('@posthog/react-native-plugin');
