@@ -121,7 +121,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow Keepsafe access your microphone for audio entries"
+          "microphonePermission": "Allow Keepsafe access your microphone for audio entries",
+          "enableBackgroundRecording": true
         }
       ],
       "expo-background-task",

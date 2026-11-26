@@ -5,6 +5,8 @@ import { logger } from '@/lib/logger';
 import { MediaService } from '@/services/media-service';
 import { Alert } from 'react-native';
 import { useCaptureContext } from '@/providers/capture-provider';
+import { useAuthContext } from '@/providers/auth-provider';
+import { resolveCaptureDiaryId } from '@/lib/last-used-diary';
 
 interface VideoCaptureParams {
     cameraRef: RefObject<CameraView | null>;
@@ -12,6 +14,7 @@ interface VideoCaptureParams {
     cameraMode: 'picture' | 'video';
     captureMode: 'camera' | 'microphone';
     isTimeCapsule: boolean;
+    diaryId?: string;
     updateCameraMode: (mode: 'picture' | 'video') => void;
     updateCameraReady: (ready: boolean) => void;
 }
@@ -46,10 +49,12 @@ export function useVideoCapture({
     cameraMode,
     captureMode,
     isTimeCapsule,
+    diaryId,
     updateCameraMode,
     updateCameraReady
 }: VideoCaptureParams) {
     const [micPermission, requestMicPermission] = useMicrophonePermissions();
+    const { user } = useAuthContext();
     const { isVideoRecording, setIsVideoRecording } = useCaptureContext();
     const [videoDuration, setVideoDuration] = useState(0);
     const videoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -169,6 +174,7 @@ export function useVideoCapture({
                             uri: encodeURIComponent(capture.uri),
                             duration: videoDuration.toString(),
                             timeCapsule: isTimeCapsule ? 'true' : undefined,
+                            diary_id: await resolveCaptureDiaryId(diaryId, user?.id),
                         }
                     });
                 }

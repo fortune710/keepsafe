@@ -3,6 +3,7 @@ import { View, ScrollView, ActivityIndicator } from 'react-native';
 import FriendSearchBar from '@/components/friend-search-bar';
 import { ContactSearchItem } from './contact-search-item';
 import { ContactSearchResult } from '@/hooks/use-contact-search';
+import { TAB_BAR_CONTENT_PADDING } from '@/constants/tab-bar';
 
 interface ContactSearchViewProps {
     searchQuery: string;
@@ -39,7 +40,7 @@ export function ContactSearchView(props: ContactSearchViewProps) {
             {isContactSearchLoading ? (
                 <ActivityIndicator size="small" color="#8B5CF6" style={{ marginTop: 20 }} />
             ) : (
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: TAB_BAR_CONTENT_PADDING }}>
                     {contactResults.map(function (item, index) {
                         return (
                             <ContactSearchItem

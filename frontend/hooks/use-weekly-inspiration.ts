@@ -29,15 +29,17 @@ export function useWeeklyInspiration() {
     staleTime: 60_000,
     queryFn: async () => {
       const { start, end } = weekBounds();
-      const [mediaResult, contactsResult, placesResult] = await Promise.allSettled([
+      const [mediaResult, contactsResult, placesResult, birthdaysResult] = await Promise.allSettled([
         InspirationMediaService.getRecentPeopleMedia(start, end),
         InspirationContactsService.getRecentAdditions(user!.id, end),
         PlaceVisitService.getVisits(user!.id, start),
+        InspirationContactsService.getBirthdays(start, end),
       ]);
       const results: InspirationItem[] = [];
       if (mediaResult.status === 'fulfilled') results.push(...mediaResult.value);
       if (contactsResult.status === 'fulfilled') results.push(...contactsResult.value);
       if (placesResult.status === 'fulfilled') results.push(...placesResult.value);
+      if (birthdaysResult.status === 'fulfilled') results.push(...birthdaysResult.value);
       return results.sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
     },
   });

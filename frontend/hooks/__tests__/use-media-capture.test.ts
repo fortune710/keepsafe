@@ -13,6 +13,7 @@ jest.mock('expo-audio', () => ({
 jest.mock('@/providers/capture-provider', () => ({ useCaptureContext: jest.fn() }));
 jest.mock('@/services/media-service', () => ({ MediaService: {} }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'capture-id' }));
+jest.mock('expo-file-system/legacy', () => ({ getInfoAsync: jest.fn().mockResolvedValue({ exists: true, isDirectory: false, size: 128 }), deleteAsync: jest.fn().mockResolvedValue(undefined) }));
 
 test('stops an interrupted owned recording and ignores a second stop', async () => {
   const recorder = {

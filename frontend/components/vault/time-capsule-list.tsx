@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { verticalScale, scale } from 'react-native-size-matters';
@@ -7,7 +7,7 @@ import TimeCapsuleCard from '@/components/entries/time-capsule-card';
 import { useTimeCapsules } from '@/hooks/use-time-capsules';
 import { TimeCapsuleWithEntry } from '@/types/time-capsule';
 import { Colors } from '@/lib/constants';
-import { SafeIcon } from '@/components/icons/safe-icon';
+import { TAB_BAR_CONTENT_PADDING } from '@/constants/tab-bar';
 
 type ListRow =
   | { kind: 'header'; key: string; label: string }
@@ -67,11 +67,18 @@ export function TimeCapsuleList({ onOpenEntry }: TimeCapsuleListProps) {
 
   if (!rows.length) {
     return (
-      <View style={styles.centered}>
-        <SafeIcon color="#8B5CF6" size={120} />
+      <View style={styles.emptyContainer}>
+        <Image
+          source={require('@/assets/illustrations/empty-time-capsule.png')}
+          style={styles.emptyIllustration}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+          accessible={false}
+        />
         <Text style={styles.emptyTitle}>No time capsules yet</Text>
-        <TouchableOpacity onPress={() => router.push('/capture')}>
-          <Text style={styles.emptySubtitleButton}>Save something for your future self.</Text>
+        <Text style={styles.emptySubtext}>Capture memories for your future self.</Text>
+        <TouchableOpacity style={styles.captureButton} onPress={() => router.push('/capture')} accessibilityRole="button">
+          <Text style={styles.captureButtonText}>Start Capturing</Text>
         </TouchableOpacity>
       </View>
     );
@@ -126,19 +133,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingBottom: verticalScale(120),
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: TAB_BAR_CONTENT_PADDING,
+  },
+  emptyIllustration: {
+    width: scale(150),
+    height: scale(150),
+    marginBottom: verticalScale(12),
+  },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1E293B',
-    marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
-  emptySubtitleButton: {
+  emptySubtext: {
     fontSize: 16,
-    fontFamily: 'Figtree-SemiBold',
-    color: '#8B5CF6',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
+    marginBottom: 24,
+  },
+  captureButton: {
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 36,
+  },
+  captureButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

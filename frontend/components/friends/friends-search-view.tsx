@@ -1,6 +1,7 @@
 import React from 'react';
 import FriendSearchBar from '@/components/friend-search-bar';
 import FriendsSection from '@/components/friends-section';
+import { TAB_BAR_CONTENT_PADDING } from '@/constants/tab-bar';
 
 interface FriendsSearchViewProps {
     searchQuery: string;
@@ -45,6 +46,7 @@ export function FriendsSearchView(props: FriendsSearchViewProps) {
                 onBlockFriend={handleBlockFriend}
                 isLoading={false}
                 searchQuery={searchQuery}
+                bottomPadding={TAB_BAR_CONTENT_PADDING}
             />
         </>
     );

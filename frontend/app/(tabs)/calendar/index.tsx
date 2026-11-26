@@ -1,7 +1,6 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, LayoutChangeEvent } from 'react-native';
 import { Flame } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import Animated, { SlideInLeft, SlideOutLeft } from 'react-native-reanimated';
@@ -9,17 +8,18 @@ import { useEntries } from '@/hooks/use-entries';
 import { useStreakTracking } from '@/hooks/use-streak-tracking';
 import { useAuthContext } from '@/providers/auth-provider';
 import { verticalScale } from 'react-native-size-matters';
-import { FlashList, FlashListRef } from '@shopify/flash-list';
+import { FlashList } from '@shopify/flash-list';
 import { formatMonthYear, formatDateWithoutYear, generateMonths, getDaysInMonth, hasEntries, dayNames, getDefaultAvatarUrl } from '@/lib/utils';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTimezone } from '@/hooks/use-timezone';
 import { Colors } from '@/lib/constants';
+import { TAB_BAR_CONTENT_PADDING } from '@/constants/tab-bar';
+import { HeaderFade } from '@/components/ui/header-fade';
 
 export default function CalendarScreen() {
   const { user, profile } = useAuthContext();
   const { entries, isLoading } = useEntries(user?.id);
   const { currentStreak, isLoading: streakLoading, checkAndUpdateStreak } = useStreakTracking(user?.id);
-  const scrollViewRef = useRef<FlashListRef<Date>>(null);
   const { getLocalDateString } = useTimezone();
   const insets = useSafeAreaInsets();
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -93,9 +93,9 @@ export default function CalendarScreen() {
             ) :
               <FlashList
                 contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight + 20 }]}
-                onLoad={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-                ref={scrollViewRef}
                 data={months}
+                keyExtractor={(month) => month.toISOString()}
+                maintainVisibleContentPosition={{ startRenderingFromBottom: true }}
                 renderItem={({ item: monthDate, index }) => {
                   const days = getDaysInMonth(monthDate);
 
@@ -172,11 +172,7 @@ export default function CalendarScreen() {
 
         {/* Fade where the header ends and the scrollable list begins, so
             content passing beneath melts away instead of cutting off sharply. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={[Colors.background, 'rgba(248, 252, 255, 0)']}
-          style={[styles.headerFade, { top: insets.top + headerHeight }]}
-        />
+        <HeaderFade style={{ top: insets.top + headerHeight }} />
       </SafeAreaView>
     </Animated.View>
   );
@@ -205,13 +201,6 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(12),
     gap: 12,
     backgroundColor: Colors.background,
-  },
-  headerFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 28,
-    zIndex: 9,
   },
   dateStack: {
     flex: 1,
@@ -263,6 +252,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingVertical: 20,
+    paddingBottom: TAB_BAR_CONTENT_PADDING,
   },
   monthCard: {
     backgroundColor: 'white',

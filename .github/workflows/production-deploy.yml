@@ -10,10 +10,60 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  eligibility:
     if: >-
       github.event.workflow_run.event == 'pull_request_target' &&
       github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      backend: ${{ steps.check.outputs.backend }}
+      pending: ${{ steps.pending.outputs.pending }}
+    steps:
+      - name: Check backend deployment eligibility
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIGRATION_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          [[ "$MIGRATION_RUN_ID" =~ ^[0-9]+$ ]]
+          jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$MIGRATION_RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name == "backend-deployment-eligible" and .conclusion == "success") | .id')"
+          if [[ -n "$jobs" ]]; then
+            echo 'backend=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'backend=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out trusted main
+        if: steps.check.outputs.backend != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for an outstanding deployment
+        if: steps.check.outputs.backend != 'true'
+        id: pending
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_SSH_PRIVATE_KEY"
+          test -n "$VPS_SSH_KNOWN_HOSTS"
+          install -m 700 -d "$RUNNER_TEMP/keepsafe-eligibility-ssh"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/keepsafe-eligibility-ssh/id_ed25519"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/keepsafe-eligibility-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/keepsafe-eligibility-ssh/id_ed25519" "$RUNNER_TEMP/keepsafe-eligibility-ssh/known_hosts"
+          deployed="$(ssh -T -i "$RUNNER_TEMP/keepsafe-eligibility-ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/keepsafe-eligibility-ssh/known_hosts" root@13.140.233.20 'test -d /root/keepsafe/.git && if [ -f /root/keepsafe/.git/keepsafe-deployed-revision ]; then cat /root/keepsafe/.git/keepsafe-deployed-revision; fi')"
+          pending="$(python3 .github/scripts/check-pending-deployment.py "$deployed" "$(git rev-parse HEAD)")"
+          echo "pending=$pending" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: eligibility
+    if: needs.eligibility.outputs.backend == 'true' || needs.eligibility.outputs.pending == 'true'
     runs-on: ubuntu-latest
     environment: production
     concurrency:
@@ -155,4 +205,6 @@ jobs:
           docker compose --env-file .env.production -f compose.production.yaml exec -T nginx nginx -t
           docker compose --env-file .env.production -f compose.production.yaml exec -T nginx nginx -s reload
           docker compose --env-file .env.production -f compose.production.yaml exec -T backend python -c "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8080/health', timeout=5).status == 200"
+          printf '%s\n' "$deploy_sha" > .git/keepsafe-deployed-revision.next
+          mv -f .git/keepsafe-deployed-revision.next .git/keepsafe-deployed-revision
           REMOTE

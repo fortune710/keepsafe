@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { MediaCapture, MediaType } from '@/types/media';
-import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState, type RecordingStatus } from 'expo-audio';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { CameraView } from 'expo-camera';
 import { MediaService } from '@/services/media-service';
 import { useCaptureContext } from '@/providers/capture-provider';
+import { MAX_AUDIO_DURATION_SECONDS } from '@/lib/audio-duration';
 
 interface UseCaptureResult {
   isCapturing: boolean;
@@ -22,10 +24,10 @@ interface UseCaptureResult {
     cameraRef: React.RefObject<CameraView | null>,
   ) => Promise<void>;
   uploadMedia: (mediaType: MediaType) => Promise<MediaCapture | null>;
-  clearCapture: () => void;
+  clearCapture: () => Promise<void>;
 }
 
-export function useMediaCapture(): UseCaptureResult {
+export function useMediaCapture(onAudioCompleted?: (capture: MediaCapture) => void): UseCaptureResult {
   const {
     isCapturing,
     setIsCapturing,
@@ -35,8 +37,13 @@ export function useMediaCapture(): UseCaptureResult {
     setMeteringLevel,
   } = useCaptureContext();
   const [capturedMedia, setCapturedMedia] = useState<MediaCapture | null>(null);
-  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const ownsAudioRecording = useRef(false);
+  const recordingGeneration = useRef(0);
+  const completingManually = useRef(false);
+  const completionHandler = useRef<(status: RecordingStatus) => void>(() => {});
+  const onCompletedRef = useRef(onAudioCompleted);
+  onCompletedRef.current = onAudioCompleted;
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true }, (status) => completionHandler.current(status));
   const recorderState = useAudioRecorderState(recorder, 100);
   useEffect(() => {
     if (!recorderState.isRecording) return;
@@ -46,6 +53,12 @@ export function useMediaCapture(): UseCaptureResult {
 
   const generateId = () => {
     return Crypto.randomUUID();
+  };
+
+  const isUsableRecording = async (uri: string | null): Promise<boolean> => {
+    if (!uri || !uri.startsWith('file://')) return false;
+    const file = await FileSystem.getInfoAsync(uri);
+    return file.exists && !file.isDirectory && (file.size === undefined || file.size > 0);
   };
 
   const startVideoRecording = useCallback(
@@ -95,20 +108,28 @@ export function useMediaCapture(): UseCaptureResult {
   );
 
   const startAudioRecording = useCallback(async () => {
+    const generation = ++recordingGeneration.current;
     setCapturedMedia(null);
     setRecordingDuration(0);
     try {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (generation !== recordingGeneration.current) return;
       if (!permission.granted) {
         Alert.alert('Permission Required', 'Please grant microphone permission to record audio.');
         return;
       }
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, allowsBackgroundRecording: true });
       await recorder.prepareToRecordAsync();
-      recorder.record();
+      if (generation !== recordingGeneration.current) {
+        await setAudioModeAsync({ allowsRecording: false, allowsBackgroundRecording: false });
+        return;
+      }
       ownsAudioRecording.current = true;
+      recorder.record({ forDuration: MAX_AUDIO_DURATION_SECONDS });
       setIsCapturing(true);
     } catch (error) {
+      ownsAudioRecording.current = false;
+      await setAudioModeAsync({ allowsRecording: false, allowsBackgroundRecording: false }).catch(() => {});
       console.error('Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start audio recording');
       setIsCapturing(false);
@@ -118,12 +139,14 @@ export function useMediaCapture(): UseCaptureResult {
   const stopAudioRecording = useCallback(async (): Promise<MediaCapture | null> => {
     if (!ownsAudioRecording.current) return null;
     ownsAudioRecording.current = false;
+    completingManually.current = true;
     try {
       const duration = recorder.currentTime;
       await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false });
+      await setAudioModeAsync({ allowsRecording: false, allowsBackgroundRecording: false });
+      if (!await isUsableRecording(recorder.uri)) throw new Error('No usable recording available');
       if (!recorder.uri) throw new Error('No recording URI available');
-      const capture: MediaCapture = { id: generateId(), type: 'audio', uri: recorder.uri, duration, timestamp: new Date() };
+      const capture: MediaCapture = { id: generateId(), type: 'audio', uri: recorder.uri, duration: Math.min(duration, MAX_AUDIO_DURATION_SECONDS), timestamp: new Date() };
       setCapturedMedia(capture);
       setRecordingDuration(0);
       setMeteringLevel(0);
@@ -131,11 +154,35 @@ export function useMediaCapture(): UseCaptureResult {
     } catch (error) {
       console.error('Failed to stop recording:', error);
       Alert.alert('Error', 'Failed to stop audio recording');
+      if (recorder.uri) await FileSystem.deleteAsync(recorder.uri, { idempotent: true }).catch(() => {});
       return null;
     } finally {
+      await setAudioModeAsync({ allowsRecording: false, allowsBackgroundRecording: false }).catch(() => {});
+      completingManually.current = false;
       setIsCapturing(false);
     }
   }, [recorder, setIsCapturing]);
+
+  completionHandler.current = (status) => {
+    if (!status.isFinished || !ownsAudioRecording.current || completingManually.current) return;
+    ownsAudioRecording.current = false;
+    const duration = Math.min(recorder.currentTime || MAX_AUDIO_DURATION_SECONDS, MAX_AUDIO_DURATION_SECONDS);
+    void (async () => {
+      await setAudioModeAsync({ allowsRecording: false, allowsBackgroundRecording: false }).catch(() => {});
+      setIsCapturing(false);
+      setRecordingDuration(0);
+      setMeteringLevel(0);
+      const usable = !status.hasError && !status.mediaServicesDidReset && await isUsableRecording(status.url).catch(() => false);
+      if (!usable || !status.url) {
+        if (status.url) await FileSystem.deleteAsync(status.url, { idempotent: true }).catch(() => {});
+        Alert.alert('Error', 'Failed to finish audio recording');
+        return;
+      }
+      const capture: MediaCapture = { id: generateId(), type: 'audio', uri: status.url, duration, timestamp: new Date() };
+      setCapturedMedia(capture);
+      onCompletedRef.current?.(capture);
+    })();
+  };
 
   const uploadMedia = useCallback(
     async (mediaType: MediaType): Promise<MediaCapture | null> => {
@@ -211,18 +258,20 @@ export function useMediaCapture(): UseCaptureResult {
   );
 
   const clearCapture = useCallback(async () => {
+    recordingGeneration.current += 1;
     setCapturedMedia(null);
     setIsCapturing(false);
     setRecordingDuration(0);
     setMeteringLevel(0);
+    const shouldDiscard = ownsAudioRecording.current;
+    ownsAudioRecording.current = false;
     try {
-      if (ownsAudioRecording.current) {
-        ownsAudioRecording.current = false;
-        await recorder.stop();
-      }
-      await setAudioModeAsync({ allowsRecording: false });
+      if (shouldDiscard) await recorder.stop();
     } catch (error) {
       console.error('Error cleaning up recording:', error);
+    } finally {
+      if (shouldDiscard && recorder.uri) await FileSystem.deleteAsync(recorder.uri, { idempotent: true }).catch(() => {});
+      await setAudioModeAsync({ allowsRecording: false, allowsBackgroundRecording: false }).catch(() => {});
     }
   }, [recorder, setIsCapturing]);
 

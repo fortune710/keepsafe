@@ -45,7 +45,7 @@ export default function CaptureScreen() {
   const RECAP_CHIP_REVEAL_EARLY_MS = 140;
 
   const responsive = useResponsive();
-  const { timeCapsule, locationAttachment } = useLocalSearchParams<{ timeCapsule?: string; locationAttachment?: string }>();
+  const { timeCapsule, locationAttachment, diary_id } = useLocalSearchParams<{ timeCapsule?: string; locationAttachment?: string; diary_id?: string }>();
   const insets = useSafeAreaInsets();
   const [captureUIMode, setCaptureUIMode] = useState<CaptureUIMode>('photo');
   const selectedMode: 'camera' | 'microphone' =
@@ -86,6 +86,7 @@ export default function CaptureScreen() {
     cameraMode,
     captureMode: selectedMode,
     isTimeCapsule: timeCapsule === 'true',
+    diaryId: diary_id,
     updateCameraMode: setCameraMode,
     updateCameraReady: setIsCameraReady,
   });
@@ -97,15 +98,17 @@ export default function CaptureScreen() {
     facing,
     updateCameraMode: setCameraMode,
     isTimeCapsule: timeCapsule === 'true',
+    diaryId: diary_id,
   });
 
   const { toggleRecording } = useAudioCapture({
     cameraRef,
     setVideoDuration,
     isTimeCapsule: timeCapsule === 'true',
+    diaryId: diary_id,
   });
 
-  const { handleUpload } = useMediaUpload(selectedMode, timeCapsule === 'true');
+  const { handleUpload } = useMediaUpload(selectedMode, timeCapsule === 'true', diary_id);
 
   // Release save lock when capture screen mounts (after navigating back from details)
   useVaultPreloader();
@@ -116,20 +119,13 @@ export default function CaptureScreen() {
     }, []),
   );
 
-  const { isCapturing, recordingDuration, meteringLevel, clearCapture } =
+  const { isCapturing, recordingDuration, meteringLevel } =
     useMediaCapture();
 
   useEffect(() => {
     if (!locationAttachment) return;
     setPendingLocationAttachment(locationAttachment);
   }, [locationAttachment, setPendingLocationAttachment]);
-
-  // Cleanup audio recording when component unmounts (navigating away)
-  useEffect(() => {
-    return () => {
-      clearCapture();
-    };
-  }, []);
 
   // Pre-configure the camera pipeline for the selected mode as soon as the user
   // swipes/taps it, rather than waiting for the first capture attempt.

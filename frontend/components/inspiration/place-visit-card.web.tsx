@@ -1,13 +1,13 @@
 import { MapPin } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { InspirationPlaceItem } from '@/types/inspiration';
 
-export function PlaceVisitCard({ item }: { item: InspirationPlaceItem }) {
-  return <View accessible accessibilityLabel={`Visited ${item.name}`} style={styles.card}>
+export function PlaceVisitCard({ item, onPress }: { item: InspirationPlaceItem; onPress?: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Visited ${item.name}`} onPress={onPress} style={styles.card}>
     <MapPin size={22} color="#0F766E" fill="#CCFBF1" />
     <Text numberOfLines={1} style={styles.name}>{item.name}</Text>
     <Text numberOfLines={1} style={styles.address}>{item.address || 'Location saved on your phone'}</Text>
-  </View>;
+  </Pressable>;
 }
 
 const styles = StyleSheet.create({

@@ -18,6 +18,16 @@ REQUIRED = (
 
 
 class RenderProductionEnvTests(unittest.TestCase):
+    def test_deployment_workflow_reads_every_instagram_setting_from_secrets(self):
+        workflow = (ROOT / '.github/workflows/production-deploy.yml').read_text()
+        for name in (
+            'META_APP_ID', 'META_APP_SECRET', 'META_INSTAGRAM_CONFIG_ID',
+            'META_INSTAGRAM_REDIRECT_URI', 'META_INSTAGRAM_LOGIN_URL',
+            'META_GRAPH_API_VERSION', 'INSTAGRAM_TOKEN_ENCRYPTION_KEY',
+        ):
+            with self.subTest(name=name):
+                self.assertIn(f'{name}: ${{{{ secrets.{name} }}}}', workflow)
+
     def test_instagram_settings_reach_backend_container(self):
         instagram_values = {
             'META_APP_ID': 'example-app-id',

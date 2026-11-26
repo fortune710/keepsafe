@@ -3,6 +3,8 @@
 ## General Guidelines
 1. Always try to make optimistic updates and save data locally where possible to make UX feel snappy.
 
+2. When integrating third-party expo packages and/or building new features, enxure compatibility of libraries involved on both iOS and Android. If a package works only for one platform, ensure to find an alternative package for the other platform.
+
 ### Calling Supabase Database
 1. When making calls to the Supabase Database, use the `TABLES` object in `constants/supabase.ts` file. DO NOT write the table name as a plain string.
 

@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { getDefaultAvatarUrl } from '@/lib/utils';
 import { verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
+import { HeaderFade } from '@/components/ui/header-fade';
 
 // Every settings icon/row shares the Sign Out row's neutral slate color.
 const SETTINGS_ICON_COLOR = '#64748B';
@@ -129,6 +130,7 @@ export default function SettingsScreen() {
         </View>
       </GestureDetector>
 
+      <View style={styles.scrollArea}>
       <ScrollView>
         <TouchableOpacity
           style={styles.profileSection}
@@ -175,6 +177,8 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <HeaderFade style={styles.headerFade} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -190,6 +194,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     backgroundColor: Colors.background,
   },
+  scrollArea: { flex: 1 },
+  headerFade: { height: 12 },
   title: {
     fontSize: 20,
     fontFamily: 'Figtree-SemiBold',

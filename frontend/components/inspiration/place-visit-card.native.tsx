@@ -1,17 +1,17 @@
 import MapView, { Marker } from 'react-native-maps';
 import { MapPin } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { InspirationPlaceItem } from '@/types/inspiration';
 
-export function PlaceVisitCard({ item }: { item: InspirationPlaceItem }) {
+export function PlaceVisitCard({ item, onPress }: { item: InspirationPlaceItem; onPress?: () => void }) {
   const region = { latitude: item.latitude, longitude: item.longitude, latitudeDelta: 0.018, longitudeDelta: 0.018 };
-  return <View accessible accessibilityLabel={`Visited ${item.name}`} style={styles.card}>
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Visited ${item.name}`} onPress={onPress} style={styles.card}>
     <MapView style={styles.map} initialRegion={region} scrollEnabled={false} zoomEnabled={false} rotateEnabled={false} pitchEnabled={false} pointerEvents="none">
       <Marker coordinate={region} />
     </MapView>
     <View style={styles.scrim} />
     <View style={styles.copy}><MapPin size={14} color="#fff" fill="#fff" /><Text numberOfLines={1} style={styles.name}>{item.name}</Text></View>
-  </View>;
+  </Pressable>;
 }
 
 const styles = StyleSheet.create({

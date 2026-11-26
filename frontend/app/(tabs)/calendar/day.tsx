@@ -1,23 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { ArrowLeft, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { ChevronLeft, CircleAlert as AlertCircle } from 'lucide-react-native';
 import VaultEntryCard from '@/components/entries/vault-entry-card';
 import { useUserEntries } from '@/hooks/use-user-entries';
 import { DateContainer } from '@/components/date-container';
 import { EntryPage } from '@/components/entries/entry-page';
 import { FlashList } from '@shopify/flash-list';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { getEntriesForDate } from '@/lib/utils';
-import { verticalScale } from 'react-native-size-matters';
+import { scale, verticalScale } from 'react-native-size-matters';
 import { useTimezone } from '@/hooks/use-timezone';
+import { Colors } from '@/lib/constants';
+import { TAB_BAR_CONTENT_PADDING } from '@/constants/tab-bar';
 
 export default function CalendarDayScreen() {
   const { date } = useLocalSearchParams();
   const { entries, isLoading, error } = useUserEntries();
   const { getLocalDateString, isUTC } = useTimezone();
+  const [headerHeight, setHeaderHeight] = useState(verticalScale(110));
 
   const selectedDate = date as string;
   console.log(selectedDate);
@@ -67,9 +69,15 @@ export default function CalendarDayScreen() {
     return (
       <FlashList
         data={dayEntries}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingTop: Math.max(0, headerHeight - verticalScale(16)), paddingBottom: TAB_BAR_CONTENT_PADDING }}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <DateContainer timezone="UTC" date={new Date(selectedDate)} />
+          </View>
+        }
         renderItem={({ item }) => (
           <VaultEntryCard
-            key={item.id}
             entry={item}
           />
         )}
@@ -86,18 +94,15 @@ export default function CalendarDayScreen() {
       >
         <>
           <EntryPage>
-            <View style={styles.header}>
+            <View style={styles.header} pointerEvents="box-none" onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
               <TouchableOpacity 
                 style={styles.backButton}
                 onPress={() => router.back()}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
               >
-                <ArrowLeft color="#64748B" size={24} />
+                <ChevronLeft color="#64748B" size={24} />
               </TouchableOpacity>
-              <DateContainer 
-                timezone='UTC'
-                date={new Date(selectedDate)}
-              />
-              <View style={{ width: 40 }} />
             </View>
 
             <View style={styles.content}>
@@ -117,29 +122,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F9FF',
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginTop: verticalScale(30)
+    paddingHorizontal: scale(16),
+    paddingTop: verticalScale(50),
+    paddingBottom: verticalScale(12),
   },
   backButton: {
-    padding: 8,
+    padding: scale(10),
+    backgroundColor: Colors.white,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: 100,
   },
-  titleContainer: {
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 2,
-  },
+  listHeader: { alignItems: 'center', justifyContent: 'center', marginVertical: verticalScale(8) },
   content: {
     flex: 1,
   },
@@ -191,12 +192,5 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
-  },
-  entriesScroll: {
-    flex: 1,
-  },
-  entriesContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
   },
 });

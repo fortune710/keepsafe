@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     },
     listHeader: { marginBottom: 10 },
     flashListStyle: { paddingVertical: 10, height: verticalScale(570) },
-    listContentContainer: { paddingVertical: 10 },
+    listContentContainer: { paddingVertical: 10, paddingHorizontal: scale(16) },
     loadingMusicItem: {
         display: "flex",
         flexDirection: "row",

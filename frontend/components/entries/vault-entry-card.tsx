@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle } from 'react-native-reanimated';
 import { RotateCcw, AlertCircle } from 'lucide-react-native';
 import { dateStringToNumber, getDefaultAvatarUrl, getRelativeDate } from '@/lib/utils';
 import { useAuthContext } from '@/providers/auth-provider';
 import { Image } from 'expo-image'
 import VaultCanvas from '../capture/canvas/vault-canvas';
-import { scale, verticalScale } from 'react-native-size-matters';
+import { scale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
 import TextTicker from 'react-native-text-ticker';
 import { MusicTag } from '@/types/capture';
@@ -20,8 +20,6 @@ interface VaultEntryCardProps {
   onMusicPress?: (music: MusicTag) => void;
   onLongPress?: (entry: EntryWithProfile) => void;
 }
-
-const { height } = Dimensions.get('window');
 
 export default function VaultEntryCard({
   entry,
@@ -159,7 +157,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
     width: '100%',
-    height: height * 0.45,
     borderWidth: 1,
     borderColor: Colors.border
   },
@@ -172,7 +169,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: verticalScale(18)
   },
   authorAvatar: {
     width: 20,

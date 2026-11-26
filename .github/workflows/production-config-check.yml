@@ -4,14 +4,11 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - compose.production.yaml
-      - config/nginx/**
-      - backend/Dockerfile
-      - .github/scripts/**
-      - .github/workflows/production-*.yml
-      - frontend/supabase/migrations/**
-      - frontend/supabase/tests/**
-      - scripts/deploy/activate-signed-webhooks.sql
+      - 'backend/**'
+      - 'compose.production.yaml'
+      - 'config/nginx/**'
+      - '.github/scripts/**'
+      - 'frontend/supabase/tests/**'
 
 permissions:
   contents: read

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, View, Pressable, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Modal, View, Pressable, StyleSheet, Dimensions, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -20,6 +20,7 @@ const KEYBOARD_GAP = verticalScale(12);
 interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
+  onDismiss?: () => void;
   children: React.ReactNode;
   height?: number | `${number}%`;
   maxHeight?: number | `${number}%`;
@@ -28,6 +29,7 @@ interface BottomSheetProps {
 export function BottomSheet({
   visible,
   onClose,
+  onDismiss,
   children,
   height,
   maxHeight = '70%',
@@ -35,6 +37,9 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const keyboard = useAnimatedKeyboard();
   const [modalVisible, setModalVisible] = useState(false);
+  const wasModalVisible = useRef(false);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   const backdropOpacity = useSharedValue(0);
   const sheetTranslateY = useSharedValue(SCREEN_HEIGHT);
@@ -70,6 +75,16 @@ export function BottomSheet({
     }
   }, [visible]);
 
+  useEffect(() => {
+    const wasVisible = wasModalVisible.current;
+    wasModalVisible.current = modalVisible;
+    if (Platform.OS === 'ios' || modalVisible || !wasVisible || visible) return;
+
+    // Android unmounts the Modal when visible becomes false and has no onDismiss event.
+    const frame = requestAnimationFrame(() => onDismissRef.current?.());
+    return () => cancelAnimationFrame(frame);
+  }, [modalVisible, visible]);
+
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
   }));
@@ -98,6 +113,7 @@ export function BottomSheet({
       animationType="none"
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <View style={styles.root}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>

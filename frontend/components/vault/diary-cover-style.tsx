@@ -1,8 +1,6 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Flower2, Heart, Leaf, Smile, Sparkles, Star } from 'lucide-react-native';
+import { StyleSheet } from 'react-native';
 import Svg, { Circle, G, Line, Path, Polygon, Rect } from 'react-native-svg';
-import { scale } from 'react-native-size-matters';
 import { DiaryStyleId } from '@/lib/diary-styles';
 import { shadeColor } from '@/lib/diary-colors';
 
@@ -11,185 +9,128 @@ interface DiaryCoverStyleProps {
   styleId: DiaryStyleId;
 }
 
-const DOT_POSITIONS = [
-  ['24%', '12%'], ['52%', '8%'], ['78%', '18%'],
-  ['33%', '35%'], ['66%', '42%'], ['86%', '56%'],
-  ['22%', '68%'], ['52%', '76%'], ['78%', '88%'],
-] as const;
+const GOLD = '#F3DBB2';
+const CREAM = '#F9EBD4';
+const surface = StyleSheet.absoluteFill;
 
-/** Code-rendered diary decoration shared by grid, editor, and opening transition. */
+/** Scalable cover artwork shared by the diary grid, editor and opening transition. */
 export function DiaryCoverStyle({ color, styleId }: DiaryCoverStyleProps) {
-  if (styleId === 'none') return null;
+  if (styleId === 'none') {
+    return (
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        <Path d="M25 8 H91 Q91 12 95 12 V148 Q91 148 91 152 H25 Q25 148 21 148 V12 Q25 12 25 8 Z" fill="none" stroke={GOLD} strokeOpacity="0.8" strokeWidth="0.65" />
+      </Svg>
+    );
+  }
 
   if (styleId === 'celestial') {
     return (
-      <Svg pointerEvents="none" style={StyleSheet.absoluteFill} viewBox="0 0 100 160">
-        <Path
-          d="M71 18c-13 5-17 21-8 31 5 6 13 8 20 5-5 8-15 13-25 10-14-4-22-19-17-33 4-11 18-18 30-13Z"
-          fill="rgba(255,255,255,0.68)"
-        />
-        <Circle cx="29" cy="34" r="3.5" fill="rgba(255,255,255,0.72)" />
-        <Circle cx="71" cy="93" r="2.6" fill="rgba(255,255,255,0.58)" />
-        <Circle cx="33" cy="118" r="2.3" fill="rgba(255,255,255,0.7)" />
-        <G stroke="rgba(255,255,255,0.54)" strokeWidth="1.2">
-          <Line x1="24" y1="83" x2="43" y2="70" />
-          <Line x1="43" y1="70" x2="57" y2="88" />
-          <Line x1="57" y1="88" x2="77" y2="76" />
-          <Line x1="25" y1="130" x2="45" y2="139" />
-          <Line x1="45" y1="139" x2="68" y2="125" />
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        <G fill="none" stroke={GOLD} strokeOpacity="0.8" strokeWidth="0.5">
+          <Path d="M28 35 Q58 5 89 35 M28 127 Q58 155 89 127" strokeDasharray="1 2" />
+          <Path d="M33 108 L41 91 L54 85 L65 68 L78 58" />
         </G>
-        <G fill="rgba(255,255,255,0.82)">
-          <Circle cx="24" cy="83" r="2" /><Circle cx="43" cy="70" r="2" />
-          <Circle cx="57" cy="88" r="2" /><Circle cx="77" cy="76" r="2" />
-          <Circle cx="25" cy="130" r="1.8" /><Circle cx="45" cy="139" r="1.8" />
-          <Circle cx="68" cy="125" r="1.8" />
+        <G fill={GOLD}>
+          <Circle cx="33" cy="108" r="1.2" /><Circle cx="41" cy="91" r="1.1" /><Circle cx="54" cy="85" r="1.4" /><Circle cx="65" cy="68" r="1.1" /><Circle cx="78" cy="58" r="1.3" />
+          <Circle cx="58" cy="36" r="4" /><Circle cx="31" cy="70" r="0.8" /><Circle cx="83" cy="99" r="0.8" /><Circle cx="44" cy="52" r="0.6" /><Circle cx="72" cy="115" r="0.7" />
+          <Path d="M41 32 a4 4 0 1 0 0 8 a3 3 0 1 1 0 -8 M75 32 a4 4 0 1 1 0 8 a3 3 0 1 0 0 -8 M27 34 a3 3 0 1 0 0 6 a2.5 2.5 0 1 1 0 -6 M89 34 a3 3 0 1 1 0 6 a2.5 2.5 0 1 0 0 -6" />
+          <Path d="M58 10 l1 4 4 1 -4 1 -1 4 -1 -4 -4 -1 4 -1 Z M58 140 l1 4 4 1 -4 1 -1 4 -1 -4 -4 -1 4 -1 Z M29 83 l.6 2.5 2.5 .6 -2.5 .6 -.6 2.5 -.6 -2.5 -2.5 -.6 2.5 -.6 Z" />
         </G>
-        <Path d="M20 53h10M25 48v10M75 112h12M81 106v12" stroke="rgba(255,255,255,0.64)" strokeWidth="1.4" strokeLinecap="round" />
       </Svg>
     );
   }
 
   if (styleId === 'terrazzo') {
     return (
-      <Svg pointerEvents="none" style={StyleSheet.absoluteFill} viewBox="0 0 100 160">
-        <Polygon points="18,15 34,10 39,25 25,31" fill="rgba(255,255,255,0.28)" />
-        <Path d="M66 8c15 4 20 16 12 25-8 8-23 4-25-7-2-8 4-15 13-18Z" fill="rgba(0,0,0,0.1)" />
-        <Polygon points="13,57 27,46 40,56 32,73 17,72" fill="rgba(255,255,255,0.2)" />
-        <Path d="M68 56c10-4 20 2 19 12-1 9-13 15-22 8-7-5-5-16 3-20Z" fill="rgba(255,255,255,0.34)" />
-        <Polygon points="37,89 53,81 64,95 54,110 37,105" fill="rgba(0,0,0,0.09)" />
-        <Path d="M14 112c8-9 23-7 27 4 4 12-7 23-20 18-10-4-14-14-7-22Z" fill="rgba(255,255,255,0.3)" />
-        <Polygon points="67,120 87,115 91,134 73,144 61,133" fill="rgba(255,255,255,0.18)" />
-        <Circle cx="48" cy="44" r="4" fill="rgba(255,255,255,0.42)" />
-        <Circle cx="83" cy="94" r="3" fill="rgba(0,0,0,0.12)" />
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        <G fill={CREAM} fillOpacity="0.8">
+          <Path d="M23 6 l9 3 2 7 -6 4 -7 -5 Z M60 3 l5 -3 5 5 -2 5 -6 -1 Z M78 35 l11 -5 7 6 -2 10 -9 2 -6 -6 Z M23 63 l9 -5 6 5 -2 8 -10 4 -5 -5 Z M57 90 l10 -4 8 7 -3 10 -8 3 -8 -6 Z M78 131 l11 -5 6 7 -3 10 -10 3 -6 -7 Z M30 139 l8 -4 7 5 -3 9 -8 2 -6 -5 Z" />
+        </G>
+        <G fill={shadeColor(color, -48)} fillOpacity="0.65">
+          <Path d="M48 22 l8 -6 8 3 3 10 -9 6 -9 -5 Z M27 39 l5 -3 6 4 -1 6 -7 3 -5 -5 Z M65 56 l6 -4 8 3 1 8 -6 5 -9 -3 Z M37 106 l10 -5 7 7 -2 9 -9 4 -8 -6 Z M82 100 l5 -3 6 3 -1 6 -6 3 -5 -3 Z M55 133 l5 -4 5 3 -1 6 -5 2 -5 -3 Z" />
+        </G>
+        <G fill={GOLD} fillOpacity="0.75"><Circle cx="47" cy="9" r="1.8" /><Circle cx="86" cy="17" r="2.3" /><Circle cx="50" cy="51" r="2" /><Circle cx="87" cy="76" r="1.8" /><Circle cx="27" cy="88" r="2.4" /><Circle cx="66" cy="119" r="1.6" /><Circle cx="49" cy="153" r="2" /></G>
       </Svg>
     );
   }
 
   if (styleId === 'wavy-lines') {
     return (
-      <Svg pointerEvents="none" style={StyleSheet.absoluteFill} viewBox="0 0 100 160">
-        {[18, 35, 52, 69, 86, 103, 120, 137].map((y, index) => (
-          <Path
-            key={y}
-            d={`M-12 ${y} C13 ${y - 18}, 30 ${y + 18}, 54 ${y} S93 ${y - 17}, 114 ${y + 1}`}
-            fill="none"
-            opacity={index % 2 === 0 ? 0.62 : 0.36}
-            stroke="white"
-            strokeWidth={index % 3 === 0 ? 2 : 1.2}
-          />
-        ))}
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        {Array.from({ length: 25 }, (_, index) => {
+          const y = -25 + index * 8;
+          return <Path key={index} d={`M15 ${y} C35 ${y - 20} 42 ${y + 17} 61 ${y + 1} S88 ${y - 10} 105 ${y + 3}`} fill="none" stroke={GOLD} strokeOpacity="0.72" strokeWidth="0.55" />;
+        })}
       </Svg>
     );
   }
 
   if (styleId === 'ribbon') {
     return (
-      <Svg pointerEvents="none" style={StyleSheet.absoluteFill} viewBox="0 0 100 160">
-        <Rect x="47" y="0" width="6" height="160" fill="rgba(255,255,255,0.19)" />
-        <Path d="M49 72C38 55 19 51 16 64c-3 12 15 20 34 12Z" fill="rgba(255,255,255,0.7)" />
-        <Path d="M51 72c11-17 30-21 33-8 3 12-15 20-34 12Z" fill="rgba(255,255,255,0.58)" />
-        <Path d="M47 76 32 113l17-8 8 15 1-43Z" fill="rgba(255,255,255,0.48)" />
-        <Path d="m54 76 14 37-16-8-8 15-1-43Z" fill="rgba(255,255,255,0.38)" />
-        <Circle cx="50" cy="73" r="8" fill="rgba(255,255,255,0.9)" />
-        <Circle cx="50" cy="73" r="4" fill="rgba(0,0,0,0.08)" />
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        <Path d="M16 70 L100 15 V39 L40 80 L100 121 V145 L16 89 Z" fill={CREAM} fillOpacity="0.48" />
+        <Path d="M16 70 L100 15 M16 89 L100 145 M40 80 L100 39 M40 80 L100 121" fill="none" stroke={GOLD} strokeOpacity="0.85" strokeWidth="0.7" />
       </Svg>
     );
   }
 
   if (styleId === 'polka-dots') {
     return (
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {DOT_POSITIONS.map(([left, top]) => (
-          <View key={`${left}-${top}`} style={[styles.dot, { left, top }]} />
-        ))}
-      </View>
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        <G fill={CREAM} fillOpacity="0.88">
+          <Circle cx="38" cy="0" r="13" /><Circle cx="100" cy="45" r="13" /><Circle cx="17" cy="103" r="11" /><Circle cx="76" cy="160" r="14" />
+          <Circle cx="81" cy="12" r="2" /><Circle cx="60" cy="40" r="2" /><Circle cx="30" cy="60" r="1.8" /><Circle cx="72" cy="80" r="2" /><Circle cx="46" cy="107" r="1.8" /><Circle cx="89" cy="122" r="2" /><Circle cx="27" cy="145" r="1.8" />
+        </G>
+      </Svg>
     );
   }
 
   if (styleId === 'checkers') {
     return (
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {Array.from({ length: 24 }, (_, index) => {
-          const row = Math.floor(index / 4);
-          const column = index % 4;
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        <Rect x="16" y="0" width="84" height="160" fill={CREAM} fillOpacity="0.75" />
+        {Array.from({ length: 8 }, (_, row) => Array.from({ length: 4 }, (_, column) => {
           if ((row + column) % 2 !== 0) return null;
-          return (
-            <View
-              key={index}
-              style={[
-                styles.checker,
-                { left: `${column * 25}%`, top: `${row * (100 / 6)}%` },
-              ]}
-            />
-          );
-        })}
-      </View>
+          const x = 16 + column * 21;
+          const y = row * 20;
+          const shift = row % 2 === 0 ? 3 : -3;
+          return <Path key={`${row}-${column}`} d={`M${x} ${y} Q${x + 10.5} ${y + shift} ${x + 21} ${y} L${x + 21} ${y + 20} Q${x + 10.5} ${y + 20 + shift} ${x} ${y + 20} Z`} fill={shadeColor(color, -35)} fillOpacity="0.85" />;
+        }))}
+      </Svg>
     );
   }
 
   if (styleId === 'botanical') {
     return (
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <Flower2 color="rgba(255,255,255,0.72)" size={scale(30)} strokeWidth={1.6} style={styles.flowerTop} />
-        <Leaf color="rgba(255,255,255,0.62)" size={scale(36)} strokeWidth={1.5} style={styles.leafMiddle} />
-        <Flower2 color="rgba(255,255,255,0.5)" size={scale(24)} strokeWidth={1.5} style={styles.flowerBottom} />
-        <View style={styles.botanicalStem} />
-      </View>
+      <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+        <G fill="none" stroke={GOLD} strokeOpacity="0.82" strokeWidth="0.65" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M20 58 Q50 29 87 5 M32 46 Q29 28 21 19 Q23 36 32 46 M42 37 Q42 20 35 12 Q34 27 42 37 M52 29 Q59 14 69 10 Q65 23 52 29 M65 20 Q74 7 85 5 M35 44 Q46 45 53 38 Q43 36 35 44 M20 133 Q46 110 81 69 M31 123 Q28 106 20 99 Q21 114 31 123 M43 111 Q43 94 35 86 Q34 101 43 111 M55 98 Q66 98 73 87 Q62 89 55 98 M66 85 Q65 70 58 63 Q57 77 66 85 M77 73 Q87 68 91 57 Q81 61 77 73 M47 151 Q65 132 93 114 M59 140 Q57 130 52 125 Q52 135 59 140 M70 132 Q80 134 86 126 Q77 125 70 132" />
+          <Path d="M24 22 l8 24 M37 15 l5 22 M66 12 L52 29 M23 102 l8 21 M37 90 l6 21 M70 89 L55 98 M60 66 l6 19 M89 59 L77 73 M54 127 l5 13 M83 127 l-13 5" strokeWidth="0.35" />
+          <Circle cx="77" cy="44" r="2" /><Circle cx="83" cy="39" r="1.5" /><Path d="M70 53 Q75 45 83 39" />
+        </G>
+      </Svg>
     );
   }
 
-  const ink = shadeColor(color, -38);
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[styles.sticker, styles.heartSticker]}><Heart color={ink} fill={ink} size={scale(14)} /></View>
-      <View style={[styles.sticker, styles.starSticker]}><Star color={ink} size={scale(15)} strokeWidth={2.2} /></View>
-      <View style={[styles.sticker, styles.smileSticker]}><Smile color={ink} size={scale(16)} strokeWidth={2.1} /></View>
-      <Sparkles color="rgba(255,255,255,0.78)" size={scale(22)} style={styles.sparkleSticker} />
-    </View>
+    <Svg pointerEvents="none" style={surface} viewBox="0 0 100 160" preserveAspectRatio="none">
+      <Circle cx="43" cy="31" r="12" fill={GOLD} fillOpacity="0.7" />
+      <G transform="rotate(8 72 38)">
+        <Rect x="55" y="14" width="36" height="43" fill={CREAM} />
+        <Rect x="58" y="17" width="30" height="37" fill={shadeColor(color, -32)} />
+        <Path d="M58 48 L67 35 L73 42 L79 30 L88 44 V54 H58 Z" fill={CREAM} fillOpacity="0.7" />
+        <Circle cx="80" cy="25" r="3" fill={GOLD} />
+      </G>
+      <G transform="rotate(-8 39 105)">
+        <Rect x="22" y="84" width="36" height="42" fill={CREAM} />
+        <Rect x="25" y="87" width="30" height="36" fill={shadeColor(color, -28)} />
+        <Path d="M25 112 L33 101 L40 108 L46 97 L55 108 V123 H25 Z" fill={GOLD} fillOpacity="0.8" />
+      </G>
+      <G fill="none" stroke={CREAM} strokeWidth="0.65" strokeOpacity="0.9">
+        <Circle cx="36" cy="60" r="13" /><Path d="M23 60 H49 M36 47 V73 M27 51 Q36 56 45 51 M27 69 Q36 64 45 69 M36 47 Q25 60 36 73 M36 47 Q47 60 36 73" />
+        <Circle cx="76" cy="108" r="11" /><Path d="M76 99 L78 106 L85 108 L78 110 L76 117 L74 110 L67 108 L74 106 Z M64 75 Q70 72 76 75 T88 75 M64 79 Q70 76 76 79 T88 79 M64 83 Q70 80 76 83 T88 83" />
+        <Path d="M51 147 Q61 132 75 131 T97 140 M54 151 Q66 139 77 140 T96 148" />
+      </G>
+    </Svg>
   );
 }
-
-const styles = StyleSheet.create({
-  dot: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: scale(5),
-    height: scale(9),
-    position: 'absolute',
-    width: scale(9),
-  },
-  checker: {
-    backgroundColor: 'rgba(255,255,255,0.13)',
-    height: `${100 / 6}%`,
-    position: 'absolute',
-    width: '25%',
-  },
-  botanicalStem: {
-    backgroundColor: 'rgba(255,255,255,0.34)',
-    bottom: '8%',
-    left: '51%',
-    position: 'absolute',
-    top: '20%',
-    transform: [{ rotate: '-14deg' }],
-    width: 1.5,
-  },
-  flowerTop: { position: 'absolute', right: '12%', top: '12%' },
-  leafMiddle: { left: '23%', position: 'absolute', top: '43%', transform: [{ rotate: '-22deg' }] },
-  flowerBottom: { bottom: '12%', position: 'absolute', right: '20%' },
-  sticker: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: scale(16),
-    height: scale(29),
-    justifyContent: 'center',
-    position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    width: scale(29),
-  },
-  heartSticker: { left: '23%', top: '17%', transform: [{ rotate: '-9deg' }] },
-  starSticker: { right: '14%', top: '38%', transform: [{ rotate: '11deg' }] },
-  smileSticker: { bottom: '14%', left: '36%', transform: [{ rotate: '7deg' }] },
-  sparkleSticker: { bottom: '22%', position: 'absolute', right: '13%' },
-});
