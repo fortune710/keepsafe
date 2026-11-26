@@ -15,7 +15,12 @@
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "ios": {
+        "env": {
+          "POSTHOG_UPLOAD_SYMBOLS": "1"
+        }
+      }
     }
   },
   "submit": {

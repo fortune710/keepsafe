@@ -18,7 +18,7 @@ module.exports = ({ config }) => {
       ...config,
       plugins: [
         ...(config.plugins || []),
-        ['posthog-react-native/expo', { uploadNativeSymbols: true, disableSandboxing: false }],
+        ['posthog-react-native/expo', { uploadNativeSymbols: true, disableSandboxing: false, skipOnConflict: true }],
       ],
     };
   }
