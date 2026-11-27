@@ -12,6 +12,7 @@ import httpx
 from services.supabase_client import get_supabase_client
 from services.queue_service import QueueService
 from config import settings
+from database.tables import DatabaseTables
 from queue_constants import (
     NOTIFICATION_BATCH_SIZE,
     NOTIFICATION_CONCURRENCY,
@@ -19,9 +20,17 @@ from queue_constants import (
     NOTIFICATION_DLQ_LIMIT,
     NOTIFICATION_DLQ_NAME,
     NOTIFICATION_QUEUE_NAME,
+    NOTIFICATION_RECEIPT_CHECKS_BATCH_SIZE,
+    NOTIFICATION_RECEIPT_CHECKS_QUEUE_NAME,
+    NOTIFICATION_RECEIPT_CHECKS_VISIBILITY_TIMEOUT_SECONDS,
 )
 from utils.logging import Logger
 logger = Logger("NotificationService")
+
+DEVICE_NOT_REGISTERED_ERROR = "DeviceNotRegistered"
+MESSAGE_RATE_EXCEEDED_ERROR = "MessageRateExceeded"
+EXPO_PUSH_SEND_URL = "https://exp.host/--/api/v2/push/send"
+EXPO_PUSH_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts"
 
 
 class NotificationService:
@@ -34,9 +43,14 @@ class NotificationService:
         self.queue_name = NOTIFICATION_QUEUE_NAME
         self.dlq_name = NOTIFICATION_DLQ_NAME
         self.dead_queue_name = NOTIFICATION_DEAD_QUEUE_NAME
+        self.receipt_checks_queue_name = NOTIFICATION_RECEIPT_CHECKS_QUEUE_NAME
         self.concurrency = NOTIFICATION_CONCURRENCY
         self.batch_size = NOTIFICATION_BATCH_SIZE
         self.dlq_limit = NOTIFICATION_DLQ_LIMIT
+        self.receipt_checks_batch_size = NOTIFICATION_RECEIPT_CHECKS_BATCH_SIZE
+        self.receipt_checks_visibility_timeout_seconds = (
+            NOTIFICATION_RECEIPT_CHECKS_VISIBILITY_TIMEOUT_SECONDS
+        )
         self.queue_service = QueueService()
         self.queue_service.supabase = self.supabase
         
@@ -60,6 +74,7 @@ class NotificationService:
                 "queue": self.queue_name,
                 "dlq": self.dlq_name,
                 "dead_queue": self.dead_queue_name,
+                "receipt_checks_queue": self.receipt_checks_queue_name,
                 "concurrency": self.concurrency,
                 "batch_size": self.batch_size,
                 "dlq_limit": self.dlq_limit,
@@ -401,9 +416,6 @@ class NotificationService:
         Returns:
             bool: `True` if the notification was accepted/sent, `False` otherwise.
         """
-        # Expo REST API endpoint
-        api_url = "https://exp.host/--/api/v2/push/send"
-        
         # Prepare messages array for Expo API
         messages = []
         for recipient in recipients:
@@ -427,7 +439,7 @@ class NotificationService:
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    api_url,
+                    EXPO_PUSH_SEND_URL,
                     json=messages,
                     headers=headers
                 )
@@ -444,34 +456,62 @@ class NotificationService:
                 else:
                     tickets = [result]
                 
-                # Check if all tickets are successful
-                all_success = all(
-                    ticket.get("status") == "ok" 
-                    for ticket in tickets 
-                    if isinstance(ticket, dict)
-                )
-                
-                if all_success:
-                    logger.info(
-                        "Notification sent via REST API",
-                        {"recipients": len(recipients), "priority": priority},
+                unregistered_tokens: List[str] = []
+                other_error_tickets: List[Dict[str, Any]] = []
+                receipt_check_messages: List[Dict[str, str]] = []
+
+                # Expo returns tickets in the same order as the messages we sent.
+                for recipient, ticket in zip(recipients, tickets):
+                    if not isinstance(ticket, dict):
+                        continue
+                    if ticket.get("status") == "ok":
+                        ticket_id = ticket.get("id")
+                        if ticket_id:
+                            receipt_check_messages.append(
+                                {"ticket_id": ticket_id, "token": recipient}
+                            )
+                        continue
+
+                    details = ticket.get("details") or {}
+                    if details.get("error") == DEVICE_NOT_REGISTERED_ERROR:
+                        unregistered_tokens.append(recipient)
+                    else:
+                        other_error_tickets.append(ticket)
+
+                if unregistered_tokens:
+                    await asyncio.to_thread(
+                        self._mark_push_tokens_inactive,
+                        unregistered_tokens,
                     )
-                    return True
-                else:
-                    # Some tickets failed
-                    error_tickets = [
-                        ticket for ticket in tickets 
-                        if isinstance(ticket, dict) and ticket.get("status") != "ok"
-                    ]
+
+                if receipt_check_messages:
+                    await asyncio.to_thread(
+                        self._enqueue_receipt_checks,
+                        receipt_check_messages,
+                    )
+
+                if other_error_tickets:
                     logger.warning(
                         "Expo REST API partial failure",
                         {
                             "recipients": len(recipients),
                             "priority": priority,
-                            "failed_tickets": error_tickets,
+                            "failed_tickets": other_error_tickets,
+                            "unregistered_tokens": len(unregistered_tokens),
                         },
                     )
                     return False
+
+                logger.info(
+                    "Notification sent via REST API",
+                    {
+                        "recipients": len(recipients),
+                        "priority": priority,
+                        "marked_inactive": len(unregistered_tokens),
+                        "receipt_checks_enqueued": len(receipt_check_messages),
+                    },
+                )
+                return True
                 
         except httpx.HTTPStatusError as e:
             # Handle HTTP errors (like 429 rate limit)
@@ -705,6 +745,287 @@ class NotificationService:
             )
             raise
     
+    def _enqueue_receipt_checks(self, messages: List[Dict[str, str]]) -> None:
+        """Enqueue accepted Expo tickets for later receipt verification."""
+        for message in messages:
+            try:
+                response = self.queue_service.send_message(
+                    queue_name=self.receipt_checks_queue_name,
+                    message=message,
+                )
+                if not self.queue_service.is_enqueue_response_valid(response):
+                    logger.error(
+                        "Failed to enqueue receipt check",
+                        {
+                            "queue": self.receipt_checks_queue_name,
+                            "ticket_id": message.get("ticket_id"),
+                        },
+                    )
+            except Exception as e:
+                logger.error(
+                    "Error enqueueing receipt check",
+                    {
+                        "ticket_id": message.get("ticket_id"),
+                        "error": str(e),
+                    },
+                )
+                self._log_error_to_posthog(
+                    error=e,
+                    context={
+                        "operation": "_enqueue_receipt_checks",
+                        "ticket_id": message.get("ticket_id"),
+                    },
+                )
+
+    async def process_receipt_checks_queue(self) -> Dict[str, int]:
+        """
+        Process Expo push receipt checks from the receipt-checks queue.
+
+        Messages stay in the queue when Expo has not produced a receipt yet.
+        Once a receipt exists (ok or error), the queue message is deleted.
+        """
+        stats = {
+            "processed": 0,
+            "succeeded": 0,
+            "kept": 0,
+            "failed": 0,
+        }
+
+        try:
+            messages = self.queue_service.read_messages(
+                queue_name=self.receipt_checks_queue_name,
+                visibility_timeout_seconds=self.receipt_checks_visibility_timeout_seconds,
+                batch_size=self.receipt_checks_batch_size,
+            )
+            if not messages:
+                logger.info(
+                    "No receipt-check messages to process",
+                    {"queue": self.receipt_checks_queue_name},
+                )
+                return stats
+
+            parsed_items: List[Dict[str, Any]] = []
+            ticket_ids: List[str] = []
+            for message in messages:
+                msg_id = message.get("msg_id")
+                raw = message.get("message", {})
+                if isinstance(raw, str):
+                    try:
+                        payload = json.loads(raw)
+                    except json.JSONDecodeError:
+                        logger.warning(
+                            "Invalid receipt-check message JSON; deleting",
+                            {"msg_id": msg_id},
+                        )
+                        await self._delete_message(
+                            msg_id, queue_name=self.receipt_checks_queue_name
+                        )
+                        stats["failed"] += 1
+                        stats["processed"] += 1
+                        continue
+                else:
+                    payload = raw or {}
+
+                ticket_id = payload.get("ticket_id")
+                token = payload.get("token")
+                if not ticket_id or not token:
+                    logger.warning(
+                        "Invalid receipt-check payload; deleting",
+                        {"msg_id": msg_id},
+                    )
+                    await self._delete_message(
+                        msg_id, queue_name=self.receipt_checks_queue_name
+                    )
+                    stats["failed"] += 1
+                    stats["processed"] += 1
+                    continue
+
+                parsed_items.append(
+                    {"msg_id": msg_id, "ticket_id": ticket_id, "token": token}
+                )
+                ticket_ids.append(ticket_id)
+
+            if not parsed_items:
+                return stats
+
+            receipts = await self._fetch_push_receipts(ticket_ids)
+
+            for item in parsed_items:
+                stats["processed"] += 1
+                receipt = receipts.get(item["ticket_id"])
+                if not receipt:
+                    stats["kept"] += 1
+                    continue
+
+                status = receipt.get("status")
+                if status == "ok":
+                    await self._delete_message(
+                        item["msg_id"], queue_name=self.receipt_checks_queue_name
+                    )
+                    stats["succeeded"] += 1
+                    continue
+
+                if status == "error":
+                    details = receipt.get("details") or {}
+                    error_code = details.get("error")
+                    token = item["token"]
+
+                    if error_code == DEVICE_NOT_REGISTERED_ERROR:
+                        await asyncio.to_thread(
+                            self._mark_push_tokens_inactive, [token]
+                        )
+                    elif error_code == MESSAGE_RATE_EXCEEDED_ERROR:
+                        await asyncio.to_thread(
+                            self._mark_push_tokens_paused, [token]
+                        )
+                    else:
+                        logger.warning(
+                            "Expo receipt error",
+                            {
+                                "ticket_id": item["ticket_id"],
+                                "error": error_code,
+                                "message": receipt.get("message"),
+                            },
+                        )
+
+                    await self._delete_message(
+                        item["msg_id"], queue_name=self.receipt_checks_queue_name
+                    )
+                    stats["succeeded"] += 1
+                    continue
+
+                # Unknown receipt shape — keep for another pass
+                stats["kept"] += 1
+
+            logger.info(
+                "Receipt-check queue processing completed",
+                {
+                    "queue": self.receipt_checks_queue_name,
+                    "processed": stats["processed"],
+                    "succeeded": stats["succeeded"],
+                    "kept": stats["kept"],
+                    "failed": stats["failed"],
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "Error processing receipt-check queue",
+                {"queue": self.receipt_checks_queue_name, "error": str(e)},
+            )
+            self._log_error_to_posthog(
+                error=e,
+                context={"operation": "process_receipt_checks_queue"},
+            )
+
+        return stats
+
+    async def _fetch_push_receipts(
+        self, ticket_ids: List[str]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Fetch Expo push receipts for the given ticket IDs."""
+        if not ticket_ids:
+            return {}
+
+        headers = {
+            "Accept": "application/json",
+            "Accept-encoding": "gzip, deflate",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    EXPO_PUSH_RECEIPTS_URL,
+                    json={"ids": ticket_ids},
+                    headers=headers,
+                )
+                response.raise_for_status()
+                result = response.json()
+
+            if isinstance(result, dict) and isinstance(result.get("data"), dict):
+                return result["data"]
+            return {}
+        except Exception as e:
+            logger.error(
+                "Error fetching Expo push receipts",
+                {"ticket_count": len(ticket_ids), "error": str(e)},
+            )
+            return {}
+
+    def _mark_push_tokens_inactive(self, tokens: List[str]) -> None:
+        """
+        Mark the given Expo push tokens as inactive so they are no longer targeted.
+
+        Called when Expo reports DeviceNotRegistered for a token.
+        """
+        if not tokens:
+            return
+
+        try:
+            response = (
+                self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                .update({"inactive": True})
+                .in_("token", tokens)
+                .execute()
+            )
+            logger.info(
+                "Marked push tokens inactive after DeviceNotRegistered",
+                {
+                    "token_count": len(tokens),
+                    "updated_rows": len(response.data) if response.data else 0,
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "Error marking push tokens inactive",
+                {"token_count": len(tokens), "error": str(e)},
+            )
+            self._log_error_to_posthog(
+                error=e,
+                context={
+                    "operation": "_mark_push_tokens_inactive",
+                    "token_count": len(tokens),
+                },
+            )
+
+    def _mark_push_tokens_paused(self, tokens: List[str]) -> None:
+        """
+        Temporarily pause tokens after MessageRateExceeded.
+
+        A Postgres cron flips paused back to false after the pause window.
+        """
+        if not tokens:
+            return
+
+        paused_at = datetime.now(timezone.utc).isoformat()
+        try:
+            response = (
+                self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                .update({"paused": True, "paused_at": paused_at})
+                .in_("token", tokens)
+                .execute()
+            )
+            logger.info(
+                "Marked push tokens paused after MessageRateExceeded",
+                {
+                    "token_count": len(tokens),
+                    "paused_at": paused_at,
+                    "updated_rows": len(response.data) if response.data else 0,
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "Error marking push tokens paused",
+                {"token_count": len(tokens), "error": str(e)},
+            )
+            self._log_error_to_posthog(
+                error=e,
+                context={
+                    "operation": "_mark_push_tokens_paused",
+                    "token_count": len(tokens),
+                },
+            )
+
     def _get_user_info_from_tokens(self, tokens: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
         """
         Get user_id and email for each push token.
@@ -721,7 +1042,7 @@ class NotificationService:
         try:
             # Query push_tokens table to get user_ids for tokens
             response = (
-                self.supabase.table("push_tokens")
+                self.supabase.table(DatabaseTables.PUSH_TOKENS)
                 .select("token, user_id")
                 .in_("token", tokens)
                 .execute()

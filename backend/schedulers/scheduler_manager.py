@@ -3,6 +3,9 @@ from typing import Iterable, List, Optional
 
 from schedulers.entry_ingestion_scheduler import EntryIngestionScheduler
 from schedulers.notification_scheduler import NotificationScheduler
+from schedulers.notification_receipt_checks_scheduler import (
+    NotificationReceiptChecksScheduler,
+)
 from schedulers.monthly_dump_scheduler import MonthlyDumpScheduler
 from schedulers.monthly_dump_enqueue_scheduler import MonthlyDumpEnqueueScheduler
 from schedulers.time_capsule_scheduler import TimeCapsuleScheduler
@@ -18,6 +21,7 @@ class SchedulerManager:
         # Monthly Dump Enqueue Scheduler is for Enqueuing the jobs
         self.schedulers: List[object] = list(schedulers) if schedulers is not None else [
             NotificationScheduler(),
+            NotificationReceiptChecksScheduler(),
             EntryIngestionScheduler(),
             MonthlyDumpScheduler(),
             MonthlyDumpEnqueueScheduler(),
