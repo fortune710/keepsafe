@@ -32,12 +32,12 @@ begin
   end if;
 
   v_result := public.create_entry_time_capsule(v_entry, v_capsule);
-  if v_result->>'created' <> 'true' then raise exception 'First call did not create'; end if;
+  if v_result->>'created' is distinct from 'true' then raise exception 'First call did not create'; end if;
   v_result := public.create_entry_time_capsule(v_entry, v_capsule);
-  if v_result->>'created' <> 'false' then raise exception 'Replay was not recognized'; end if;
+  if v_result->>'created' is distinct from 'false' then raise exception 'Replay was not recognized'; end if;
   update public.entries set is_private = false where id = v_id;
   v_result := public.create_entry_time_capsule(v_entry, v_capsule);
-  if v_result->>'created' <> 'false' then raise exception 'Replay failed after a privacy change'; end if;
+  if v_result->>'created' is distinct from 'false' then raise exception 'Replay failed after a privacy change'; end if;
   if (select count(*) from public.time_capsules where entry_id = v_id) <> 1 then
     raise exception 'Replay created a duplicate capsule';
   end if;
@@ -51,7 +51,7 @@ begin
   insert into public.entries (id, user_id, diary_id, type, content_url, is_private, shared_with_everyone, shared_with, attachments)
   values (v_legacy_id, v_user, v_diary, 'photo', 'https://example.test/old.jpg', true, true, array[v_user::varchar], '[]'::jsonb);
   v_result := public.create_entry_time_capsule(jsonb_set(v_entry, '{id}', to_jsonb(v_legacy_id)), v_capsule);
-  if v_result->>'created' <> 'false' then raise exception 'Recovery should reuse the legacy entry'; end if;
+  if v_result->>'created' is distinct from 'false' then raise exception 'Recovery should reuse the legacy entry'; end if;
   if not exists (select 1 from public.entries where id = v_legacy_id and content_url = 'https://example.test/old.jpg' and shared_with_everyone = false and cardinality(shared_with) = 0) then
     raise exception 'Recovery changed media or failed to clear sharing';
   end if;
@@ -67,7 +67,7 @@ begin
   insert into public.time_capsules (entry_id, user_id, reveal_type, condition_label)
   values (v_legacy_capsule_id, v_user, 'condition', 'A milestone');
   v_result := public.create_entry_time_capsule(jsonb_set(v_entry, '{id}', to_jsonb(v_legacy_capsule_id)), v_capsule);
-  if v_result->>'created' <> 'false' then raise exception 'Legacy capsule replay created an entry'; end if;
+  if v_result->>'created' is distinct from 'false' then raise exception 'Legacy capsule replay created an entry'; end if;
   perform public.create_entry_time_capsule(jsonb_set(v_entry, '{id}', to_jsonb(v_legacy_capsule_id)), v_capsule);
   if (select count(*) from public.time_capsules where entry_id = v_legacy_capsule_id) <> 1 then
     raise exception 'Legacy capsule replay created a duplicate';
