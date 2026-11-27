@@ -32,24 +32,18 @@ interface EntryProcessingData {
 
 const TIME_CAPSULE_CREATE_MAX_ATTEMPTS = 3;
 
-/**
- * Bounded retry for the capsule-row insert. A failure here happens *after* the entry row
- * already exists, so leaving it unretried would strand an entry with no time_capsules row -
- * which per the RLS design means fully visible, unprotected, in the main feed.
- */
 const createTimeCapsuleWithRetry = async (
-  entryId: string,
-  userId: string,
+  entry: EntryInsert,
   draft: TimeCapsuleDraft,
-): Promise<boolean> => {
+): Promise<Entry> => {
   for (let attempt = 1; attempt <= TIME_CAPSULE_CREATE_MAX_ATTEMPTS; attempt++) {
-    const result = await TimeCapsuleService.createCapsule(entryId, userId, draft);
-    if (result.success) return true;
+    const result = await TimeCapsuleService.createEntryAndCapsule(entry, draft);
+    if (result.success && result.data) return result.data;
     if (attempt < TIME_CAPSULE_CREATE_MAX_ATTEMPTS) {
       await new Promise((resolve) => setTimeout(resolve, attempt * 500));
     }
   }
-  return false;
+  throw new Error('Failed to save time capsule. Please retry.');
 };
 
 // A lightweight foreground queue persisted to device storage.
@@ -74,15 +68,6 @@ const saveQueue = async (queue: EntryProcessingData[]): Promise<void> => {
   await deviceStorage.setItem(QUEUE_STORAGE_KEY, queue);
 };
 
-const dequeueNext = async (): Promise<EntryProcessingData | undefined> => {
-  const queue = await loadQueue();
-  const next = queue.shift();
-  await saveQueue(queue);
-  return next;
-};
-
-
-
 /**
  * Uploads media to Supabase storage
  */
@@ -90,7 +75,8 @@ const uploadMedia = async (
   file: string,
   userId: string,
   fileName: string,
-  contentType: string
+  contentType: string,
+  reuseExisting = false,
 ): Promise<string | null> => {
   const filePath = UPLOAD_PATHS.MEDIA(userId, fileName);
 
@@ -106,6 +92,10 @@ const uploadMedia = async (
       });
 
     if (error) {
+      const storageError = error as { status?: number; statusCode?: string | number };
+      if (reuseExisting && (storageError.status === 409 || String(storageError.statusCode) === '409')) {
+        return supabase.storage.from(STORAGE_BUCKETS.MEDIA).getPublicUrl(filePath).data.publicUrl;
+      }
       console.error('Upload error:', error);
       return null;
     }
@@ -152,7 +142,7 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
     // partial success (entry created, but e.g. time capsule creation below failed) safe:
     // re-running the upload+insert would otherwise fail on the id's unique constraint.
     let entry: Entry;
-    const { data: existingEntry } = await supabase
+    const { data: existingEntry } = isTimeCapsule ? { data: null } : await supabase
       .from(TABLES.ENTRIES)
       .select('*')
       .eq('id', data.entryId)
@@ -166,10 +156,10 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
       try {
         const timestamp = Date.now();
         const fileExtension = getFileExtension(data.capture.type);
-        const fileName = `${data.capture.type}_${timestamp}.${fileExtension}`;
+        const fileName = isTimeCapsule ? `${data.entryId}.${fileExtension}` : `${data.capture.type}_${timestamp}.${fileExtension}`;
         const contentType = getContentType(data.capture.type);
 
-        const uploadedUrl = await uploadMedia(data.capture.uri, data.userId, fileName, contentType);
+        const uploadedUrl = await uploadMedia(data.capture.uri, data.userId, fileName, contentType, isTimeCapsule);
 
         if (!uploadedUrl) {
           throw new Error('Failed to upload media to storage');
@@ -181,7 +171,7 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
         throw new Error('Failed to upload media. Please try again.');
       }
 
-      const sharedWith = data.isPrivate ? [data.userId] : [data.userId, ...data.selectedFriends];
+      const sharedWith = isTimeCapsule ? [] : data.isPrivate ? [data.userId] : [data.userId, ...data.selectedFriends];
 
       const createdAt = getTimefromTimezone().toISOString();
 
@@ -196,29 +186,19 @@ const processEntry = async (data: EntryProcessingData): Promise<{ success: boole
         music_tag: data.musicTag || null,
         location_tag: data.locationTag || null,
         is_private: data.isPrivate,
-        shared_with_everyone: data.isEveryone,
+        shared_with_everyone: isTimeCapsule ? false : data.isEveryone,
         attachments: data.attachments,
         created_at: createdAt,
         updated_at: createdAt,
         metadata: data.capture.metadata ? JSON.parse(JSON.stringify(data.capture.metadata)) : null,
       };
 
-      console.log('Processing new entry', newEntry);
-
-      // Use EntryService to create the entry
-      const result = await EntryService.createEntry(data.userId, newEntry);
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create entry');
-      }
-
-      entry = result.data!;
-    }
-
-    if (data.timeCapsule) {
-      const capsuleCreated = await createTimeCapsuleWithRetry(data.entryId, data.userId, data.timeCapsule);
-      if (!capsuleCreated) {
-        throw new Error('Entry saved, but sealing it in your Time Capsule failed. Please retry.');
+      if (data.timeCapsule) {
+        entry = await createTimeCapsuleWithRetry(newEntry, data.timeCapsule);
+      } else {
+        const result = await EntryService.createEntry(data.userId, newEntry);
+        if (!result.success || !result.data) throw new Error(result.error || 'Failed to create entry');
+        entry = result.data;
       }
     }
 
@@ -302,11 +282,15 @@ export async function startForegroundQueueProcessor(): Promise<void> {
 
   try {
     let next: EntryProcessingData | undefined;
-    // eslint-disable-next-line no-constant-condition
-    while ((next = await dequeueNext())) {
+    const attempted = new Set<string>();
+    while ((next = (await loadQueue()).find((item) => !attempted.has(item.idempotencyKey)))) {
+      attempted.add(next.idempotencyKey);
       try {
         logger.info('Processing entry in foreground:', next.entryId);
-        await processEntry(next);
+        const result = await processEntry(next);
+        if (!result.success && next.timeCapsule) continue;
+        const queue = await loadQueue();
+        await saveQueue(queue.filter((item) => item.idempotencyKey !== next!.idempotencyKey));
       } catch (err) {
         logger.error('Queue item processing failed, leaving as-is for retry:', err);
       }
@@ -379,8 +363,6 @@ export async function retryEntryProcessing(data: EntryProcessingData): Promise<v
   if (!existingEntry) {
     queue.push(data);
     await saveQueue(queue);
-    void startForegroundQueueProcessor();
-  } else {
-    console.log('Entry with idempotency key already in queue, skipping retry:', data.idempotencyKey);
   }
+  void startForegroundQueueProcessor();
 }
