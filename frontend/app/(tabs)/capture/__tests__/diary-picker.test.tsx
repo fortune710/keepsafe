@@ -45,11 +45,21 @@ test('the diary popover renders the diaries and highlights the selected diary', 
   const screen = render(<DetailsScreen />);
   fireEvent.press(screen.getByLabelText('Choose a diary'));
   expect(screen.getByText('My Diary')).toBeTruthy();
-  expect(screen.getByText('Summer')).toBeTruthy();
+  expect(screen.getByRole('radio', { name: 'Summer' })).toBeTruthy();
   expect(screen.getAllByRole('radio')[0].props.accessibilityState.selected).toBe(true);
   expect(screen.getByRole('radio', { name: 'Summer' }).props.accessibilityState.selected).toBe(true);
   fireEvent.press(screen.getByText('My Diary'));
   expect(screen.getByRole('radio', { name: 'My Diary' }).props.accessibilityState.selected).toBe(true);
+});
+
+test('the diary badge opens the picker and the capsule badge removes capsule mode', () => {
+  const screen = render(<DetailsScreen />);
+  fireEvent.press(screen.getByLabelText('Change diary, Summer'));
+  fireEvent(screen.getByRole('switch', { name: 'Save as time capsule' }), 'valueChange', true);
+  expect(screen.getByLabelText('Remove time capsule')).toBeTruthy();
+  expect(screen.queryByLabelText('Change diary, Summer')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Remove time capsule'));
+  expect(screen.getByLabelText('Change diary, Summer')).toBeTruthy();
 });
 
 test('enabling the time capsule switch opens its settings', () => {

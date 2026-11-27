@@ -53,6 +53,7 @@ import EntryAttachmentList from '@/components/capture/entry-attachment-list';
 import { MediaCanvasItemType } from '@/types/capture';
 import { useCaptureContext } from '@/providers/capture-provider';
 import { DiaryCoverVisual } from '@/components/vault/diary-cover-card';
+import Animated, { FadeInDown, FadeOutUp, ReduceMotion } from 'react-native-reanimated';
 
 interface Friend {
   id: string;
@@ -98,6 +99,7 @@ export default function DetailsScreen() {
     Array.isArray(diary_id) ? diary_id[0] : diary_id,
   );
   const effectiveDiaryId = selectedDiaryId || user?.id;
+  const selectedDiary = diaries.find((diary) => diary.id === effectiveDiaryId);
   const { saveEntry, isLoading } = useEntryOperations();
   const { isSaveLocked, lockSave } = useSaveLock();
   const { friends } = useFriends(user?.id);
@@ -376,14 +378,14 @@ export default function DetailsScreen() {
         user_id: user.id,
         diary_id: effectiveDiaryId || user.id,
         type: capture.type as 'photo' | 'video' | 'audio',
-        shared_with: [user.id, ...selectedFriends],
+        shared_with: timeCapsuleDraft ? [] : [user.id, ...selectedFriends],
         attachments: entryAttachments,
         content_url: capture.uri,
         text_content: caption || null,
         music_tag: null,
         location_tag: locationTag || null,
         is_private: isPrivate,
-        shared_with_everyone: isEveryone,
+        shared_with_everyone: timeCapsuleDraft ? false : isEveryone,
         metadata: capture.metadata
           ? JSON.parse(JSON.stringify(capture.metadata))
           : null,
@@ -601,6 +603,22 @@ export default function DetailsScreen() {
         </View>
 
         <View style={styles.form}>
+          {timeCapsuleDraft ? (
+            <Animated.View key="capsule" entering={FadeInDown.duration(180).reduceMotion(ReduceMotion.System)} exiting={FadeOutUp.duration(140).reduceMotion(ReduceMotion.System)} style={styles.badge}>
+              <Hourglass color="#7C3AED" size={16} />
+              <Text style={styles.badgeText}>Time Capsule</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Remove time capsule" hitSlop={10} onPress={() => { setTimeCapsuleDraft(null); setHasChosenCapsuleType(false); }}>
+                <X color="#7C3AED" size={16} />
+              </Pressable>
+            </Animated.View>
+          ) : (
+            <Animated.View key="diary" entering={FadeInDown.duration(180).reduceMotion(ReduceMotion.System)} exiting={FadeOutUp.duration(140).reduceMotion(ReduceMotion.System)} style={styles.badgeContainer}>
+              <Pressable style={styles.badge} accessibilityRole="button" accessibilityLabel={`Change diary${selectedDiary ? `, ${selectedDiary.name}` : ''}`} onPress={() => setActiveSheet('diaries')}>
+                {selectedDiary ? <DiaryCoverVisual color={selectedDiary.cover_color || selectedDiary.color || '#8B5CF6'} diaryStyle={selectedDiary.style} borderRadius={2} style={styles.badgeCover} /> : <DiaryIcon color="#7C3AED" size={16} />}
+                <Text style={styles.badgeText} numberOfLines={1}>{selectedDiary?.name || 'Choose a diary'}</Text>
+              </Pressable>
+            </Animated.View>
+          )}
           <TouchableOpacity
             style={[
               styles.saveButton,
@@ -894,6 +912,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
+  badgeContainer: { alignSelf: 'flex-start' },
+  badge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#F1EBFF', borderRadius: 18, paddingHorizontal: 11, paddingVertical: 6, maxWidth: '100%' },
+  badgeText: { color: '#6D28D9', fontFamily: 'Figtree-SemiBold', fontSize: 13, flexShrink: 1 },
+  badgeCover: { width: 16 },
   thoughtsInput: {
     backgroundColor: 'white',
     borderRadius: 12,

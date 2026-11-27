@@ -4,6 +4,8 @@ import { Database } from '@/types/database';
 import { TimeCapsuleWithEntry, TimeCapsuleDraft } from '@/types/time-capsule';
 import { logger } from '@/lib/logger';
 import { posthog } from '@/constants/posthog';
+import { StreakService } from './streak-service';
+import { capsuleDraftSchema, capsuleEntrySchema } from '@/lib/validations/time-capsules';
 
 type TimeCapsuleInsert = Database['public']['Tables']['time_capsules']['Insert'];
 
@@ -22,6 +24,25 @@ export interface TimeCapsuleServiceResult<T = any> {
  * backend HTTP endpoint. See the time-capsule plan for why.
  */
 export class TimeCapsuleService {
+  static async createEntryAndCapsule(entry: Database['public']['Tables']['entries']['Insert'], draft: TimeCapsuleDraft): Promise<TimeCapsuleServiceResult<Database['public']['Tables']['entries']['Row']>> {
+    const validation = capsuleEntrySchema.safeParse(entry);
+    const validDraft = capsuleDraftSchema.safeParse(draft);
+    if (!validation.success || !validDraft.success) return { success: false, error: 'Invalid time capsule details' };
+    const capsule = { reveal_type: draft.revealType, unlock_at: draft.revealType === 'date' ? draft.unlockAt : null, condition_label: draft.revealType === 'condition' ? draft.conditionLabel : null };
+    const { data, error } = await (supabase.rpc as any)('create_entry_time_capsule', { p_entry: entry, p_capsule: capsule });
+    if (error || !data?.entry) {
+      logger.error('time_capsule_create_failed', { entryId: entry.id, errorCode: error?.code });
+      return { success: false, error: 'Failed to save time capsule' };
+    }
+    if (data.created) {
+      try {
+        const streak = await StreakService.loadStreakData(entry.user_id);
+        await StreakService.updateStreak(entry.user_id, new Date(data.entry.created_at), streak);
+      } catch (error) { logger.warn('Unable to update streak', error); }
+      posthog.capture('time_capsule_created', { reveal_type: draft.revealType });
+    }
+    return { success: true, data: data.entry };
+  }
   static async listCapsules(userId: string): Promise<TimeCapsuleWithEntry[]> {
     const { data, error } = await supabase
       .from(TABLES.TIME_CAPSULES)
