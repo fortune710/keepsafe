@@ -77,7 +77,7 @@ export function TimeCapsuleList({ onOpenEntry }: TimeCapsuleListProps) {
         />
         <Text style={styles.emptyTitle}>No time capsules yet</Text>
         <Text style={styles.emptySubtext}>Capture memories for your future self.</Text>
-        <TouchableOpacity style={styles.captureButton} onPress={() => router.push('/capture')} accessibilityRole="button">
+        <TouchableOpacity style={styles.captureButton} onPress={() => router.push({ pathname: '/capture', params: { timeCapsule: 'true' } })} accessibilityRole="button">
           <Text style={styles.captureButtonText}>Start Capturing</Text>
         </TouchableOpacity>
       </View>
