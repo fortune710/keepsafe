@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -30,7 +31,7 @@ export default function GridImagePickerCameraModal({
   onCapture,
 }: GridImagePickerCameraModalProps) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <View style={styles.cameraModalOverlay}>
         <View style={styles.cameraBackdrop} />
 
@@ -76,7 +77,7 @@ export default function GridImagePickerCameraModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </ReplayScreenShield></Modal>
   );
 }
 

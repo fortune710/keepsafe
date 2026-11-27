@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -79,7 +80,7 @@ const SearchEntryPreview: React.FC<SearchEntryPreviewProps> = ({ entry }) => {
         transparent
         animationType="fade"
         onRequestClose={close}
-      >
+      ><ReplayScreenShield allow={false} overlay onDismiss={close}>
         <View style={styles.fullscreenOverlay}>
           <TouchableOpacity style={styles.fullscreenBackdrop} onPress={close} />
           <View style={styles.fullscreenContent}>
@@ -109,7 +110,7 @@ const SearchEntryPreview: React.FC<SearchEntryPreviewProps> = ({ entry }) => {
             )}
           </View>
         </View>
-      </Modal>
+      </ReplayScreenShield></Modal>
     </>
   );
 };

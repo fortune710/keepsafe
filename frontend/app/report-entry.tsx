@@ -1,3 +1,4 @@
+import { posthog } from '@/constants/posthog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TouchableOpacity, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -41,13 +42,17 @@ export default function ReportEntryScreen() {
       return;
     }
 
+    let submitted = false;
     try {
       await createReportAsync({ entryId: safeEntryId, reason: selectedReason });
+      submitted = true;
+      posthog.capture('report_submitted');
       await deviceStorage.removeEntry(user.id, safeEntryId);
       toast('Entry reported. It has been removed from this device.');
       if (router.canGoBack()) return router.back();
       return router.replace('/diary/entries');
     } catch (error) {
+      if (!submitted) posthog.capture('report_failed');
       const errorMessage = error instanceof Error ? error.message : 'Unable to report this entry.';
       toast(errorMessage, 'error');
     }

@@ -1,3 +1,5 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
+import { isReplaySafeNavigatorScreen } from '@/lib/analytics/replay';
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -41,6 +43,9 @@ const TAB_BAR_STYLE = {
 export default function TabsLayout() {
   return (
     <Tabs
+      screenLayout={({ route, children }) => (
+        <ReplayScreenShield allow={isReplaySafeNavigatorScreen('tabs', route.name)}>{children}</ReplayScreenShield>
+      )}
       initialRouteName="capture"
       screenOptions={{
         headerShown: false,

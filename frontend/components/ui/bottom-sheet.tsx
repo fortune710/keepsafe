@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, View, Pressable, StyleSheet, Dimensions, Platform } from 'react-native';
 import Animated, {
@@ -114,7 +115,7 @@ export function BottomSheet({
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
       onDismiss={onDismiss}
-    >
+    ><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <View style={styles.root}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -133,7 +134,7 @@ export function BottomSheet({
           </Animated.View>
         </View>
       </View>
-    </Modal>
+    </ReplayScreenShield></Modal>
   );
 }
 

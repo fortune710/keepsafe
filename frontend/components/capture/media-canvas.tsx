@@ -1,3 +1,4 @@
+import { ReplayScreenShield } from '@/components/replay-screen-shield';
 import React, { RefObject, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TouchableOpacity, Dimensions } from "react-native";
 import { Image } from "expo-image";
@@ -34,6 +35,11 @@ interface MediaCanvasProps {
 export default function MediaCanvas({ type, removeElement, uri, ref, items, transformsRef, facing }: MediaCanvasProps) {
   const [showMusicPopover, setShowMusicPopover] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTag | null>(null);
+
+  const closeMusicPopover = () => {
+    setShowMusicPopover(false);
+    setSelectedMusic(null);
+  };
 
   if (!uri) return null;
 
@@ -72,16 +78,13 @@ export default function MediaCanvas({ type, removeElement, uri, ref, items, tran
       </ViewShot>
 
       {showMusicPopover && selectedMusic && (
-        <Portal>
+        <Portal><ReplayScreenShield allow={false} overlay onDismiss={closeMusicPopover}>
           <AudioPreviewPopover
             music={selectedMusic}
-            onClose={() => {
-              setShowMusicPopover(false);
-              setSelectedMusic(null);
-            }}
+            onClose={closeMusicPopover}
             isVisible={showMusicPopover}
           />
-        </Portal>
+        </ReplayScreenShield></Portal>
       )}
     </View>
   );

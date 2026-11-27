@@ -1,49 +1,72 @@
 import { PostHog } from 'posthog-react-native';
 import { Platform } from 'react-native';
+import * as Updates from 'expo-updates';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sanitizeEvent } from '@/lib/analytics/privacy';
+import { analyticsEnabled } from '@/lib/analytics/environment';
+import { sanitizeDiagnosticLog } from '@/lib/analytics/diagnostics';
 
 const apiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 const host = process.env.EXPO_PUBLIC_POSTHOG_HOST;
 
-if (!apiKey || !host) {
-  if (__DEV__) {
-    console.warn(
-      'PostHog environment variables not configured. Analytics will be disabled.'
-    );
-  }
-}
+// Avoid initializing the SDK at all in development, including development update channels.
+export const analyticsIsEnabled = analyticsEnabled({
+  dev: __DEV__, environment: process.env.EXPO_PUBLIC_NODE_ENV, channel: Updates.channel,
+  platform: Platform.OS, apiKey, host,
+});
 
-// No-op mock for PostHog
 const noOpPostHog = {
-  capture: (_event: string, _properties?: object) => Promise.resolve(),
-  identify: (_distinctId: string, _properties?: object) => Promise.resolve(),
+  capture: () => Promise.resolve(),
+  captureException: () => {},
+  captureLog: () => {},
+  identify: () => Promise.resolve(),
   reset: () => Promise.resolve(),
-  screen: (_screenName: string, _properties?: object) => Promise.resolve(),
-  group: (_groupType: string, _groupKey: string, _properties?: object) =>
-    Promise.resolve(),
-  alias: (_alias: string) => Promise.resolve(),
+  screen: () => Promise.resolve(),
+  startSessionRecording: () => Promise.resolve(),
+  stopSessionRecording: () => Promise.resolve(),
+  group: () => Promise.resolve(),
+  alias: () => Promise.resolve(),
   reloadFeatureFlags: () => {},
-  onFeatureFlags: (_callback: () => void) => () => {},
+  onFeatureFlags: () => () => {},
   isFeatureEnabled: () => false,
   getFeatureFlag: () => null,
   getFeatureFlagPayload: () => null,
 } as unknown as PostHog;
 
-// Only initialize PostHog if:
-// 1. API key and host are configured
-// 2. Not on web platform (posthog-react-native doesn't work on web/SSR)
-// Skip PostHog on web entirely to avoid SSR errors during development
-const shouldInitializePostHog = apiKey && host && Platform.OS !== 'web';
-
-export const posthog = shouldInitializePostHog
-  ? new PostHog(apiKey, {
+export const posthog = analyticsIsEnabled
+  ? new PostHog(apiKey!, {
       host,
-      enableSessionReplay: !__DEV__,
+      // Isolate the sanitized queue from any older, potentially sensitive queued events.
+      customStorage: {
+        getItem: (key) => AsyncStorage.getItem(`analytics-private-v1:${key}`),
+        setItem: (key, value) => AsyncStorage.setItem(`analytics-private-v1:${key}`, value),
+      },
+      logs: {
+        beforeSend: sanitizeDiagnosticLog,
+      },
+      before_send: (event) => {
+        const sanitized = sanitizeEvent(event);
+        if (!sanitized) return null;
+        sanitized.properties = { ...sanitized.properties, platform: Platform.OS, os_version: String(Platform.Version) };
+        return sanitized;
+      },
+      // Recording is started only for reviewed screens by ReplayController.
+      enableSessionReplay: false,
+      sessionReplayConfig: {
+        maskAllTextInputs: true,
+        maskAllImages: true,
+        maskAllSandboxedViews: true,
+        captureLog: false,
+        captureNetworkTelemetry: false,
+        captureTouches: false,
+      },
+      captureAppLifecycleEvents: false,
+      capturePushNotificationOpened: false,
+      capturePushNotificationSubscriptions: false,
+      rageClickConfig: { enabled: false },
       errorTracking: {
-        autocapture: {
-          uncaughtExceptions: true,
-          unhandledRejections: true,
-          console: ['error', 'warn'],
-        },
+        autocapture: { uncaughtExceptions: true, unhandledRejections: true, console: [], nativeCrashes: Platform.OS === 'ios' },
+        exceptionSteps: { enabled: false },
       },
     })
   : noOpPostHog;

@@ -16,36 +16,15 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   // Collect device information
   const deviceInfo = getDeviceInfo();
 
-  // Capture error to PostHog
   React.useEffect(() => {
-    try {
-      const errorProperties: Record<string, string> = {
-        error_name: error.name || 'Unknown',
-        error_message: error.message || 'Unknown error',
-        error_stack: error.stack || 'No stack trace',
-        ...deviceInfo,
-      };
-
-      posthog.capture('app_error', errorProperties);
-
-      // Also capture as exception for PostHog's exception tracking
-      const exceptionProperties: Record<string, string> = {
-        $exception_message: error.message || 'Unknown error',
-        $exception_type: error.name || 'Unknown',
-        $exception_stack_trace_raw: error.stack || 'No stack trace',
-        ...deviceInfo,
-      };
-
-      posthog.capture('$exception', exceptionProperties);
-    } catch (posthogError) {
-      logger.error('Failed to capture error to PostHog:', posthogError);
-    }
-
-    // Log error locally
-    logger.error('ErrorBoundary caught an error:', {
-      error,
-      deviceInfo,
+    // The PostHog before_send filter removes unreviewed diagnostic data.
+    posthog.captureException(error, { error_source: 'render_boundary' });
+    posthog.captureLog({
+      body: error.message,
+      level: 'error',
+      attributes: { error_source: 'render_boundary', stack: error.stack },
     });
+    logger.error('ErrorBoundary caught an error:', { error, deviceInfo });
   }, [error]);
 
   return (
