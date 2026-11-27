@@ -303,6 +303,9 @@ export interface Database {
           token: string
           platform: 'ios' | 'android' | 'web'
           device_id: string | null
+          inactive: boolean
+          paused: boolean
+          paused_at: string | null
           created_at: string
           updated_at: string
         }
@@ -312,6 +315,9 @@ export interface Database {
           token: string
           platform: 'ios' | 'android' | 'web'
           device_id?: string | null
+          inactive?: boolean
+          paused?: boolean
+          paused_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -321,6 +327,9 @@ export interface Database {
           token?: string
           platform?: 'ios' | 'android' | 'web'
           device_id?: string | null
+          inactive?: boolean
+          paused?: boolean
+          paused_at?: string | null
           created_at?: string
           updated_at?: string
         }
