@@ -35,6 +35,9 @@ begin
   if v_result->>'created' <> 'true' then raise exception 'First call did not create'; end if;
   v_result := public.create_entry_time_capsule(v_entry, v_capsule);
   if v_result->>'created' <> 'false' then raise exception 'Replay was not recognized'; end if;
+  update public.entries set is_private = false where id = v_id;
+  v_result := public.create_entry_time_capsule(v_entry, v_capsule);
+  if v_result->>'created' <> 'false' then raise exception 'Replay failed after a privacy change'; end if;
   if (select count(*) from public.time_capsules where entry_id = v_id) <> 1 then
     raise exception 'Replay created a duplicate capsule';
   end if;

@@ -32,7 +32,19 @@ begin
   v_request := pg_catalog.jsonb_build_object('entry', p_entry - 'created_at' - 'updated_at', 'capsule', p_capsule);
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_entry.id::text, 0));
   select * into v_existing from public.entries where id = v_entry.id for update;
-  if found and (
+  if found and v_existing.user_id is distinct from v_user then
+    raise exception 'Entry ID already in use' using errcode = '23505';
+  end if;
+  select * into v_capsule from public.time_capsules where entry_id = v_entry.id;
+  if found and v_capsule.creation_request is not null then
+    if v_capsule.user_id is distinct from v_user or v_capsule.creation_request is distinct from v_request then
+      raise exception 'Entry ID already in use' using errcode = '23505';
+    end if;
+    return pg_catalog.jsonb_build_object('entry', pg_catalog.to_jsonb(v_existing), 'created', false);
+  end if;
+  -- Only legacy rows lack an original request to compare. Check their stored
+  -- entry fields before attaching or accepting an existing legacy capsule.
+  if v_existing.id is not null and (
     v_existing.user_id is distinct from v_user
     or v_existing.diary_id is distinct from v_entry.diary_id
     or v_existing.type is distinct from v_entry.type
@@ -45,23 +57,16 @@ begin
   ) then
     raise exception 'Entry ID already in use' using errcode = '23505';
   end if;
-  select * into v_capsule from public.time_capsules where entry_id = v_entry.id;
-  if found then
+  if v_capsule.id is not null then
     if v_capsule.user_id is distinct from v_user or (
-      v_capsule.creation_request is not null and v_capsule.creation_request is distinct from v_request
-    ) or (
-      v_capsule.creation_request is null and (
         v_capsule.reveal_type is distinct from p_capsule->>'reveal_type'
         or v_capsule.unlock_at is distinct from (p_capsule->>'unlock_at')::timestamptz
         or v_capsule.condition_label is distinct from p_capsule->>'condition_label'
-      )
     ) then
       raise exception 'Entry ID already in use' using errcode = '23505';
     end if;
-    if v_capsule.creation_request is null then
-      update public.entries set shared_with = array[]::varchar[], shared_with_everyone = false where id = v_entry.id and user_id = v_user returning * into v_existing;
-      update public.time_capsules set creation_request = v_request where id = v_capsule.id and user_id = v_user;
-    end if;
+    update public.entries set shared_with = array[]::varchar[], shared_with_everyone = false where id = v_entry.id and user_id = v_user returning * into v_existing;
+    update public.time_capsules set creation_request = v_request where id = v_capsule.id and user_id = v_user;
     return pg_catalog.jsonb_build_object('entry', pg_catalog.to_jsonb(v_existing), 'created', false);
   end if;
   if v_existing.id is null then
