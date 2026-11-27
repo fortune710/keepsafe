@@ -154,6 +154,9 @@ export class PushNotificationService {
           platform: platform,
           device_id: deviceId,
           environment: environment,
+          inactive: false,
+          paused: false,
+          paused_at: null,
           updated_at: new Date().toISOString(),
         } as never, {
           onConflict: 'user_id,device_id,environment'

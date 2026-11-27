@@ -4,6 +4,7 @@ import logging
 from services.redis_client import get_redis_client
 from services.supabase_client import get_supabase_client
 from config import settings
+from database.tables import DatabaseTables
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +152,10 @@ class CacheService:
     
     def get_push_tokens(self, user_id: str) -> List[str]:
         """
-        Get push tokens for a user with lazy loading.
+        Get active push tokens for a user with lazy loading.
+        
+        Skips tokens marked inactive (e.g. DeviceNotRegistered by Expo)
+        or temporarily paused (e.g. MessageRateExceeded).
         
         Args:
             user_id: User ID to get tokens for
@@ -171,9 +175,23 @@ class CacheService:
         logger.debug(f"Cache miss for push tokens: {user_id}")
         try:
             environment = self._get_environment()
-            response = self.supabase.table("push_tokens").select("token").eq("user_id", user_id).eq("environment", environment).execute()
+            response = (
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
+                .select("token")
+                .eq("user_id", user_id)
+                .eq("environment", environment)
+                .eq("inactive", False)
+                .eq("paused", False)
+                .execute()
+            )
             
             tokens = response.data if response.data else []
+            if any(token.get("token") == "" for token in tokens):
+                self._mark_empty_string_push_tokens_inactive(
+                    user_ids=[user_id],
+                    environment=environment,
+                )
+
             token_list = [token["token"] for token in tokens if token.get("token")]
             
             # Cache the result
@@ -194,7 +212,10 @@ class CacheService:
     
     def get_push_tokens_batch(self, user_ids: List[str]) -> Dict[str, List[str]]:
         """
-        Retrieve Expo push tokens for multiple users, using cached values when available and falling back to Supabase for misses.
+        Retrieve active Expo push tokens for multiple users, using cached values when available and falling back to Supabase for misses.
+        
+        Skips tokens marked inactive (e.g. DeviceNotRegistered by Expo)
+        or temporarily paused (e.g. MessageRateExceeded).
         
         Parameters:
             user_ids (List[str]): User IDs to retrieve tokens for.
@@ -234,9 +255,30 @@ class CacheService:
         if uncached_user_ids:
             try:
                 environment = self._get_environment()
-                response = self.supabase.table("push_tokens").select("user_id, token").in_("user_id", uncached_user_ids).eq("environment", environment).execute()
+                response = (
+                    self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
+                    .select("user_id, token")
+                    .in_("user_id", uncached_user_ids)
+                    .eq("environment", environment)
+                    .eq("inactive", False)
+                    .eq("paused", False)
+                    .execute()
+                )
                 
                 tokens_list = response.data if response.data else []
+
+                users_with_empty_tokens = list(
+                    {
+                        token_data["user_id"]
+                        for token_data in tokens_list
+                        if token_data.get("user_id") and token_data.get("token") == ""
+                    }
+                )
+                if users_with_empty_tokens:
+                    self._mark_empty_string_push_tokens_inactive(
+                        user_ids=users_with_empty_tokens,
+                        environment=environment,
+                    )
                 
                 # Group tokens by user_id
                 tokens_by_user: Dict[str, List[str]] = {}
@@ -263,6 +305,55 @@ class CacheService:
                 logger.error(f"Error batch fetching push tokens from Supabase: {str(e)}")
         
         return result
+
+
+    def invalidate_push_tokens(self, user_ids: List[str]) -> None:
+        """Drop cached push token lists for the given users."""
+        if not user_ids or not self.redis_client:
+            return
+        keys = [f"push_tokens:{user_id}" for user_id in user_ids]
+        try:
+            self.redis_client.delete(*keys)
+        except Exception:
+            logger.exception(
+                "Error invalidating push token cache",
+                extra={"user_count": len(user_ids)},
+            )
+
+    def _mark_empty_string_push_tokens_inactive(
+        self,
+        *,
+        user_ids: List[str],
+        environment: str,
+    ) -> None:
+        """Mark empty-string push tokens inactive so they are cleaned up and never sent."""
+        if not user_ids:
+            return
+
+        try:
+            response = (
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
+                .update({"inactive": True})
+                .in_("user_id", user_ids)
+                .eq("token", "")
+                .eq("environment", environment)
+                .eq("inactive", False)
+                .execute()
+            )
+            logger.info(
+                "Marked empty-string push tokens inactive",
+                extra={
+                    "user_count": len(user_ids),
+                    "environment": environment,
+                    "updated_rows": len(response.data) if response.data else 0,
+                },
+            )
+            self.invalidate_push_tokens(user_ids)
+        except Exception:
+            logger.exception(
+                "Error marking empty-string push tokens inactive",
+                extra={"user_ids": user_ids, "environment": environment},
+            )
     
     def _get_from_redis(self, key: str) -> Optional[Any]:
         """

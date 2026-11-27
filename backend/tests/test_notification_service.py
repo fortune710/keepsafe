@@ -210,11 +210,16 @@ async def test_enqueue_notification_invalid_queue_response_returns_false(notific
 async def test_send_notification_success(notification_service):
     """_send_notification should successfully send via REST API."""
     # Arrange - Mock httpx for REST API
-    import httpx
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = [{"status": "ok", "id": "test-id"}]
     mock_response.raise_for_status = MagicMock()
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
     
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
@@ -234,6 +239,157 @@ async def test_send_notification_success(notification_service):
         # Assert
         assert result is True
         mock_client.post.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_send_notification_marks_device_not_registered_inactive(
+    notification_service, mock_supabase_client
+):
+    """DeviceNotRegistered tickets should mark tokens inactive and still succeed."""
+    dead_token = "ExponentPushToken[dead]"
+    live_token = "ExponentPushToken[live]"
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "data": [
+            {
+                "status": "error",
+                "message": f'"{dead_token}" is not a registered push notification recipient',
+                "details": {"error": "DeviceNotRegistered"},
+            },
+            {"status": "ok", "id": "ticket-live"},
+        ]
+    }
+    mock_response.raise_for_status = MagicMock()
+
+    update_chain = MagicMock()
+    mock_supabase_client.table.return_value.update.return_value = update_chain
+    update_chain.in_.return_value.execute.return_value = MagicMock(data=[{"token": dead_token}])
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value = mock_client
+
+        result = await notification_service._send_notification(
+            title="Test",
+            body="Test",
+            recipients=[dead_token, live_token],
+            priority="default",
+        )
+
+    assert result is True
+    mock_supabase_client.table.assert_called_with("push_tokens")
+    mock_supabase_client.table.return_value.update.assert_called_once_with({"inactive": True})
+    update_chain.in_.assert_called_once_with("token", [dead_token])
+
+
+@pytest.mark.asyncio
+async def test_device_not_registered_soft_deletes_push_tokens_in_table(
+    notification_service, mock_supabase_client
+):
+    """
+    Mock push_tokens rows + a DeviceNotRegistered Expo response, then verify
+    the unregistered token is soft-deleted (inactive=True) in the table mock.
+    """
+    dead_token = "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+    live_token = "ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]"
+
+    # In-memory stand-in for the push_tokens table
+    push_tokens_table = {
+        dead_token: {
+            "id": "row-dead",
+            "user_id": "user-1",
+            "token": dead_token,
+            "inactive": False,
+        },
+        live_token: {
+            "id": "row-live",
+            "user_id": "user-2",
+            "token": live_token,
+            "inactive": False,
+        },
+    }
+
+    def table_side_effect(table_name):
+        table = MagicMock()
+        if table_name != "push_tokens":
+            return table
+
+        def update(payload):
+            update_builder = MagicMock()
+
+            def in_filter(column, values):
+                execute_result = MagicMock()
+                updated = []
+                if column == "token":
+                    for token in values:
+                        row = push_tokens_table.get(token)
+                        if row is not None:
+                            row.update(payload)
+                            updated.append(dict(row))
+                execute_result.data = updated
+                in_builder = MagicMock()
+                in_builder.execute.return_value = execute_result
+                return in_builder
+
+            update_builder.in_.side_effect = in_filter
+            return update_builder
+
+        table.update.side_effect = update
+        return table
+
+    mock_supabase_client.table.side_effect = table_side_effect
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
+
+    expo_response = MagicMock()
+    expo_response.status_code = 200
+    expo_response.raise_for_status = MagicMock()
+    expo_response.json.return_value = {
+        "data": [
+            {
+                "status": "error",
+                "message": f'"{dead_token}" is not a registered push notification recipient',
+                "details": {"error": "DeviceNotRegistered"},
+            },
+            {"status": "ok", "id": "ticket-live"},
+        ]
+    }
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = AsyncMock(return_value=expo_response)
+        mock_client_class.return_value = mock_client
+
+        result = await notification_service._send_notification(
+            title="Test",
+            body="Test",
+            recipients=[dead_token, live_token],
+            priority="default",
+        )
+
+    assert result is True
+    # Soft-deleted via inactive flag (not hard-deleted from the table)
+    assert push_tokens_table[dead_token]["inactive"] is True
+    assert push_tokens_table[live_token]["inactive"] is False
+    assert dead_token in push_tokens_table  # row still exists
+    assert live_token in push_tokens_table
 
 
 @pytest.mark.asyncio
@@ -257,6 +413,12 @@ async def test_send_notification_rate_limit_retry(notification_service):
     success_response.status_code = 200
     success_response.json.return_value = [{"status": "ok", "id": "test-id"}]
     success_response.raise_for_status = MagicMock()
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
     
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()

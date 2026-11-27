@@ -301,34 +301,166 @@ def test_get_push_tokens_cache_hit(cache_service, mock_redis_client):
     cache_service.supabase.table.assert_not_called()
 
 
+def _mock_push_tokens_table(rows):
+    """
+    Build a Supabase table mock that filters an in-memory push_tokens dataset.
+
+    Supports the query chains used by CacheService:
+      select().eq()....execute()
+      select().in_().eq()....execute()
+      update(...).in_().eq()....execute()
+    """
+    state = {"filters": {}, "in_filters": {}, "columns": "*", "update_payload": None}
+
+    def reset_filters():
+        state["filters"] = {}
+        state["in_filters"] = {}
+        state["columns"] = "*"
+        state["update_payload"] = None
+
+    def select(columns="*"):
+        reset_filters()
+        state["columns"] = columns
+        return query
+
+    def update(payload):
+        reset_filters()
+        state["update_payload"] = payload
+        return query
+
+    def eq(column, value):
+        state["filters"][column] = value
+        return query
+
+    def in_(column, values):
+        state["in_filters"][column] = list(values)
+        return query
+
+    def execute():
+        matched = []
+        for row in rows:
+            if any(row.get(col) != val for col, val in state["filters"].items()):
+                continue
+            if any(row.get(col) not in vals for col, vals in state["in_filters"].items()):
+                continue
+            matched.append(row)
+
+        if state["update_payload"] is not None:
+            for row in matched:
+                row.update(state["update_payload"])
+            result = MagicMock()
+            result.data = [dict(row) for row in matched]
+            return result
+
+        if state["columns"] == "*":
+            data = [dict(row) for row in matched]
+        else:
+            cols = [c.strip() for c in state["columns"].split(",")]
+            data = [{col: row.get(col) for col in cols} for row in matched]
+
+        result = MagicMock()
+        result.data = data
+        return result
+
+    query = MagicMock()
+    query.eq.side_effect = eq
+    query.in_.side_effect = in_
+    query.execute.side_effect = execute
+
+    table = MagicMock()
+    table.select.side_effect = select
+    table.update.side_effect = update
+    return table
+
+
 def test_get_push_tokens_cache_miss(cache_service, mock_redis_client, mock_supabase_client):
-    """Test getting push tokens with cache miss (fetch from Supabase)."""
-    # Arrange
+    """Cache miss fetches from Supabase and skips inactive/paused/empty tokens."""
     user_id = "user-123"
-    tokens_data = [
-        {"token": "token1"},
-        {"token": "token2"}
+    active_token = "ExponentPushToken[active]"
+    inactive_token = "ExponentPushToken[inactive]"
+    push_token_rows = [
+        {
+            "user_id": user_id,
+            "token": active_token,
+            "environment": "dev",
+            "inactive": False,
+            "paused": False,
+        },
+        {
+            "user_id": user_id,
+            "token": inactive_token,
+            "environment": "dev",
+            "inactive": True,
+            "paused": False,
+        },
+        {
+            "user_id": user_id,
+            "token": "ExponentPushToken[paused]",
+            "environment": "dev",
+            "inactive": False,
+            "paused": True,
+        },
+        {
+            "user_id": user_id,
+            "token": "",
+            "environment": "dev",
+            "inactive": False,
+            "paused": False,
+        },
     ]
-    
-    # Cache miss
+
     mock_redis_client.get.return_value = None
-    
-    # Supabase response
-    mock_response = MagicMock()
-    mock_response.data = tokens_data
-    mock_table = MagicMock()
-    mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_response
-    mock_supabase_client.table.return_value = mock_table
-    
-    # Act
-    result = cache_service.get_push_tokens(user_id)
-    
-    # Assert
-    assert result == ["token1", "token2"]
+    mock_supabase_client.table.return_value = _mock_push_tokens_table(push_token_rows)
+
+    with patch("services.cache_service.settings") as mock_settings:
+        mock_settings.ENVIRONMENT = "development"
+        mock_settings.REDIS_CACHE_TTL = 3600
+        result = cache_service.get_push_tokens(user_id)
+
+    assert result == [active_token]
+    assert inactive_token not in result
+    assert "ExponentPushToken[paused]" not in result
+    assert "" not in result
+    empty_row = next(row for row in push_token_rows if row["token"] == "")
+    assert empty_row["inactive"] is True
     mock_redis_client.setex.assert_called_once()
-    # Verify cache was set
     call_args = mock_redis_client.setex.call_args
     assert call_args[0][0] == f"push_tokens:{user_id}"
+    assert json.loads(call_args[0][2]) == [active_token]
+
+
+def test_get_push_tokens_batch_marks_empty_string_tokens_inactive(
+    cache_service, mock_redis_client, mock_supabase_client
+):
+    """Batch fetch marks empty-string tokens inactive and excludes them from results."""
+    user_ids = ["user-1"]
+    mock_redis_client.mget.return_value = [None]
+    push_token_rows = [
+        {
+            "user_id": "user-1",
+            "token": "ExponentPushToken[good]",
+            "environment": "dev",
+            "inactive": False,
+            "paused": False,
+        },
+        {
+            "user_id": "user-1",
+            "token": "",
+            "environment": "dev",
+            "inactive": False,
+            "paused": False,
+        },
+    ]
+    mock_supabase_client.table.return_value = _mock_push_tokens_table(push_token_rows)
+
+    with patch("services.cache_service.settings") as mock_settings:
+        mock_settings.ENVIRONMENT = "development"
+        mock_settings.REDIS_CACHE_TTL = 3600
+        result = cache_service.get_push_tokens_batch(user_ids)
+
+    assert result["user-1"] == ["ExponentPushToken[good]"]
+    empty_row = next(row for row in push_token_rows if row["token"] == "")
+    assert empty_row["inactive"] is True
 
 
 def test_get_push_tokens_empty_list_cached(cache_service, mock_redis_client, mock_supabase_client):
@@ -342,9 +474,11 @@ def test_get_push_tokens_empty_list_cached(cache_service, mock_redis_client, moc
     # Supabase response - no tokens
     mock_response = MagicMock()
     mock_response.data = []
-    mock_table = MagicMock()
-    mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_response
-    mock_supabase_client.table.return_value = mock_table
+    query = MagicMock()
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.execute.return_value = mock_response
+    mock_supabase_client.table.return_value = query
     
     # Act
     result = cache_service.get_push_tokens(user_id)
@@ -382,34 +516,54 @@ def test_get_push_tokens_batch_cache_hit(cache_service, mock_redis_client):
 
 
 def test_get_push_tokens_batch_partial_cache(cache_service, mock_redis_client, mock_supabase_client):
-    """Test batch getting push tokens with partial cache hit."""
-    # Arrange
+    """Batch fetch skips inactive tokens for cache-miss users."""
     user_ids = ["user-1", "user-2"]
-    # user-1 in cache, user-2 not in cache
     cached_values = [
         json.dumps(["token1"]),
-        None  # Cache miss for user-2
+        None,  # Cache miss for user-2
     ]
-    
     mock_redis_client.mget.return_value = cached_values
-    
-    # Supabase response for user-2
-    mock_response = MagicMock()
-    mock_response.data = [
-        {"user_id": "user-2", "token": "token2"},
-        {"user_id": "user-2", "token": "token3"}
-    ]
-    mock_table = MagicMock()
-    mock_table.select.return_value.in_.return_value.eq.return_value.execute.return_value = mock_response
-    mock_supabase_client.table.return_value = mock_table
-    
-    # Act
-    result = cache_service.get_push_tokens_batch(user_ids)
-    
-    # Assert
-    assert len(result) == 2
+
+    mock_supabase_client.table.return_value = _mock_push_tokens_table([
+        {
+            "user_id": "user-2",
+            "token": "token2",
+            "environment": "dev",
+            "inactive": False,
+            "paused": False,
+        },
+        {
+            "user_id": "user-2",
+            "token": "token3-inactive",
+            "environment": "dev",
+            "inactive": True,
+            "paused": False,
+        },
+        {
+            "user_id": "user-2",
+            "token": "token4",
+            "environment": "dev",
+            "inactive": False,
+            "paused": False,
+        },
+        {
+            "user_id": "user-2",
+            "token": "token5-paused",
+            "environment": "dev",
+            "inactive": False,
+            "paused": True,
+        },
+    ])
+
+    with patch("services.cache_service.settings") as mock_settings:
+        mock_settings.ENVIRONMENT = "development"
+        mock_settings.REDIS_CACHE_TTL = 3600
+        result = cache_service.get_push_tokens_batch(user_ids)
+
     assert result["user-1"] == ["token1"]
-    assert result["user-2"] == ["token2", "token3"]
+    assert result["user-2"] == ["token2", "token4"]
+    assert "token3-inactive" not in result["user-2"]
+    assert "token5-paused" not in result["user-2"]
 
 
 def test_redis_error_handling(cache_service, mock_redis_client, mock_supabase_client):
