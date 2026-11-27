@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -317,3 +318,126 @@ async def test_message_rate_exceeded_receipt_pauses_token(
         queue_name=NOTIFICATION_RECEIPT_CHECKS_QUEUE_NAME,
         message_id=msg_id,
     )
+
+
+@pytest.mark.asyncio
+async def test_receipt_enqueue_failure_fails_send(notification_service):
+    """If receipt-check enqueue fails, the send must fail so the notification is not deleted."""
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data=None)
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=False
+    )
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client_class.return_value = _mock_httpx_post(
+            {"data": [{"status": "ok", "id": "ticket-1"}]}
+        )
+        result = await notification_service._send_notification(
+            title="Hello",
+            body="World",
+            recipients=["ExponentPushToken[aaa]"],
+            priority="default",
+        )
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_expired_receipt_check_is_deleted(notification_service):
+    """Receipt-check messages older than Expo's retention window are expired."""
+    msg_id = 46
+    enqueued_at = (
+        datetime.now(timezone.utc) - timedelta(hours=25)
+    ).isoformat()
+
+    notification_service.queue_service.read_messages = MagicMock(
+        return_value=[
+            {
+                "msg_id": msg_id,
+                "enqueued_at": enqueued_at,
+                "message": {
+                    "ticket_id": "ticket-old",
+                    "token": "ExponentPushToken[old]",
+                },
+            }
+        ]
+    )
+    notification_service.queue_service.delete_message = MagicMock()
+
+    stats = await notification_service.process_receipt_checks_queue()
+
+    assert stats["processed"] == 1
+    assert stats["expired"] == 1
+    assert stats["kept"] == 0
+    notification_service.queue_service.delete_message.assert_called_once_with(
+        queue_name=NOTIFICATION_RECEIPT_CHECKS_QUEUE_NAME,
+        message_id=msg_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_invalid_receipt_payload_type_is_deleted(notification_service):
+    """Non-object receipt payloads are deleted as invalid instead of crashing the batch."""
+    msg_id = 47
+
+    notification_service.queue_service.read_messages = MagicMock(
+        return_value=[
+            {
+                "msg_id": msg_id,
+                "message": "[]",
+            }
+        ]
+    )
+    notification_service.queue_service.delete_message = MagicMock()
+
+    stats = await notification_service.process_receipt_checks_queue()
+
+    assert stats["processed"] == 1
+    assert stats["failed"] == 1
+    notification_service.queue_service.delete_message.assert_called_once_with(
+        queue_name=NOTIFICATION_RECEIPT_CHECKS_QUEUE_NAME,
+        message_id=msg_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_mark_inactive_failure_keeps_receipt_message(
+    notification_service, mock_supabase_client
+):
+    """If token status update fails, keep the receipt-check message for retry."""
+    msg_id = 48
+    ticket_id = "ticket-keep-1"
+    token = "ExponentPushToken[keep]"
+
+    notification_service.queue_service.read_messages = MagicMock(
+        return_value=[
+            {
+                "msg_id": msg_id,
+                "message": {"ticket_id": ticket_id, "token": token},
+            }
+        ]
+    )
+    notification_service.queue_service.delete_message = MagicMock()
+    mock_supabase_client.table.return_value.update.return_value.in_.return_value.execute.side_effect = (
+        Exception("db down")
+    )
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client_class.return_value = _mock_httpx_post(
+            {
+                "data": {
+                    ticket_id: {
+                        "status": "error",
+                        "details": {"error": "DeviceNotRegistered"},
+                    }
+                }
+            }
+        )
+        stats = await notification_service.process_receipt_checks_queue()
+
+    assert stats["processed"] == 1
+    assert stats["kept"] == 1
+    assert stats["succeeded"] == 0
+    notification_service.queue_service.delete_message.assert_not_called()

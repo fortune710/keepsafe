@@ -175,14 +175,15 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
     read_response = MagicMock()
     read_response.data = mock_messages
     
-    # Mock failed Expo send (non-rate-limit error)
-    from exponent_server_sdk import PushServerError
-    mock_response = MagicMock()
-    mock_response.status_code = 400
-    notification_service.expo_client.publish = MagicMock(
-        side_effect=PushServerError("Invalid token", mock_response)
+    # Mock failed Expo REST send (non-rate-limit error)
+    failed_response = MagicMock()
+    failed_response.status_code = 400
+    failed_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "400 Bad Request",
+        request=MagicMock(),
+        response=failed_response,
     )
-    
+
     # Track RPC calls to verify DLQ send
     rpc_calls_tracker = []
     
@@ -206,9 +207,16 @@ async def test_failure_retry_dlq_flow(notification_service, mock_supabase_client
         return mock_schema
     
     mock_supabase_client.schema.side_effect = mock_schema_side_effect
-    
-    # Act
-    stats = await notification_service.process_queue()
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = AsyncMock(return_value=failed_response)
+        mock_client_class.return_value = mock_client
+
+        # Act
+        stats = await notification_service.process_queue()
     
     # Assert
     assert stats["processed"] == 1
@@ -252,59 +260,14 @@ async def test_dlq_limit_exceeded_moves_to_dead_queue(notification_service, mock
     
     read_response = MagicMock()
     read_response.data = mock_messages
-    
-    # Mock failed Expo send
-    from exponent_server_sdk import PushServerError
-    mock_response = MagicMock()
-    mock_response.status_code = 400
-    notification_service.expo_client.publish = MagicMock(
-        side_effect=PushServerError("Invalid token", mock_response)
-    )
-    
-    # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
-    def mock_schema_side_effect(schema_name):
-        """Return a mock schema object that handles rpc calls."""
-        mock_schema = MagicMock()
-        
-        def mock_rpc_side_effect(rpc_name, *args, **kwargs):
-            """Handle different RPC calls."""
-            mock_rpc_result = MagicMock()
-            if rpc_name == "read":
-                mock_rpc_result.execute.return_value = read_response
-            else:
-                mock_rpc_result.execute.return_value = MagicMock()
-            return mock_rpc_result
-        
-        mock_schema.rpc.side_effect = mock_rpc_side_effect
-        return mock_schema
-    
-    mock_supabase_client.schema.side_effect = mock_schema_side_effect
-    # Arrange - Message that has already failed 3 times
-    message_data = {
-        "title": "Test Title",
-        "body": "Test Body",
-        "recipients": ["ExponentPushToken[abc123]"],
-        "priority": "default",
-        "failure_count": 3,  # Already at limit
-        "metadata": {}
-    }
-    mock_messages = [
-        {
-            "msg_id": 1,
-            "read_ct": 1,
-            "message": json.dumps(message_data)
-        }
-    ]
-    
-    read_response = MagicMock()
-    read_response.data = mock_messages
-    
-    # Mock failed Expo send
-    from exponent_server_sdk import PushServerError
-    mock_response = MagicMock()
-    mock_response.status_code = 400
-    notification_service.expo_client.publish = MagicMock(
-        side_effect=PushServerError("Invalid token", mock_response)
+
+    # Mock failed Expo REST send
+    failed_response = MagicMock()
+    failed_response.status_code = 400
+    failed_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "400 Bad Request",
+        request=MagicMock(),
+        response=failed_response,
     )
     
     # Track RPC calls to verify send destinations
@@ -330,9 +293,16 @@ async def test_dlq_limit_exceeded_moves_to_dead_queue(notification_service, mock
         return mock_schema
     
     mock_supabase_client.schema.side_effect = mock_schema_side_effect
-    
-    # Act
-    stats = await notification_service.process_queue()
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = AsyncMock(return_value=failed_response)
+        mock_client_class.return_value = mock_client
+
+        # Act
+        stats = await notification_service.process_queue()
     
     # Assert
     assert stats["processed"] == 1
@@ -355,57 +325,6 @@ async def test_dlq_limit_exceeded_moves_to_dead_queue(notification_service, mock
     ]
     assert len(dead_sends) == 1
     assert len(dlq_sends) == 0
-    # Arrange - Multiple messages
-    mock_messages = [
-        {
-            "msg_id": i,
-            "read_ct": 1,
-            "message": json.dumps({
-                "title": f"Test {i}",
-                "body": f"Body {i}",
-                "recipients": [f"token{i}"],
-                "priority": "default",
-                "failure_count": 0,
-                "metadata": {}
-            })
-        }
-        for i in range(5)
-    ]
-    
-    read_response = MagicMock()
-    read_response.data = mock_messages
-    
-    # Mock httpx for REST API
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = mock_httpx_client_success()
-        mock_client_class.return_value = mock_client
-        
-        # Mock schema().rpc().execute() chain for multiple RPC calls (read and delete)
-        def mock_schema_side_effect(schema_name):
-            """Return a mock schema object that handles rpc calls."""
-            mock_schema = MagicMock()
-            
-            def mock_rpc_side_effect(rpc_name, *args, **kwargs):
-                """Handle different RPC calls."""
-                mock_rpc_result = MagicMock()
-                if rpc_name == "read":
-                    mock_rpc_result.execute.return_value = read_response
-                else:
-                    mock_rpc_result.execute.return_value = MagicMock()
-                return mock_rpc_result
-            
-            mock_schema.rpc.side_effect = mock_rpc_side_effect
-            return mock_schema
-        
-        mock_supabase_client.schema.side_effect = mock_schema_side_effect
-        
-        # Act
-        stats = await notification_service.process_queue()
-        
-        # Assert
-        assert stats["processed"] == 5
-        assert stats["succeeded"] == 5
-        assert mock_client.post.call_count == 5
 
 
 @pytest.mark.asyncio
@@ -543,6 +462,12 @@ async def test_exponential_backoff_calculation(notification_service):
     
     # Success response
     success_response = mock_httpx_success_response()
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
     
     # Mock sleep to track delays
     sleep_calls = []

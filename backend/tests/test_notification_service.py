@@ -210,11 +210,16 @@ async def test_enqueue_notification_invalid_queue_response_returns_false(notific
 async def test_send_notification_success(notification_service):
     """_send_notification should successfully send via REST API."""
     # Arrange - Mock httpx for REST API
-    import httpx
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = [{"status": "ok", "id": "test-id"}]
     mock_response.raise_for_status = MagicMock()
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
     
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
@@ -261,6 +266,12 @@ async def test_send_notification_marks_device_not_registered_inactive(
     update_chain = MagicMock()
     mock_supabase_client.table.return_value.update.return_value = update_chain
     update_chain.in_.return_value.execute.return_value = MagicMock(data=[{"token": dead_token}])
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
@@ -338,6 +349,12 @@ async def test_device_not_registered_soft_deletes_push_tokens_in_table(
         return table
 
     mock_supabase_client.table.side_effect = table_side_effect
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
 
     expo_response = MagicMock()
     expo_response.status_code = 200
@@ -396,6 +413,12 @@ async def test_send_notification_rate_limit_retry(notification_service):
     success_response.status_code = 200
     success_response.json.return_value = [{"status": "ok", "id": "test-id"}]
     success_response.raise_for_status = MagicMock()
+    notification_service.queue_service.send_message = MagicMock(
+        return_value=MagicMock(data={"msg_id": 1})
+    )
+    notification_service.queue_service.is_enqueue_response_valid = MagicMock(
+        return_value=True
+    )
     
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()

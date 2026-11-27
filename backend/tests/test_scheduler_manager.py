@@ -34,18 +34,21 @@ def test_scheduler_manager_stops_all_schedulers_in_reverse_order():
 
 def test_scheduler_manager_builds_default_schedulers():
     with patch("schedulers.scheduler_manager.NotificationScheduler") as notification_cls, \
+         patch("schedulers.scheduler_manager.NotificationReceiptChecksScheduler") as receipt_checks_cls, \
          patch("schedulers.scheduler_manager.EntryIngestionScheduler") as ingestion_cls, \
          patch("schedulers.scheduler_manager.MonthlyDumpScheduler") as monthly_cls, \
          patch("schedulers.scheduler_manager.MonthlyDumpEnqueueScheduler") as enqueue_cls, \
          patch("schedulers.scheduler_manager.TimeCapsuleScheduler") as time_capsule_cls:
         
         notification_scheduler = MagicMock()
+        receipt_checks_scheduler = MagicMock()
         ingestion_scheduler = MagicMock()
         monthly_scheduler = MagicMock()
         enqueue_scheduler = MagicMock()
         time_capsule_scheduler = MagicMock()
         
         notification_cls.return_value = notification_scheduler
+        receipt_checks_cls.return_value = receipt_checks_scheduler
         ingestion_cls.return_value = ingestion_scheduler
         monthly_cls.return_value = monthly_scheduler
         enqueue_cls.return_value = enqueue_scheduler
@@ -54,10 +57,12 @@ def test_scheduler_manager_builds_default_schedulers():
         manager = SchedulerManager()
 
         assert manager.schedulers == [
-            notification_scheduler, 
+            notification_scheduler,
+            receipt_checks_scheduler,
             ingestion_scheduler, 
             monthly_scheduler,
             enqueue_scheduler,
             time_capsule_scheduler,
         ]
         time_capsule_cls.assert_called_once_with()
+        receipt_checks_cls.assert_called_once_with()

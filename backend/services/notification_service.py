@@ -11,6 +11,7 @@ import httpx
 
 from services.supabase_client import get_supabase_client
 from services.queue_service import QueueService
+from services.cache_service import CacheService
 from config import settings
 from database.tables import DatabaseTables
 from queue_constants import (
@@ -23,6 +24,7 @@ from queue_constants import (
     NOTIFICATION_RECEIPT_CHECKS_BATCH_SIZE,
     NOTIFICATION_RECEIPT_CHECKS_QUEUE_NAME,
     NOTIFICATION_RECEIPT_CHECKS_VISIBILITY_TIMEOUT_SECONDS,
+    NOTIFICATION_RECEIPT_CHECKS_MAX_AGE_HOURS,
 )
 from utils.logging import Logger
 logger = Logger("NotificationService")
@@ -461,7 +463,7 @@ class NotificationService:
                 receipt_check_messages: List[Dict[str, str]] = []
 
                 # Expo returns tickets in the same order as the messages we sent.
-                for recipient, ticket in zip(recipients, tickets):
+                for recipient, ticket in zip(recipients, tickets, strict=False):
                     if not isinstance(ticket, dict):
                         continue
                     if ticket.get("status") == "ok":
@@ -485,10 +487,18 @@ class NotificationService:
                     )
 
                 if receipt_check_messages:
-                    await asyncio.to_thread(
+                    enqueued = await asyncio.to_thread(
                         self._enqueue_receipt_checks,
                         receipt_check_messages,
                     )
+                    if not enqueued:
+                        logger.error(
+                            "Failed to enqueue one or more receipt checks",
+                            {
+                                "receipt_checks": len(receipt_check_messages),
+                            },
+                        )
+                        return False
 
                 if other_error_tickets:
                     logger.warning(
@@ -745,8 +755,13 @@ class NotificationService:
             )
             raise
     
-    def _enqueue_receipt_checks(self, messages: List[Dict[str, str]]) -> None:
-        """Enqueue accepted Expo tickets for later receipt verification."""
+    def _enqueue_receipt_checks(self, messages: List[Dict[str, str]]) -> bool:
+        """Enqueue accepted Expo tickets for later receipt verification.
+
+        Returns:
+            bool: True if every message was enqueued successfully.
+        """
+        all_ok = True
         for message in messages:
             try:
                 response = self.queue_service.send_message(
@@ -754,6 +769,7 @@ class NotificationService:
                     message=message,
                 )
                 if not self.queue_service.is_enqueue_response_valid(response):
+                    all_ok = False
                     logger.error(
                         "Failed to enqueue receipt check",
                         {
@@ -762,6 +778,7 @@ class NotificationService:
                         },
                     )
             except Exception as e:
+                all_ok = False
                 logger.error(
                     "Error enqueueing receipt check",
                     {
@@ -776,6 +793,26 @@ class NotificationService:
                         "ticket_id": message.get("ticket_id"),
                     },
                 )
+        return all_ok
+
+    def _is_receipt_check_expired(self, message: Dict[str, Any]) -> bool:
+        """Return True when a receipt-check message is older than Expo's receipt window."""
+        enqueued_at = message.get("enqueued_at")
+        if not enqueued_at:
+            return False
+        try:
+            if isinstance(enqueued_at, str):
+                ts = datetime.fromisoformat(enqueued_at.replace("Z", "+00:00"))
+            elif isinstance(enqueued_at, datetime):
+                ts = enqueued_at
+            else:
+                return False
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            age_seconds = (datetime.now(timezone.utc) - ts.astimezone(timezone.utc)).total_seconds()
+            return age_seconds > NOTIFICATION_RECEIPT_CHECKS_MAX_AGE_HOURS * 3600
+        except Exception:
+            return False
 
     async def process_receipt_checks_queue(self) -> Dict[str, int]:
         """
@@ -783,12 +820,14 @@ class NotificationService:
 
         Messages stay in the queue when Expo has not produced a receipt yet.
         Once a receipt exists (ok or error), the queue message is deleted.
+        Messages older than the receipt retention window are expired.
         """
         stats = {
             "processed": 0,
             "succeeded": 0,
             "kept": 0,
             "failed": 0,
+            "expired": 0,
         }
 
         try:
@@ -808,6 +847,15 @@ class NotificationService:
             ticket_ids: List[str] = []
             for message in messages:
                 msg_id = message.get("msg_id")
+                stats["processed"] += 1
+
+                if self._is_receipt_check_expired(message):
+                    await self._delete_message(
+                        msg_id, queue_name=self.receipt_checks_queue_name
+                    )
+                    stats["expired"] += 1
+                    continue
+
                 raw = message.get("message", {})
                 if isinstance(raw, str):
                     try:
@@ -821,10 +869,20 @@ class NotificationService:
                             msg_id, queue_name=self.receipt_checks_queue_name
                         )
                         stats["failed"] += 1
-                        stats["processed"] += 1
                         continue
                 else:
-                    payload = raw or {}
+                    payload = raw
+
+                if not isinstance(payload, dict):
+                    logger.warning(
+                        "Invalid receipt-check payload type; deleting",
+                        {"msg_id": msg_id, "payload_type": type(payload).__name__},
+                    )
+                    await self._delete_message(
+                        msg_id, queue_name=self.receipt_checks_queue_name
+                    )
+                    stats["failed"] += 1
+                    continue
 
                 ticket_id = payload.get("ticket_id")
                 token = payload.get("token")
@@ -837,7 +895,6 @@ class NotificationService:
                         msg_id, queue_name=self.receipt_checks_queue_name
                     )
                     stats["failed"] += 1
-                    stats["processed"] += 1
                     continue
 
                 parsed_items.append(
@@ -851,7 +908,6 @@ class NotificationService:
             receipts = await self._fetch_push_receipts(ticket_ids)
 
             for item in parsed_items:
-                stats["processed"] += 1
                 receipt = receipts.get(item["ticket_id"])
                 if not receipt:
                     stats["kept"] += 1
@@ -869,13 +925,14 @@ class NotificationService:
                     details = receipt.get("details") or {}
                     error_code = details.get("error")
                     token = item["token"]
+                    update_ok = True
 
                     if error_code == DEVICE_NOT_REGISTERED_ERROR:
-                        await asyncio.to_thread(
+                        update_ok = await asyncio.to_thread(
                             self._mark_push_tokens_inactive, [token]
                         )
                     elif error_code == MESSAGE_RATE_EXCEEDED_ERROR:
-                        await asyncio.to_thread(
+                        update_ok = await asyncio.to_thread(
                             self._mark_push_tokens_paused, [token]
                         )
                     else:
@@ -887,6 +944,10 @@ class NotificationService:
                                 "message": receipt.get("message"),
                             },
                         )
+
+                    if not update_ok:
+                        stats["kept"] += 1
+                        continue
 
                     await self._delete_message(
                         item["msg_id"], queue_name=self.receipt_checks_queue_name
@@ -905,6 +966,7 @@ class NotificationService:
                     "succeeded": stats["succeeded"],
                     "kept": stats["kept"],
                     "failed": stats["failed"],
+                    "expired": stats["expired"],
                 },
             )
         except Exception as e:
@@ -952,18 +1014,45 @@ class NotificationService:
             )
             return {}
 
-    def _mark_push_tokens_inactive(self, tokens: List[str]) -> None:
+    def _invalidate_push_token_cache_for_tokens(self, tokens: List[str]) -> None:
+        """Invalidate Redis push-token caches for owners of the given tokens."""
+        if not tokens:
+            return
+        try:
+            response = (
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
+                .select("user_id")
+                .in_("token", tokens)
+                .execute()
+            )
+            user_ids = list(
+                {
+                    row.get("user_id")
+                    for row in (response.data or [])
+                    if row.get("user_id")
+                }
+            )
+            if user_ids:
+                CacheService().invalidate_push_tokens(user_ids)
+        except Exception as e:
+            logger.error(
+                "Error invalidating push token cache",
+                {"token_count": len(tokens), "error": str(e)},
+            )
+
+    def _mark_push_tokens_inactive(self, tokens: List[str]) -> bool:
         """
         Mark the given Expo push tokens as inactive so they are no longer targeted.
 
-        Called when Expo reports DeviceNotRegistered for a token.
+        Returns:
+            bool: True when the update succeeds (including zero matching rows).
         """
         if not tokens:
-            return
+            return True
 
         try:
             response = (
-                self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
                 .update({"inactive": True})
                 .in_("token", tokens)
                 .execute()
@@ -975,6 +1064,8 @@ class NotificationService:
                     "updated_rows": len(response.data) if response.data else 0,
                 },
             )
+            self._invalidate_push_token_cache_for_tokens(tokens)
+            return True
         except Exception as e:
             logger.error(
                 "Error marking push tokens inactive",
@@ -987,20 +1078,24 @@ class NotificationService:
                     "token_count": len(tokens),
                 },
             )
+            return False
 
-    def _mark_push_tokens_paused(self, tokens: List[str]) -> None:
+    def _mark_push_tokens_paused(self, tokens: List[str]) -> bool:
         """
         Temporarily pause tokens after MessageRateExceeded.
 
         A Postgres cron flips paused back to false after the pause window.
+
+        Returns:
+            bool: True when the update succeeds (including zero matching rows).
         """
         if not tokens:
-            return
+            return True
 
         paused_at = datetime.now(timezone.utc).isoformat()
         try:
             response = (
-                self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
                 .update({"paused": True, "paused_at": paused_at})
                 .in_("token", tokens)
                 .execute()
@@ -1013,6 +1108,8 @@ class NotificationService:
                     "updated_rows": len(response.data) if response.data else 0,
                 },
             )
+            self._invalidate_push_token_cache_for_tokens(tokens)
+            return True
         except Exception as e:
             logger.error(
                 "Error marking push tokens paused",
@@ -1025,6 +1122,7 @@ class NotificationService:
                     "token_count": len(tokens),
                 },
             )
+            return False
 
     def _get_user_info_from_tokens(self, tokens: List[str]) -> Dict[str, Dict[str, Optional[str]]]:
         """
@@ -1042,7 +1140,7 @@ class NotificationService:
         try:
             # Query push_tokens table to get user_ids for tokens
             response = (
-                self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
                 .select("token, user_id")
                 .in_("token", tokens)
                 .execute()

@@ -176,7 +176,7 @@ class CacheService:
         try:
             environment = self._get_environment()
             response = (
-                self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
                 .select("token")
                 .eq("user_id", user_id)
                 .eq("environment", environment)
@@ -256,7 +256,7 @@ class CacheService:
             try:
                 environment = self._get_environment()
                 response = (
-                    self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                    self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
                     .select("user_id, token")
                     .in_("user_id", uncached_user_ids)
                     .eq("environment", environment)
@@ -306,6 +306,20 @@ class CacheService:
         
         return result
 
+
+    def invalidate_push_tokens(self, user_ids: List[str]) -> None:
+        """Drop cached push token lists for the given users."""
+        if not user_ids or not self.redis_client:
+            return
+        keys = [f"push_tokens:{user_id}" for user_id in user_ids]
+        try:
+            self.redis_client.delete(*keys)
+        except Exception:
+            logger.exception(
+                "Error invalidating push token cache",
+                extra={"user_count": len(user_ids)},
+            )
+
     def _mark_empty_string_push_tokens_inactive(
         self,
         *,
@@ -318,7 +332,7 @@ class CacheService:
 
         try:
             response = (
-                self.supabase.table(DatabaseTables.PUSH_TOKENS)
+                self.supabase.table(DatabaseTables.PUSH_TOKENS.value)
                 .update({"inactive": True})
                 .in_("user_id", user_ids)
                 .eq("token", "")
@@ -334,10 +348,10 @@ class CacheService:
                     "updated_rows": len(response.data) if response.data else 0,
                 },
             )
-        except Exception as e:
-            logger.error(
-                "Error marking empty-string push tokens inactive: %s",
-                str(e),
+            self.invalidate_push_tokens(user_ids)
+        except Exception:
+            logger.exception(
+                "Error marking empty-string push tokens inactive",
                 extra={"user_ids": user_ids, "environment": environment},
             )
     
