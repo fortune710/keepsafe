@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -40,9 +40,16 @@ export function TimeCapsuleList() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
   const [openedExpanded, setOpenedExpanded] = useState(false);
-  const [savingCapsule, setSavingCapsule] =
-    useState<TimeCapsuleWithEntry | null>(null);
-  const selectedCapsule = capsules.find((capsule) => capsule.id === selectedId);
+  const [savingCapsule, setSavingCapsule] = useState<{
+    capsule: TimeCapsuleWithEntry;
+    session: number;
+  } | null>(null);
+  const nextSheetSession = useRef(0);
+  const selectedRecord = capsules.find((capsule) => capsule.id === selectedId);
+  const selectedCapsule = selectedRecord?.status === 'unlocked' ? undefined : selectedRecord;
+  useEffect(() => {
+    if (selectedRecord?.status === 'unlocked') setSelectedId(null);
+  }, [selectedRecord?.status]);
   const { formatted } = useCountdown(
     selectedCapsule?.status === 'pending_release'
       ? selectedCapsule.release_available_at
@@ -199,7 +206,7 @@ export function TimeCapsuleList() {
               capsule={item.capsule}
               onPress={(capsule) => {
                 if (capsule.status === 'unlocked') {
-                  setSavingCapsule(capsule);
+                  setSavingCapsule({ capsule, session: ++nextSheetSession.current });
                   return;
                 }
                 setSelectedId(capsule.id);
@@ -259,7 +266,7 @@ export function TimeCapsuleList() {
                   <Text style={styles.secondaryButtonText}>Cancel release</Text>
                 </TouchableOpacity>
               </>
-            ) : (
+            ) : selectedCapsule.status === 'locked' ? (
               <>
                 <Text style={styles.detailDescription}>
                   Early release takes{' '}
@@ -282,14 +289,15 @@ export function TimeCapsuleList() {
                   </Text>
                 </TouchableOpacity>
               </>
-            )}
+            ) : null}
           </View>
         ) : null}
       </BottomSheet>
       {savingCapsule ? (
         <SaveOpenedCapsuleSheet
-          capsule={savingCapsule}
-          onClose={() => setSavingCapsule(null)}
+          key={savingCapsule.session}
+          capsule={savingCapsule.capsule}
+          onClose={() => setSavingCapsule(current => current?.session === savingCapsule.session ? null : current)}
         />
       ) : null}
     </>

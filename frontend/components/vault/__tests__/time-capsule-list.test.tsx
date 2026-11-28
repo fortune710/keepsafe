@@ -1,11 +1,12 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { TimeCapsuleList } from '../time-capsule-list';
 import { useTimeCapsules } from '@/hooks/use-time-capsules';
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
 jest.mock('@/hooks/use-time-capsules', () => ({ useTimeCapsules: jest.fn() }));
-jest.mock('@/components/vault/save-opened-capsule-sheet', () => ({ SaveOpenedCapsuleSheet: () => { const { Text } = require('react-native'); return <Text>Save opened capsule</Text>; } }));
+const mockSheetClosers: Array<() => void> = [];
+jest.mock('@/components/vault/save-opened-capsule-sheet', () => ({ SaveOpenedCapsuleSheet: ({ onClose }: any) => { const { Text } = require('react-native'); mockSheetClosers.push(onClose); return <Text onPress={onClose}>Save opened capsule</Text>; } }));
 jest.mock('@/hooks/use-countdown', () => ({ useCountdown: () => ({ formatted: '23h 59m' }) }));
 jest.mock('@/components/ui/bottom-sheet', () => ({ BottomSheet: ({ visible, children }: any) => visible ? children : null }));
 jest.mock('@shopify/flash-list', () => {
@@ -32,7 +33,37 @@ const cancelRelease = jest.fn().mockResolvedValue({ success: true });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSheetClosers.length = 0;
   (useTimeCapsules as jest.Mock).mockReturnValue({ capsules: [capsule], lockedCapsules: [capsule], pendingCapsules: [], unlockedCapsules: [], isLoading: false, requestRelease, cancelRelease });
+});
+
+test('closes release details when the capsule becomes unlocked', () => {
+  const pending = { ...capsule, status: 'pending_release', release_available_at: '2030-01-01T12:00:00Z' };
+  (useTimeCapsules as jest.Mock).mockReturnValue({ capsules: [pending], lockedCapsules: [], pendingCapsules: [pending], unlockedCapsules: [], isLoading: false, requestRelease, cancelRelease });
+  const screen = render(<TimeCapsuleList />);
+  fireEvent.press(screen.getByLabelText('View locked time capsule'));
+  expect(screen.getByText('Cancel release')).toBeTruthy();
+  const unlocked = { ...capsule, status: 'unlocked' };
+  (useTimeCapsules as jest.Mock).mockReturnValue({ capsules: [unlocked], lockedCapsules: [], pendingCapsules: [], unlockedCapsules: [unlocked], isLoading: false, requestRelease, cancelRelease });
+  screen.rerender(<TimeCapsuleList />);
+  expect(screen.queryByText('Release early')).toBeNull();
+  expect(screen.queryByText('Cancel release')).toBeNull();
+  expect(screen.queryByText('Release date')).toBeNull();
+});
+
+test('a stale save cannot close a reopened sheet for the same capsule', () => {
+  const unlocked = { ...capsule, status: 'unlocked' };
+  (useTimeCapsules as jest.Mock).mockReturnValue({ capsules: [unlocked], lockedCapsules: [], pendingCapsules: [], unlockedCapsules: [unlocked], isLoading: false, requestRelease, cancelRelease });
+  const screen = render(<TimeCapsuleList />);
+  fireEvent.press(screen.getByLabelText('Opened'));
+  fireEvent.press(screen.getByLabelText('Open time capsule entry'));
+  const oldClose = mockSheetClosers[mockSheetClosers.length - 1];
+  fireEvent.press(screen.getByText('Save opened capsule'));
+  fireEvent.press(screen.getByLabelText('Open time capsule entry'));
+  act(() => oldClose());
+  expect(screen.getByText('Save opened capsule')).toBeTruthy();
+  fireEvent.press(screen.getByText('Save opened capsule'));
+  expect(screen.queryByText('Save opened capsule')).toBeNull();
 });
 
 test('a locked card hides media and opens its release details', async () => {
