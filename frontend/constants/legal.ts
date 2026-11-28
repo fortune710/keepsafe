@@ -8,6 +8,7 @@ export interface LegalSection {
 export interface LegalDocument {
   id: LegalDocId;
   title: string;
+  subheading: string;
   lastUpdated: string;
   sections: LegalSection[];
 }
@@ -16,7 +17,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocId, LegalDocument> = {
   terms: {
     id: 'terms',
     title: 'Terms of Service',
-    lastUpdated: 'January 15, 2025',
+    subheading: 'The rules for using Keepsafe and sharing your content.',
+    lastUpdated: 'November 27, 2026',
     sections: [
       {
         title: '1. Acceptance of Terms',
@@ -59,7 +61,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocId, LegalDocument> = {
   eula: {
     id: 'eula',
     title: 'End User License Agreement',
-    lastUpdated: 'January 15, 2025',
+    subheading: 'Your license to use the Keepsafe app and its conditions.',
+    lastUpdated: 'November 27, 2026',
     sections: [
       {
         title: '1. Grant of License',
@@ -102,7 +105,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocId, LegalDocument> = {
   privacy: {
     id: 'privacy',
     title: 'Privacy Policy',
-    lastUpdated: 'January 15, 2025',
+    subheading: 'How Keepsafe collects, uses, and protects your information.',
+    lastUpdated: 'November 27, 2026',
     sections: [
       {
         title: '1. Introduction',

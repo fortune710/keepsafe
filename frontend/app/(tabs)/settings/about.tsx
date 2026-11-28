@@ -6,15 +6,14 @@ import { BackButton } from '@/components/back-button';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { Colors } from '@/lib/constants';
+import { Image } from 'expo-image';
+import { version as appVersion } from '@/package.json';
 
 // Every option icon shares this neutral slate color, matching the main
 // settings screen.
 const OPTION_ICON_COLOR = '#64748B';
 
 export default function AboutScreen() {
-  const appVersion = '1.0.0';
-  const buildNumber = '2025.01.15';
-
   const handleContactSupport = () => {
     Linking.openURL('mailto:contact@fortunealebiosu.dev?subject=Keepsafe Support');
   };
@@ -29,12 +28,11 @@ export default function AboutScreen() {
 
       <View style={styles.content}>
         <View style={styles.appSection}>
-          <Text style={styles.appName}>Keepsafe</Text>
-          <Text style={styles.appTagline}>Your most treasured moments, all in one place</Text>
-          
-          <View style={styles.versionInfo}>
-            <Text style={styles.versionText}>Version {appVersion}</Text>
-            <Text style={styles.buildText}>Build {buildNumber}</Text>
+          <Image source={require('@/assets/images/keepsafe-logo.png')} style={styles.appLogo} contentFit="contain" />
+          <View style={styles.appInfo}>
+            <Text style={styles.appName}>Keepsafe</Text>
+            <Text style={styles.appTagline}>Your digital diary</Text>
+            <Text style={styles.versionText}>v{appVersion}</Text>
           </View>
         </View>
 
@@ -95,44 +93,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   appSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     margin: 20,
-    borderRadius: 20,
-    paddingVertical: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    gap: 16,
+  },
+  appLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+  },
+  appInfo: {
+    flex: 1,
   },
   appName: {
-    fontSize: 32,
+    fontSize: 22,
     fontFamily: 'Figtree-Bold',
     color: '#1E293B',
-    marginBottom: 8,
-  },
-  appTagline: {
-    fontSize: 16,
-    fontFamily: 'Figtree-Regular',
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 20,
-  },
-  versionInfo: {
-    alignItems: 'center',
-  },
-  versionText: {
-    fontSize: 16,
-    fontFamily: 'Figtree-SemiBold',
-    color: '#8B5CF6',
     marginBottom: 4,
   },
-  buildText: {
+  appTagline: {
     fontSize: 14,
     fontFamily: 'Figtree-Regular',
-    color: '#94A3B8',
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  versionText: {
+    fontSize: 14,
+    fontFamily: 'Figtree-SemiBold',
+    color: '#8B5CF6',
   },
   linksSection: {
     marginHorizontal: 20,

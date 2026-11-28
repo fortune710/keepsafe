@@ -2,7 +2,6 @@
   "expo": {
     "name": "Keepsafe",
     "slug": "keepsafe",
-    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/keepsafe-logo.png",
     "scheme": "keepsafe",

@@ -1,9 +1,11 @@
 const { withPodfile } = require('expo/config-plugins');
+const { version } = require('./package.json');
 
 module.exports = ({ config }) => {
   // The native push-open hook runs before JavaScript and bypasses before_send.
   config = {
     ...config,
+    version,
     ios: {
       ...config.ios,
       infoPlist: {
