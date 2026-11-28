@@ -18,18 +18,21 @@ REQUIRED = (
 
 
 class RenderProductionEnvTests(unittest.TestCase):
-    def test_deployment_workflow_reads_every_instagram_setting_from_secrets(self):
+    def test_deployment_workflow_reads_optional_settings_from_secrets(self):
         workflow = (ROOT / '.github/workflows/production-deploy.yml').read_text()
         for name in (
             'META_APP_ID', 'META_APP_SECRET', 'META_INSTAGRAM_CONFIG_ID',
             'META_INSTAGRAM_REDIRECT_URI', 'META_INSTAGRAM_LOGIN_URL',
             'META_GRAPH_API_VERSION', 'INSTAGRAM_TOKEN_ENCRYPTION_KEY',
+            'XAI_API_KEY', 'COHERE_API_KEY',
         ):
             with self.subTest(name=name):
                 self.assertIn(f'{name}: ${{{{ secrets.{name} }}}}', workflow)
 
-    def test_instagram_settings_reach_backend_container(self):
-        instagram_values = {
+    def test_optional_settings_reach_backend_container(self):
+        optional_values = {
+            'XAI_API_KEY': 'example-xai-key',
+            'COHERE_API_KEY': 'example-cohere-key',
             'META_APP_ID': 'example-app-id',
             'META_APP_SECRET': 'example-secret',
             'META_INSTAGRAM_CONFIG_ID': 'example-config-id',
@@ -41,7 +44,7 @@ class RenderProductionEnvTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'env'
             env = {key: 'placeholder' for key in REQUIRED}
-            env.update(instagram_values)
+            env.update(optional_values)
             env['PATH'] = os.environ['PATH']
             subprocess.run([sys.executable, str(RENDERER), str(output)], env=env, check=True)
             result = subprocess.run(
@@ -50,7 +53,7 @@ class RenderProductionEnvTests(unittest.TestCase):
                 env={'PATH': os.environ['PATH']}, check=True, capture_output=True, text=True,
             )
             backend_environment = json.loads(result.stdout)['services']['backend']['environment']
-            for name, value in instagram_values.items():
+            for name, value in optional_values.items():
                 self.assertEqual(backend_environment[name], value)
 
     def test_redis_url_and_password_are_required(self):
