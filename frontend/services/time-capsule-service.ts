@@ -5,7 +5,10 @@ import { TimeCapsuleWithEntry, TimeCapsuleDraft } from '@/types/time-capsule';
 import { logger } from '@/lib/logger';
 import { posthog } from '@/constants/posthog';
 import { StreakService } from './streak-service';
-import { capsuleDraftSchema, capsuleEntrySchema } from '@/lib/validations/time-capsules';
+import { capsuleDraftSchema, capsuleEntrySchema, saveOpenedCapsuleSchema } from '@/lib/validations/time-capsules';
+import { z } from 'zod';
+
+export type SaveOpenedCapsuleInput = z.infer<typeof saveOpenedCapsuleSchema>;
 
 type TimeCapsuleInsert = Database['public']['Tables']['time_capsules']['Insert'];
 
@@ -24,6 +27,17 @@ export interface TimeCapsuleServiceResult<T = any> {
  * backend HTTP endpoint. See the time-capsule plan for why.
  */
 export class TimeCapsuleService {
+  static async saveOpenedCapsule(input: SaveOpenedCapsuleInput) {
+    const parsed = saveOpenedCapsuleSchema.safeParse(input);
+    if (!parsed.success) throw new Error('Please choose a diary and who can see this entry.');
+    const { capsuleId, diaryId, sharing, friendIds } = parsed.data;
+    const { data, error } = await (supabase.rpc as any)('save_opened_time_capsule', {
+      p_capsule_id: capsuleId, p_diary_id: diaryId, p_sharing: sharing,
+      p_friend_ids: sharing === 'friends' ? friendIds : [],
+    });
+    if (error || !data) throw new Error('Unable to save this entry. Please try again.');
+    return data as Database['public']['Tables']['entries']['Row'];
+  }
   static async createEntryAndCapsule(entry: Database['public']['Tables']['entries']['Insert'], draft: TimeCapsuleDraft): Promise<TimeCapsuleServiceResult<Database['public']['Tables']['entries']['Row']>> {
     const validation = capsuleEntrySchema.safeParse(entry);
     const validDraft = capsuleDraftSchema.safeParse(draft);

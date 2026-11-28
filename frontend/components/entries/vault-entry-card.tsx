@@ -19,6 +19,11 @@ interface VaultEntryCardProps {
   onRetry?: (entryId: string) => void;
   onMusicPress?: (music: MusicTag) => void;
   onLongPress?: (entry: EntryWithProfile) => void;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+  mediaPlaceholder?: React.ReactNode;
+  showAuthor?: boolean;
+  footer?: React.ReactNode;
 }
 
 export default function VaultEntryCard({
@@ -27,6 +32,11 @@ export default function VaultEntryCard({
   onRetry,
   onMusicPress,
   onLongPress,
+  onPress,
+  accessibilityLabel,
+  mediaPlaceholder,
+  showAuthor = true,
+  footer,
 }: VaultEntryCardProps) {
   const numberHash = useMemo(() => {
     return dateStringToNumber(entry.created_at);
@@ -94,24 +104,24 @@ export default function VaultEntryCard({
 
   return (
     <View style={styles.container}>
-      <Pressable onLongPress={() => onLongPress?.(entry)} delayLongPress={350}>
+      <Pressable style={onPress ? styles.fullWidth : undefined} onPress={onPress} onLongPress={() => onLongPress?.(entry)} delayLongPress={350} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={accessibilityLabel}>
         <Animated.View
           style={includeRotation ? [styles.entryCard, rotateStyle] : styles.entryCard}
           entering={FadeIn.duration(200)}
           exiting={FadeOut.duration(150)}
         >
-          <VaultCanvas
+          {mediaPlaceholder !== undefined ? mediaPlaceholder : <VaultCanvas
             type={entry.type}
             items={entry.attachments}
             uri={entry.content_url || ''}
             style={styles.entryImage as any}
             onMusicPress={onMusicPress}
             metadata={entry.metadata}
-          />
+          />}
 
           {getStatusIndicator()}
 
-          <View style={styles.authorContainer}>
+          {showAuthor ? <View style={styles.authorContainer}>
             <Image
               source={{
                 uri: safeProfile?.avatar_url || getDefaultAvatarUrl(safeProfile?.full_name || '')
@@ -125,7 +135,8 @@ export default function VaultEntryCard({
             </View>
 
             <Text style={styles.dateText}>{getRelativeDate(entry.created_at)}</Text>
-          </View>
+          </View> : null}
+          {footer}
         </Animated.View>
       </Pressable>
     </View>
@@ -133,6 +144,7 @@ export default function VaultEntryCard({
 }
 
 const styles = StyleSheet.create({
+  fullWidth: { width: '100%' },
   container: {
     width: '100%',
     display: 'flex',

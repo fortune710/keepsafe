@@ -10,7 +10,6 @@ import { CircleIconButton } from '@/components/ui/circle-icon-button';
 import { DiaryAiIcon } from '@/components/icons/diary-ai-icon';
 import { DiaryCoverCard } from '@/components/vault/diary-cover-card';
 import { TimeCapsuleList } from '@/components/vault/time-capsule-list';
-import { TimeCapsuleWithEntry } from '@/types/time-capsule';
 import { CreateDiarySheet } from '@/components/vault/create-diary-sheet';
 import { useDiaries } from '@/hooks/use-diaries';
 import { EditDiarySheet } from '@/components/vault/edit-diary-sheet';
@@ -126,11 +125,7 @@ export default function DiaryHubScreen() {
         )}
 
         {activeChip === 'capsules' && (
-          <TimeCapsuleList
-            onOpenEntry={(capsule: TimeCapsuleWithEntry) =>
-              router.push(`/time-capsule-reveal/${capsule.entry_id}`)
-            }
-          />
+          <TimeCapsuleList />
         )}
 
         {activeChip === 'inspiration' && (

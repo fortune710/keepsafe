@@ -9,6 +9,8 @@ on:
       - 'config/nginx/**'
       - '.github/scripts/**'
       - 'frontend/supabase/tests/**'
+      - 'frontend/supabase/migrations/**'
+      - '.github/workflows/production-config-check.yml'
 
 permissions:
   contents: read
@@ -19,10 +21,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Test durable webhook delivery
+      - name: Install database test dependency
         run: |
           npm install --prefix "$RUNNER_TEMP/webhook-pgtest" --no-save --ignore-scripts @electric-sql/pglite@0.5.17
+
+      - name: Test durable webhook delivery
+        run: |
           NODE_PATH="$RUNNER_TEMP/webhook-pgtest/node_modules" node frontend/supabase/tests/webhook_outbox.cjs
+
+      - name: Test opened capsule saving and access
+        run: |
+          NODE_PATH="$RUNNER_TEMP/webhook-pgtest/node_modules" node frontend/supabase/tests/save_opened_capsule.cjs
 
       - name: Render validation environment
         env:
