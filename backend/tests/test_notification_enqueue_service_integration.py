@@ -52,7 +52,7 @@ def notification_enqueue_service(monkeypatch, mock_supabase_client, mock_redis_c
     	NotificationEnqueueService: An instance of NotificationEnqueueService with its supabase, cache_service, and notification_service wired to the provided mocks.
     """
     from services import notification_enqueue_service as enqueue_module
-    from services import redis_client as redis_module
+    from config import redis_client as redis_module
     from services import cache_service as cache_module
     
     # Mock get_supabase_client

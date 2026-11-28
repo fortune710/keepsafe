@@ -15,7 +15,7 @@ from dateutil.relativedelta import relativedelta
 from PIL import Image
 from supabase import Client
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from controllers.entry_controller import EntryController
 import logging
 

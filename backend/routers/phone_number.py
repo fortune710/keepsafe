@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from config import settings
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 from twilio.rest import Client
 

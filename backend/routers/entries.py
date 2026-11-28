@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from typing import Optional, Any, Dict, List
 from controllers.entry_controller import EntryController
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 from utils.dumps.dump_utils import normalize_month
 import calendar

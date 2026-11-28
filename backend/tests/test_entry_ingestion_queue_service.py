@@ -24,7 +24,7 @@ def service(monkeypatch, mock_supabase_client):
 
     monkeypatch.setattr(service_module, "get_supabase_client", lambda: mock_supabase_client)
     monkeypatch.setattr(service_module, "QueueService", MagicMock)
-    monkeypatch.setattr(service_module, "IngestionService", MagicMock)
+    monkeypatch.setattr(service_module, "create_ingestion_service", MagicMock)
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(service_module, "ENTRY_INGESTION_BATCH_SIZE", 10)

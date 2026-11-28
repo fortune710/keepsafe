@@ -45,6 +45,12 @@ class Settings:
     
     # Google Gemini
     GOOGLE_GENERATIVE_AI_API_KEY: str = os.getenv("GOOGLE_GENERATIVE_AI_API_KEY", "")
+
+    # xAI
+    XAI_API_KEY: str = os.getenv("XAI_API_KEY", "")
+
+    # Cohere
+    COHERE_API_KEY: str = os.getenv("COHERE_API_KEY", "")
     
     # Pinecone
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")

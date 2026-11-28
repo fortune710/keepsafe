@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from services.monthly_dump_service import MonthlyDumpService
 from services.queues.monthly_dump_queue_service import MonthlyDumpQueueService
 from services.storage_service import StorageService

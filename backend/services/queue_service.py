@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 import json
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 import logging
 
 logger = logging.getLogger(__name__)

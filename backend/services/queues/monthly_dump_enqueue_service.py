@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from dateutil.relativedelta import relativedelta
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from services.queue_service import QueueService
 from queue_constants import MONTHLY_DUMP_QUEUE_NAME, MONTHLY_DUMP_ENQUEUE_BATCH_SIZE
 from database.tables import DatabaseTables

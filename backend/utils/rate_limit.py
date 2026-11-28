@@ -3,7 +3,7 @@ import functools
 import logging
 from typing import Callable, Optional
 from fastapi import Request, HTTPException, status
-from services.redis_client import get_redis_client
+from config.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 

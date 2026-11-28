@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from services.notification_enqueue_service import NotificationEnqueueService
 from controllers.time_capsule_controller import TimeCapsuleController
 from queue_constants import TIME_CAPSULE_BATCH_SIZE

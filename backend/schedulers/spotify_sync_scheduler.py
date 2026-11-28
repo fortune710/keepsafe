@@ -6,7 +6,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from database.tables import DatabaseTables
 from services.spotify_service import SpotifyService
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 

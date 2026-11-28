@@ -15,9 +15,9 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from config import settings
-from services.pinecone_client import get_pinecone_index
-from services.supabase_client import get_supabase_client
-from services.supabase_client import get_supabase_client
+from config.pinecone_client import get_pinecone_index
+from config.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 
 
