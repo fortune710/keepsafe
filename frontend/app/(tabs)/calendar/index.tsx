@@ -126,6 +126,12 @@ export default function CalendarScreen() {
                                     <View style={styles.dayNumberCircle}>
                                       <Text style={styles.dayNumberActive}>{day}</Text>
                                     </View>
+                                  ) : day === today.getDate() &&
+                                      monthDate.getMonth() === today.getMonth() &&
+                                      monthDate.getFullYear() === today.getFullYear() ? (
+                                    <View style={[styles.dayNumberCircle, styles.todayCircle]}>
+                                      <Text style={styles.todayNumber}>{day}</Text>
+                                    </View>
                                   ) : (
                                     <Text style={styles.dayNumber}>{day}</Text>
                                   )}
@@ -331,6 +337,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Figtree-Medium',
     color: 'white',
+  },
+  todayCircle: {
+    backgroundColor: Colors.brandTranslucent,
+  },
+  todayNumber: {
+    fontSize: 16,
+    fontFamily: 'Figtree-Medium',
+    color: Colors.primary,
   },
 
 });

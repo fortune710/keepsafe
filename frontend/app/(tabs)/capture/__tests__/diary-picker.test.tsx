@@ -43,7 +43,7 @@ beforeEach(() => (useDiaries as jest.Mock).mockReturnValue({ diaries, isLoading:
 
 test('the diary popover renders the diaries and highlights the selected diary', () => {
   const screen = render(<DetailsScreen />);
-  fireEvent.press(screen.getByLabelText('Choose a diary'));
+  fireEvent.press(screen.getByLabelText('Change diary, Summer'));
   expect(screen.getByText('My Diary')).toBeTruthy();
   expect(screen.getByRole('radio', { name: 'Summer' })).toBeTruthy();
   expect(screen.getAllByRole('radio')[0].props.accessibilityState.selected).toBe(true);
@@ -52,30 +52,41 @@ test('the diary popover renders the diaries and highlights the selected diary', 
   expect(screen.getByRole('radio', { name: 'My Diary' }).props.accessibilityState.selected).toBe(true);
 });
 
-test('the diary badge opens the picker and the capsule badge removes capsule mode', () => {
+test('badge controls switch destinations and open separate sheets', () => {
   const screen = render(<DetailsScreen />);
   fireEvent.press(screen.getByLabelText('Change diary, Summer'));
-  fireEvent(screen.getByRole('switch', { name: 'Save as time capsule' }), 'valueChange', true);
-  expect(screen.getByLabelText('Remove time capsule')).toBeTruthy();
-  expect(screen.queryByLabelText('Change diary, Summer')).toBeNull();
-  fireEvent.press(screen.getByLabelText('Remove time capsule'));
-  expect(screen.getByLabelText('Change diary, Summer')).toBeTruthy();
+  expect(screen.getByRole('radio', { name: 'Summer' })).toBeTruthy();
+  expect(screen.queryByRole('switch', { name: 'Save as time capsule' })).toBeNull();
+  fireEvent.press(screen.getByText('My Diary'));
+  // Dismiss the diary sheet before using the destination switch.
+  fireEvent.press(screen.getByLabelText('Close diary picker'));
+  fireEvent.press(screen.getByLabelText('Switch to time capsule'));
+  expect(screen.queryByLabelText('Change diary, My Diary')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Configure time capsule'));
+  expect(screen.getByText('When should this memory be revealed?')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Close time capsule settings'));
+  fireEvent.press(screen.getByLabelText('Switch to diary'));
+  expect(screen.getByLabelText('Change diary, My Diary')).toBeTruthy();
 });
 
-test('enabling the time capsule switch opens its settings', () => {
+test('switching away preserves capsule settings for a later switch back', () => {
   const screen = render(<DetailsScreen />);
-  fireEvent.press(screen.getByLabelText('Choose a diary'));
-  fireEvent(screen.getByRole('switch', { name: 'Save as time capsule' }), 'valueChange', true);
-  expect(screen.getByText('When should this memory be revealed?')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Switch to time capsule'));
+  fireEvent.press(screen.getByLabelText('Configure time capsule'));
   fireEvent.press(screen.getByText('When a condition is met'));
+  expect(screen.getByText('Choose a condition')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Close time capsule settings'));
+  fireEvent.press(screen.getByLabelText('Switch to diary'));
+  expect(screen.getByLabelText('Change diary, Summer')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Switch to time capsule'));
+  fireEvent.press(screen.getByLabelText('Configure time capsule'));
   expect(screen.getByText('Choose a condition')).toBeTruthy();
 });
 
-test('the diary popover has the time capsule toggle available', () => {
+test('the time capsule sheet shows the date stepper', () => {
   const screen = render(<DetailsScreen />);
-  fireEvent.press(screen.getByLabelText('Choose a diary'));
-  expect(screen.getByText('Save as time capsule')).toBeTruthy();
-  fireEvent.press(screen.getByText('Save as time capsule'));
+  fireEvent.press(screen.getByLabelText('Switch to time capsule'));
+  fireEvent.press(screen.getByLabelText('Configure time capsule'));
   expect(screen.getByText('When should this memory be revealed?')).toBeTruthy();
   fireEvent.press(screen.getByText('On a date'));
   expect(screen.getByText('Choose a date')).toBeTruthy();
@@ -85,7 +96,7 @@ test('the default diary uses the user ID regardless of its name', async () => {
   const defaultDiary = { ...diaries[0], name: 'Personal memories' };
   (useDiaries as jest.Mock).mockReturnValue({ diaries: [diaries[1], defaultDiary], isLoading: false, error: null });
   const screen = render(<DetailsScreen />);
-  fireEvent.press(screen.getByLabelText('Choose a diary'));
+  fireEvent.press(screen.getByLabelText('Change diary, Summer'));
   fireEvent.press(screen.getByText('Personal memories'));
   expect(screen.getByRole('radio', { name: 'Personal memories' }).props.accessibilityState.selected).toBe(true);
   fireEvent.press(screen.getByText('Save Privately'));
