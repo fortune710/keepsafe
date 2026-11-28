@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     },
     backToLoginButton: {
         backgroundColor: '#8B5CF6',
-        borderRadius: 12,
+        borderRadius: 36,
         paddingVertical: 16,
         alignItems: 'center',
         width: '100%',

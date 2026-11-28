@@ -1,12 +1,11 @@
-import logging
-
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from queue_constants import NOTIFICATION_RECEIPT_CHECKS_INTERVAL_MINUTES
 from services.notification_service import NotificationService
+from utils.logging import Logger
 
-logger = logging.getLogger(__name__)
+logger = Logger("NotificationReceiptChecksScheduler")
 
 
 class NotificationReceiptChecksScheduler:
@@ -22,7 +21,7 @@ class NotificationReceiptChecksScheduler:
         if self.is_running:
             logger.warning(
                 "Notification receipt-checks scheduler is already running",
-                extra={"job_id": "process_notification_receipt_checks_queue"},
+                {"job_id": "process_notification_receipt_checks_queue"},
             )
             return
 
@@ -37,7 +36,7 @@ class NotificationReceiptChecksScheduler:
         self.is_running = True
         logger.info(
             "Notification receipt-checks scheduler started",
-            extra={
+            {
                 "job_id": "process_notification_receipt_checks_queue",
                 "interval_minutes": self.interval_minutes,
             },
@@ -47,7 +46,7 @@ class NotificationReceiptChecksScheduler:
         if not self.is_running:
             logger.warning(
                 "Notification receipt-checks scheduler is not running",
-                extra={"job_id": "process_notification_receipt_checks_queue"},
+                {"job_id": "process_notification_receipt_checks_queue"},
             )
             return
 
@@ -56,25 +55,28 @@ class NotificationReceiptChecksScheduler:
         self.notification_service.shutdown()
         logger.info(
             "Notification receipt-checks scheduler stopped",
-            extra={"job_id": "process_notification_receipt_checks_queue"},
+            {"job_id": "process_notification_receipt_checks_queue"},
         )
 
     async def _process_queue_job(self):
         try:
             logger.info(
                 "Starting scheduled notification receipt-check processing",
-                extra={"job_id": "process_notification_receipt_checks_queue"},
+                {"job_id": "process_notification_receipt_checks_queue"},
             )
             stats = await self.notification_service.process_receipt_checks_queue()
             logger.info(
                 "Scheduled notification receipt-check processing completed",
-                extra={
+                {
                     "job_id": "process_notification_receipt_checks_queue",
                     "stats": stats,
                 },
             )
-        except Exception:
-            logger.exception(
+        except Exception as exc:
+            logger.error(
                 "Scheduled notification receipt-check processing failed",
-                extra={"job_id": "process_notification_receipt_checks_queue"},
+                {
+                    "job_id": "process_notification_receipt_checks_queue",
+                    "error": str(exc),
+                },
             )

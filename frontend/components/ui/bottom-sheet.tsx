@@ -115,7 +115,8 @@ export function BottomSheet({
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
       onDismiss={onDismiss}
-    ><ReplayScreenShield allow={false} overlay onDismiss={onClose}>
+    >
+      <ReplayScreenShield allow={false} overlay onDismiss={onClose}>
       <View style={styles.root}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
@@ -153,7 +154,7 @@ const styles = StyleSheet.create({
   sheet: {
     marginHorizontal: SHEET_GAP,
     backgroundColor: 'white',
-    borderRadius: scale(28),
+    borderRadius: scale(36),
     paddingTop: verticalScale(12),
     overflow: 'hidden',
   },

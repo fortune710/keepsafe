@@ -6,14 +6,15 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { FileText, ChevronRight } from 'lucide-react-native';
+import { FileText } from 'lucide-react-native';
 import { BackButton } from '@/components/back-button';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { logger } from '@/lib/logger';
 import { LEGAL_DOCUMENTS, type LegalDocId } from '@/constants/legal';
 import { Colors } from '@/lib/constants';
+import { HeaderFade } from '@/components/ui/header-fade';
 
 // Every option icon shares this neutral slate color, matching the main
 // settings screen.
@@ -22,10 +23,12 @@ const OPTION_ICON_COLOR = '#64748B';
 type LegalDocument = LegalDocId;
 
 export default function LegalScreen() {
+  const insets = useSafeAreaInsets();
   const { doc } = useLocalSearchParams<{ doc: LegalDocument }>();
   const [selectedDoc, setSelectedDoc] = useState<LegalDocument | null>(
     doc || null,
   );
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const legalDocuments = [
     {
@@ -69,7 +72,7 @@ export default function LegalScreen() {
 
     return (
       <View style={styles.documentContent}>
-        <Text style={styles.documentTitle}>{document.title}</Text>
+        <Text style={styles.documentSubheading}>{document.subheading}</Text>
         <Text style={styles.lastUpdated}>
           Last Updated: {document.lastUpdated}
         </Text>
@@ -86,7 +89,7 @@ export default function LegalScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { top: insets.top }]} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
         <BackButton
           onPress={() => {
             if (selectedDoc) {
@@ -103,9 +106,10 @@ export default function LegalScreen() {
         </Text>
         <View style={{ width: 40 }} />
       </View>
+      <HeaderFade style={{ top: insets.top + headerHeight }} />
 
       {!selectedDoc ? (
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingTop: headerHeight }]}>
           <View style={styles.documentsSection}>
             {legalDocuments.map((doc) => (
               <TouchableOpacity
@@ -122,13 +126,12 @@ export default function LegalScreen() {
                     {doc.description}
                   </Text>
                 </View>
-                <ChevronRight color="#94A3B8" size={20} />
               </TouchableOpacity>
             ))}
           </View>
         </View>
       ) : (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.content} contentContainerStyle={{ paddingTop: headerHeight }} showsVerticalScrollIndicator={false}>
           {renderDocumentContent(selectedDoc)}
         </ScrollView>
       )}
@@ -142,6 +145,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    backgroundColor: Colors.background,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -189,21 +198,14 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   documentContent: {
-    backgroundColor: 'white',
     margin: 20,
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
-  documentTitle: {
-    fontSize: 28,
-    fontFamily: 'Figtree-Bold',
-    color: '#1E293B',
-    marginBottom: 8,
+  documentSubheading: {
+    fontSize: 15,
+    fontFamily: 'Figtree-Regular',
+    color: '#64748B',
+    lineHeight: 22,
+    marginBottom: 12,
   },
   lastUpdated: {
     fontSize: 14,

@@ -9,7 +9,7 @@ from posthog import Posthog
 import json
 import httpx
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from services.queue_service import QueueService
 from services.cache_service import CacheService
 from config import settings

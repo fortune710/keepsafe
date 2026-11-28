@@ -1,8 +1,8 @@
 from typing import Dict, Any, List, Optional
 import json
 import logging
-from services.redis_client import get_redis_client
-from services.supabase_client import get_supabase_client
+from config.redis_client import get_redis_client
+from config.supabase_client import get_supabase_client
 from config import settings
 from database.tables import DatabaseTables
 

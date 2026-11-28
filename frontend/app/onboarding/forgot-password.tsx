@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { ArrowLeft, Mail } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { useAuthContext } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { Colors } from '@/lib/constants';
 import { scale, verticalScale } from 'react-native-size-matters';
 import { Image } from 'expo-image';
+import { Button } from '@/components/ui/button';
 
 export default function ForgotPasswordScreen() {
     const [email, setEmail] = useState('');
@@ -48,7 +48,7 @@ export default function ForgotPasswordScreen() {
 
     return (
         <View style={styles.container}>
-            <Animated.View style={styles.content}>
+            <View style={styles.content}>
                 {/* Header with back button */}
                 <View style={styles.header}>
                     <TouchableOpacity
@@ -62,11 +62,11 @@ export default function ForgotPasswordScreen() {
                 {/* Icon and title */}
                 <View style={styles.titleContainer}>
                     <View style={styles.iconCircle}>
-                        <Mail color="#8B5CF6" size={scale(32)} />
+                        <Image source={require('@/assets/images/mail.svg')} style={styles.icon} />
                     </View>
                     <Text style={styles.title}>Forgot Password?</Text>
                     <Text style={styles.subtitle}>
-                        No worries! Enter the email address associated with your account and we'll send you a link to reset your password.
+                        Enter your email and we'll send you a reset link.
                     </Text>
                 </View>
 
@@ -84,28 +84,24 @@ export default function ForgotPasswordScreen() {
                         autoFocus
                     />
 
-                    <TouchableOpacity
-                        style={[styles.sendButton, (!email.trim() || loading) && styles.sendButtonDisabled]}
-                        onPress={handleSendResetLink}
-                        disabled={!email.trim() || loading}
-                    >
-                        <Text style={styles.sendButtonText}>
-                            {loading ? 'Sending...' : 'Send Reset Link'}
-                        </Text>
-                    </TouchableOpacity>
                 </View>
-
-                {/* Back to login */}
-                <View style={styles.bottomContainer}>
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                    >
-                        <Text style={styles.backToLoginText}>
-                            Remember your password? <Text style={styles.backToLoginLink}>Sign In</Text>
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </Animated.View>
+            </View>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={12}
+                style={styles.buttonSection}
+            >
+                <Button onPress={handleSendResetLink} disabled={!email.trim() || loading} loading={loading}>
+                    <Text style={styles.sendButtonText}>{loading ? 'Sending...' : 'Send Reset Link'}</Text>
+                </Button>
+            </KeyboardAvoidingView>
+            <View style={styles.bottomContainer}>
+                <TouchableOpacity onPress={() => router.back()}>
+                    <Text style={styles.backToLoginText}>
+                        Remember your password? <Text style={styles.backToLoginLink}>Sign In</Text>
+                    </Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }
@@ -117,7 +113,7 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: 32,
+        paddingHorizontal: scale(16),
     },
     header: {
         paddingTop: 60,
@@ -128,71 +124,68 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     titleContainer: {
-        alignItems: 'center',
-        marginBottom: verticalScale(32),
+        paddingTop: verticalScale(24),
     },
     iconCircle: {
-        width: scale(72),
-        height: scale(72),
-        borderRadius: scale(36),
-        backgroundColor: '#F3E8FF',
+        width: scale(48),
+        height: scale(48),
+        borderRadius: scale(24),
+        backgroundColor: Colors.brandTranslucent,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: verticalScale(20),
+        marginBottom: verticalScale(16),
+    },
+    icon: {
+        width: scale(22),
+        height: scale(22),
     },
     title: {
-        fontSize: scale(24),
+        fontSize: scale(20),
         fontFamily: 'Figtree-Bold',
         color: '#1E293B',
-        marginBottom: 8,
-        textAlign: 'center',
+        marginBottom: verticalScale(8),
+        textAlign: 'left',
     },
     subtitle: {
-        fontSize: 15,
+        fontSize: scale(14),
         color: '#64748B',
-        textAlign: 'center',
-        lineHeight: 22,
+        textAlign: 'left',
+        marginBottom: verticalScale(24),
         fontFamily: 'Figtree-Regular',
-        paddingHorizontal: 16,
     },
     formContainer: {
         width: '100%',
-        gap: verticalScale(16),
+        marginBottom: verticalScale(20),
     },
     input: {
         backgroundColor: 'white',
         borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        fontSize: 16,
+        paddingHorizontal: scale(12),
+        paddingVertical: verticalScale(12),
+        fontSize: scale(16),
         borderWidth: 1,
         borderColor: '#E2E8F0',
         fontFamily: 'Figtree-Regular',
     },
-    sendButton: {
-        backgroundColor: '#8B5CF6',
-        borderRadius: 12,
-        paddingVertical: 16,
-        alignItems: 'center',
-        width: '100%',
-    },
-    sendButtonDisabled: {
-        opacity: 0.6,
+    buttonSection: {
+        paddingHorizontal: scale(16),
     },
     sendButtonText: {
         color: 'white',
-        fontSize: 18,
+        fontSize: 16,
         fontFamily: 'Figtree-SemiBold',
     },
     bottomContainer: {
-        position: 'absolute',
-        bottom: 50,
-        alignSelf: 'center',
+        marginTop: verticalScale(24),
+        paddingHorizontal: scale(16),
+        paddingBottom: verticalScale(36),
     },
     backToLoginText: {
-        fontSize: 16,
+        fontSize: 13,
         color: '#64748B',
         fontFamily: 'Figtree-Regular',
+        textAlign: 'center',
+        lineHeight: 18,
     },
     backToLoginLink: {
         color: '#8B5CF6',

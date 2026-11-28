@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from services.ingestion_service import IngestionService
 from services.queues.entry_ingestion_queue_service import EntryIngestionQueueService
 from services.notification_enqueue_service import NotificationEnqueueService
 from services.friend_service import FriendService
@@ -33,8 +32,8 @@ async def verify_webhook_signature(
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
-ingestion_service = IngestionService()
 entry_ingestion_queue_service = EntryIngestionQueueService()
+ingestion_service = entry_ingestion_queue_service.ingestion_service
 notification_enqueue_service = NotificationEnqueueService()
 friend_service = FriendService()
 email_service = EmailService()

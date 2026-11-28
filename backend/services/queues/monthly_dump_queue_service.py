@@ -7,7 +7,7 @@ import random
 from datetime import datetime, timezone
 
 from services.queue_service import QueueService
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from services.monthly_dump_service import MonthlyDumpService, MonthlyDumpInputs
 from services.notification_enqueue_service import NotificationEnqueueService
 from controllers.monthly_dump_controller import MonthlyDumpController

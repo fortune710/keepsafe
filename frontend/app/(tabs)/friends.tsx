@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshControl, StyleSheet } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -176,12 +175,12 @@ export default function FriendsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {!isSearching && (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+        <View>
           <FriendsHeader title="Friends" />
-        </Animated.View>
+        </View>
       )}
 
-      <Animated.View style={styles.viewContainer} layout={LinearTransition.duration(250)}>
+      <View style={styles.viewContainer}>
         {error ? (
           <ErrorState
             title="Unable to Load Friends"
@@ -225,7 +224,7 @@ export default function FriendsScreen() {
           />
         )}
         {!isSearching && <HeaderFade style={styles.headerFade} />}
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }

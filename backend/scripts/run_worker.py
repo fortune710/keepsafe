@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 # Add the parent directory to sys.path so we can import modules from 'backend'
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from services.queue_service import QueueService
 from services.queues.entry_ingestion_queue_service import EntryIngestionQueueService
 from services.queues.monthly_dump_queue_service import MonthlyDumpQueueService, MonthlyDumpInputs
@@ -62,8 +62,8 @@ async def main():
 
     try:
         if worker_type == "ingestion":
-            from services.ingestion_service import IngestionService
-            ingestion_service = IngestionService()
+            from services.ingestion_service import create_ingestion_service
+            ingestion_service = create_ingestion_service()
             entry_id = payload.get("entry_id")
             
             # Fetch entry from DB

@@ -6,7 +6,7 @@ import os
 # Add the parent directory to sys.path so we can import modules from 'backend'
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 
 def insert_media(user_id: str):
     supabase = get_supabase_client()

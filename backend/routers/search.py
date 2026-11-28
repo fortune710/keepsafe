@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from services.search_agent import SearchAgent
+from agents.search_agent import SearchAgent
 from utils.auth import get_current_user
 
 

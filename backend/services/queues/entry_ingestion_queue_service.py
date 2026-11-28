@@ -13,9 +13,9 @@ from queue_constants import (
     ENTRY_INGESTION_DLQ_NAME,
     ENTRY_INGESTION_QUEUE_NAME,
 )
-from services.ingestion_service import IngestionService
+from services.ingestion_service import create_ingestion_service
 from services.queue_service import QueueService
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class EntryIngestionQueueService:
         self.supabase = get_supabase_client()
         self.queue_service = QueueService()
         self.queue_service.supabase = self.supabase
-        self.ingestion_service = IngestionService()
+        self.ingestion_service = create_ingestion_service()
         self.queue_name = ENTRY_INGESTION_QUEUE_NAME
         self.dlq_name = ENTRY_INGESTION_DLQ_NAME
         self.dead_queue_name = ENTRY_INGESTION_DEAD_QUEUE_NAME

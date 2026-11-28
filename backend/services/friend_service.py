@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional
 import logging
 from services.notification_service import NotificationService
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from services.cache_service import CacheService
 
 logger = logging.getLogger(__name__)

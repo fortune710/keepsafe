@@ -1,8 +1,5 @@
-import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { TABLES } from '@/constants/supabase';
-import { InviteLink, InviteResult, ShareOptions } from '@/types/friends';
+import { useCallback } from 'react';
+import { ShareOptions } from '@/types/friends';
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { useAuthContext } from '@/providers/auth-provider';
@@ -47,7 +44,13 @@ export function useFriendInvitation(): UseFriendInvitationResult {
     };
 
     try {
-      const result = await Share.share(shareOptions);
+      const message = [shareOptions.title, shareOptions.message, shareOptions.url]
+        .filter(Boolean)
+        .join('\n\n');
+      const result = await Share.share(
+        { title: shareOptions.title, message },
+        { subject: shareOptions.title },
+      );
 
       return result.action !== Share.dismissedAction;
     } catch (error) {

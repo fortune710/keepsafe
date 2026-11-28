@@ -51,7 +51,7 @@ def cache_service(monkeypatch, mock_redis_client, mock_supabase_client):
         CacheService: An instance whose `redis_client` and `supabase` attributes are set to the provided mocks and whose settings.REDIS_CACHE_TTL is set to 3600.
     """
     from services import cache_service as cache_module
-    from services import redis_client as redis_module
+    from config import redis_client as redis_module
     
     # Mock get_redis_client to return our mock
     monkeypatch.setattr(
@@ -92,7 +92,7 @@ def cache_service_no_redis(monkeypatch, mock_supabase_client):
         CacheService: A CacheService instance with `supabase` set to `mock_supabase_client` and no Redis client.
     """
     from services import cache_service as cache_module
-    from services import redis_client as redis_module
+    from config import redis_client as redis_module
     
     # Mock get_redis_client to return None (Redis unavailable)
     monkeypatch.setattr(

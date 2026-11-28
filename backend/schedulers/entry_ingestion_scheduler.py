@@ -48,6 +48,7 @@ class EntryIngestionScheduler:
     async def _process_queue_job(self):
         try:
             logger.info("Starting scheduled entry ingestion queue processing", {"job_id": "process_entry_ingestion_queue"})
+            await self.entry_ingestion_service.process_dlq()
             stats = await self.entry_ingestion_service.process_queue()
             logger.info("Scheduled entry ingestion processing completed", {"job_id": "process_entry_ingestion_queue", "stats": stats})
         except Exception as exc:

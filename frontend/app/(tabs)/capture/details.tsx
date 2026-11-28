@@ -10,13 +10,12 @@ import {
   Pressable,
   Dimensions,
   ScrollView,
-  Switch,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, Sticker, UserPlus2, Check, ChevronLeft, Hourglass } from 'lucide-react-native';
+import { X, Sticker, UserPlus2, Check, Hourglass, ArrowLeftRight } from 'lucide-react-native';
 import { DiaryIcon } from '@/components/icons/diary-icon';
 import { useDiaries } from '@/hooks/use-diaries';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -53,7 +52,7 @@ import EntryAttachmentList from '@/components/capture/entry-attachment-list';
 import { MediaCanvasItemType } from '@/types/capture';
 import { useCaptureContext } from '@/providers/capture-provider';
 import { DiaryCoverVisual } from '@/components/vault/diary-cover-card';
-import Animated, { FadeInDown, FadeOutUp, ReduceMotion } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 interface Friend {
   id: string;
@@ -65,7 +64,7 @@ interface Friend {
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Matches the ~0.63 camera preview height on the capture page, minus a bit
 // to account for this card's own padding/border and the caption below it.
-const PHOTO_CARD_HEIGHT = SCREEN_HEIGHT * 0.5;
+const PHOTO_CARD_HEIGHT = SCREEN_HEIGHT * 0.48;
 
 /**
  * Render the details screen for reviewing a captured media item, editing attachments,
@@ -157,6 +156,7 @@ export default function DetailsScreen() {
     timeCapsule === 'true' ? { revealType: 'date', unlockAt: tomorrowIso() } : null,
   );
   const [hasChosenCapsuleType, setHasChosenCapsuleType] = useState(false);
+  const savedCapsuleDraft = useRef<TimeCapsuleDraft | null>(null);
   const [caption, setCaption] = useState<string>('');
   const [editorActiveTab, setEditorActiveTab] = useState<
     MediaCanvasItemType | undefined
@@ -547,17 +547,6 @@ export default function DetailsScreen() {
             <UserPlus2 color="#64748B" size={24} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.modeButton,
-              (activeSheet === 'diaries' || activeSheet === 'timeCapsule') && styles.modeButtonActive,
-            ]}
-            onPress={() => setActiveSheet('diaries')}
-            accessibilityRole="button"
-            accessibilityLabel="Choose a diary"
-          >
-            <DiaryIcon color={timeCapsuleDraft ? '#8B5CF6' : '#64748B'} size={24} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -603,22 +592,32 @@ export default function DetailsScreen() {
         </View>
 
         <View style={styles.form}>
-          {timeCapsuleDraft ? (
-            <Animated.View key="capsule" entering={FadeInDown.duration(180).reduceMotion(ReduceMotion.System)} exiting={FadeOutUp.duration(140).reduceMotion(ReduceMotion.System)} style={styles.badge}>
-              <Hourglass color="#7C3AED" size={16} />
-              <Text style={styles.badgeText}>Time Capsule</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Remove time capsule" hitSlop={10} onPress={() => { setTimeCapsuleDraft(null); setHasChosenCapsuleType(false); }}>
-                <X color="#7C3AED" size={16} />
-              </Pressable>
-            </Animated.View>
-          ) : (
-            <Animated.View key="diary" entering={FadeInDown.duration(180).reduceMotion(ReduceMotion.System)} exiting={FadeOutUp.duration(140).reduceMotion(ReduceMotion.System)} style={styles.badgeContainer}>
-              <Pressable style={styles.badge} accessibilityRole="button" accessibilityLabel={`Change diary${selectedDiary ? `, ${selectedDiary.name}` : ''}`} onPress={() => setActiveSheet('diaries')}>
-                {selectedDiary ? <DiaryCoverVisual color={selectedDiary.cover_color || selectedDiary.color || '#8B5CF6'} diaryStyle={selectedDiary.style} borderRadius={2} style={styles.badgeCover} /> : <DiaryIcon color="#7C3AED" size={16} />}
-                <Text style={styles.badgeText} numberOfLines={1}>{selectedDiary?.name || 'Choose a diary'}</Text>
-              </Pressable>
-            </Animated.View>
-          )}
+          <Animated.View layout={LinearTransition.duration(200).reduceMotion(ReduceMotion.System)} style={[styles.badge, styles.badgeSpacing]}>
+            <Pressable style={styles.badgeMain} accessibilityRole="button" accessibilityLabel={timeCapsuleDraft ? 'Configure time capsule' : `Change diary${selectedDiary ? `, ${selectedDiary.name}` : ''}`} onPress={() => setActiveSheet(timeCapsuleDraft ? 'timeCapsule' : 'diaries')}>
+              <View style={styles.badgeIconFrame}>
+                {timeCapsuleDraft ? (
+                  <Animated.View key="capsule-icon" entering={FadeIn.duration(150).reduceMotion(ReduceMotion.System)} exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)} style={styles.badgeIcon}>
+                    <Hourglass color="#7C3AED" size={20} />
+                  </Animated.View>
+                ) : (
+                  <Animated.View key="diary-icon" entering={FadeIn.duration(150).reduceMotion(ReduceMotion.System)} exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)} style={styles.badgeIcon}>
+                    {selectedDiary ? <DiaryCoverVisual color={selectedDiary.cover_color || selectedDiary.color || '#8B5CF6'} diaryStyle={selectedDiary.style} borderRadius={2} style={styles.badgeCover} /> : <DiaryIcon color="#7C3AED" size={20} />}
+                  </Animated.View>
+                )}
+              </View>
+              <Text style={styles.badgeText} numberOfLines={1}>{timeCapsuleDraft ? 'Time Capsule' : selectedDiary?.name || 'Choose a diary'}</Text>
+            </Pressable>
+            <Pressable style={styles.badgeSwitch} accessibilityRole="button" accessibilityLabel={timeCapsuleDraft ? 'Switch to diary' : 'Switch to time capsule'} onPress={() => {
+              if (timeCapsuleDraft) {
+                savedCapsuleDraft.current = timeCapsuleDraft;
+                setTimeCapsuleDraft(null);
+                return;
+              }
+              setTimeCapsuleDraft(savedCapsuleDraft.current ?? { revealType: 'date', unlockAt: tomorrowIso() });
+            }}>
+              <ArrowLeftRight color="#7C3AED" size={20} />
+            </Pressable>
+          </Animated.View>
           <TouchableOpacity
             style={[
               styles.saveButton,
@@ -644,6 +643,8 @@ export default function DetailsScreen() {
             <TouchableOpacity
               style={styles.sheetCloseButton}
               onPress={() => setActiveSheet(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Close attachments"
               hitSlop={12}
             >
               <X color="#64748B" size={20} />
@@ -681,7 +682,7 @@ export default function DetailsScreen() {
       </BottomSheet>
 
       <BottomSheet
-        visible={activeSheet === 'diaries' || activeSheet === 'timeCapsule'}
+        visible={activeSheet === 'diaries'}
         onClose={() => setActiveSheet(null)}
         height="55%"
         maxHeight="55%"
@@ -689,22 +690,17 @@ export default function DetailsScreen() {
         <View style={styles.diarySheetBody}>
           <View style={styles.diarySheetHeader}>
             <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} pointerEvents="none" />
-            {activeSheet === 'timeCapsule' ? (
-              <TouchableOpacity onPress={() => setActiveSheet('diaries')} accessibilityRole="button" accessibilityLabel="Back to diaries" hitSlop={12}>
-                <ChevronLeft color="#64748B" size={24} />
-              </TouchableOpacity>
-            ) : null}
-            <Text style={styles.sheetTitle}>{activeSheet === 'diaries' ? 'Choose a diary' : 'Time Capsule'}</Text>
+            <Text style={styles.sheetTitle}>Choose a diary</Text>
             <TouchableOpacity
               style={styles.sheetCloseButton}
               onPress={() => setActiveSheet(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Close diary picker"
               hitSlop={12}
             >
               <X color="#64748B" size={20} />
             </TouchableOpacity>
           </View>
-          {activeSheet === 'diaries' ? (
-            <>
               <View style={styles.diaryListWrapper}>
               <ScrollView style={styles.diaryList} contentContainerStyle={styles.diaryListContent} keyboardShouldPersistTaps="handled">
                 {diariesLoading && diaries.length === 0 ? <Text style={styles.diaryMessage}>Loading diaries...</Text> : null}
@@ -730,32 +726,21 @@ export default function DetailsScreen() {
               <LinearGradient pointerEvents="none" colors={['rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} style={styles.diaryFadeTop} />
               <LinearGradient pointerEvents="none" colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)']} style={styles.diaryFadeBottom} />
               </View>
-              <View style={styles.capsuleFooter}>
-                <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} pointerEvents="none" />
-                <Pressable style={styles.capsuleFooterLabel} accessibilityRole="button" onPress={() => {
-                  setTimeCapsuleDraft((draft) => draft ?? { revealType: 'date', unlockAt: tomorrowIso() });
-                  setActiveSheet('timeCapsule');
-                }}>
-                  <Hourglass color="#8B5CF6" size={18} />
-                  <Text style={styles.capsuleFooterText}>Save as time capsule</Text>
-                </Pressable>
-                <Switch
-                  accessibilityLabel="Save as time capsule"
-                  value={timeCapsuleDraft !== null}
-                  onValueChange={(enabled) => {
-                    if (!enabled) { setTimeCapsuleDraft(null); setHasChosenCapsuleType(false); return; }
-                    setTimeCapsuleDraft((draft) => draft ?? { revealType: 'date', unlockAt: tomorrowIso() });
-                    setActiveSheet('timeCapsule');
-                  }}
-                  trackColor={{ true: '#8B5CF6', false: Colors.border }}
-                />
-              </View>
-            </>
-          ) : (
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={activeSheet === 'timeCapsule'} onClose={() => setActiveSheet(null)} height="55%" maxHeight="55%">
+        <View style={styles.diarySheetBody}>
+          <View style={styles.diarySheetHeader}>
+            <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} pointerEvents="none" />
+            <Text style={styles.sheetTitle}>Time Capsule</Text>
+            <TouchableOpacity style={styles.sheetCloseButton} onPress={() => setActiveSheet(null)} accessibilityRole="button" accessibilityLabel="Close time capsule settings" hitSlop={12}>
+              <X color="#64748B" size={20} />
+            </TouchableOpacity>
+          </View>
             <ScrollView ref={timeCapsuleScrollRef} style={styles.diaryListWrapper} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets>
               <TimeCapsuleConfig value={timeCapsuleDraft} onChange={setTimeCapsuleDraft} startUnselected={!hasChosenCapsuleType} onSelectRevealType={() => setHasChosenCapsuleType(true)} onCustomInputLayout={() => requestAnimationFrame(() => timeCapsuleScrollRef.current?.scrollToEnd({ animated: true }))} />
             </ScrollView>
-          )}
         </View>
       </BottomSheet>
 
@@ -823,6 +808,7 @@ const styles = StyleSheet.create({
   photoFrame: {
     backgroundColor: 'white',
     margin: 20,
+    marginTop: 12,
     borderRadius: scale(12),
     borderWidth: 1,
     borderColor: Colors.border,
@@ -888,9 +874,6 @@ const styles = StyleSheet.create({
   },
   diaryName: { flex: 1, fontFamily: 'Figtree-SemiBold', fontSize: 15, color: '#1E293B' },
   diaryMessage: { fontFamily: 'Figtree-Regular', color: '#64748B', paddingVertical: verticalScale(16) },
-  capsuleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(8), paddingTop: verticalScale(12), overflow: 'hidden' },
-  capsuleFooterLabel: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: scale(10), paddingVertical: verticalScale(8) },
-  capsuleFooterText: { fontFamily: 'Figtree-SemiBold', fontSize: 15, color: '#8B5CF6' },
   mediaPreview: {
     width: '100%',
     height: PHOTO_CARD_HEIGHT,
@@ -912,10 +895,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
-  badgeContainer: { alignSelf: 'flex-start' },
-  badge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#F1EBFF', borderRadius: 18, paddingHorizontal: 11, paddingVertical: 6, maxWidth: '100%' },
-  badgeText: { color: '#6D28D9', fontFamily: 'Figtree-SemiBold', fontSize: 13, flexShrink: 1 },
-  badgeCover: { width: 16 },
+  badgeSpacing: { marginVertical: verticalScale(6) },
+  badge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1EBFF', borderRadius: 26, minHeight: 50, maxWidth: '100%' },
+  badgeMain: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingVertical: 10, minHeight: 50, flexShrink: 1 },
+  badgeSwitch: { width: 48, minHeight: 50, alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: '#6D28D9', fontFamily: 'Figtree-SemiBold', fontSize: 15, flexShrink: 1 },
+  badgeIconFrame: { width: 20, height: 30 },
+  badgeIcon: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  badgeCover: { width: 20 },
   thoughtsInput: {
     backgroundColor: 'white',
     borderRadius: 12,

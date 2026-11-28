@@ -144,6 +144,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           REDIS_URL: ${{ secrets.REDIS_URL }}

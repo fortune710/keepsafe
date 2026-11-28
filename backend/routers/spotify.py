@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from services.spotify_service import SpotifyService
-from services.supabase_client import get_supabase_client
+from config.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 
 logger = logging.getLogger(__name__)

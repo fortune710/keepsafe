@@ -5,7 +5,9 @@ from google.genai import types
 
 def get_media_bytes(media_path: str) -> bytes:
     """Download media bytes from a URL or path."""
-    return requests.get(media_path).content
+    response = requests.get(media_path, timeout=(5, 60))
+    response.raise_for_status()
+    return response.content
 
 
 def get_image_part(image_path: str) -> types.Part:

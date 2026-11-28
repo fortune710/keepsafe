@@ -10,8 +10,8 @@ from redis.exceptions import RedisError
 from controllers.external_connections_controller import ExternalConnectionsController
 from config import settings
 from services import instagram_service
-from services.redis_client import get_redis_client
-from services.supabase_client import get_supabase_client
+from config.redis_client import get_redis_client
+from config.supabase_client import get_supabase_client
 from utils.auth import get_current_user
 
 logger = logging.getLogger(__name__)

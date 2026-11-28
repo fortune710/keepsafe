@@ -5,22 +5,27 @@ import json
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
 from pydantic import BaseModel
 from utils.logging import Logger
 
 from models import FriendSummary, SearchResult
-from services.gemini_client import (
-    generate_embedding,
-)
-from services.model_factory import ModelType, get_model
-from services.pinecone_client import get_pinecone_index
-from services.supabase_client import get_supabase_client
+from agents.embedding_model_factory import EmbeddingModel, EmbeddingProvider
+from agents.model_factory import AgentModel, ModelProvider
+from config.pinecone_client import get_pinecone_index
+from config.supabase_client import get_supabase_client
 from utils.datetime_utils import iso_to_unix_epoch
 
 
 logger = Logger("SearchAgent")
 
 StreamCallback = Callable[[Dict[str, Any]], Awaitable[None]]
+
+
+@tool("route_search", description="Select which internal tools to use for a search query.")
+def route_search(use_friends_tool: bool, use_search_tool: bool, use_metadata: bool) -> str:
+    """Select which internal tools to activate for a search query."""
+    return "ok"
 
 
 class SearchAgent:
@@ -32,7 +37,8 @@ class SearchAgent:
     """
 
     def __init__(self) -> None:
-        self._model = get_model(ModelType.GEMINI)
+        self._model = AgentModel(ModelProvider.GEMINI).bind_tools([route_search])
+        self._embedding_model = EmbeddingModel(EmbeddingProvider.GOOGLE)
         self._pinecone_index = get_pinecone_index()
         self._supabase = get_supabase_client()
 
@@ -284,7 +290,7 @@ class SearchAgent:
         Search Pinecone for entries semantically similar to the query.
         Filters to entries visible to the given user.
         """
-        embedding = await generate_embedding(query)
+        embedding = await self._embedding_model.aembed_query(query)
         if not embedding:
             return []
 
