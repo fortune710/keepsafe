@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Plus, X } from 'lucide-react-native';
 import { FRIENDSHIP_STATUS } from '@/constants/supabase';
 import { Colors } from '@/lib/constants';
@@ -28,7 +27,7 @@ interface FriendItemProps {
   index?: number;
 }
 
-export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecline, onBlock, index = 0 }: FriendItemProps) {
+export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecline, onBlock }: FriendItemProps) {
   const confirmRemove = () => {
     Alert.alert(
       'Remove Friend',
@@ -101,9 +100,7 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
   };
 
   return (
-    <Animated.View
-      entering={FadeInDown.delay(index * 50).duration(300).springify().damping(20).stiffness(90)}
-    >
+    <View>
       <View
         style={styles.container}
       >
@@ -143,7 +140,7 @@ export default function FriendItem({ friend, onRemove, onPress, onAccept, onDecl
           </TouchableOpacity>
         )}
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
